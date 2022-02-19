@@ -82,7 +82,7 @@ module Savi::Compiler::Local
       end
     end
 
-    protected def emit_errors(ctx, analysis)
+    protected def emit_errors(ctx, analysis, member_idents)
       # Don't bother showing errors for unreachable use sites.
       # They're likely to be based on inaccurate information anyway.
       return if @is_unreachable
@@ -95,17 +95,28 @@ module Savi::Compiler::Local
         if @sometimes_no_predecessor
           predecessor_writes = @predecessors.select(&.writes_new_value)
 
+          error_hints = [] of {Source::Pos, String}
           message = if predecessor_writes.any?
+            predecessor_writes.each { |write_site|
+              error_hints << {write_site.pos,
+                "this assignment is not guaranteed to precede that usage"}
+            }
             "This local variable isn't guaranteed to have a value yet"
           elsif analysis.by_ref_and_location[@ref].any?(&.last.any?(&.writes_new_value))
             "This local variable has no assigned value yet"
           else
-            "The identifier '#{@node.value}' hasn't been defined yet"
+            matching_member = member_idents.find(&.value.==(@node.value))
+            if matching_member
+              error_hints << {matching_member.pos,
+                "if you want to access this member, prefix the identifier " +
+                "with the `@` symbol"}
+              "A local variable with this name hasn't been defined yet"
+            else
+              "The identifier '#{@node.value}' hasn't been defined yet"
+            end
           end
 
-          ctx.error_at self, message, predecessor_writes.map { |write_site|
-            {write_site.pos, "this assignment is not guaranteed to precede that usage"}
-          }
+          ctx.error_at self, message, error_hints
         end
 
         # If a consume is a predecessor, this means that the value that was
@@ -399,8 +410,8 @@ module Savi::Compiler::Local
     end
 
     # Emit all errors gathered during previous analysis.
-    def emit_errors(ctx)
-      @analysis.each_use_site.each(&.emit_errors(ctx, @analysis))
+    def emit_errors(ctx, member_idents)
+      @analysis.each_use_site.each(&.emit_errors(ctx, @analysis, member_idents))
     end
   end
 
@@ -419,6 +430,12 @@ module Savi::Compiler::Local
       deps = {refer, flow}
       prev = ctx.prev_ctx.try(&.local)
 
+      # Member names are only used in error hints, so we don't include them
+      # in the proper dependencies that invalidate the cache, since they
+      # can never change whether an error is produced or not -
+      # they can only change the hint text for produced errors.
+      member_idents = f_link.type.resolve(ctx).functions.reject(&.has_tag?(:hygienic)).map(&.ident)
+
       # TODO: Re-enable cache when it doesn't crash:
       # maybe_from_func_cache(ctx, prev, f, f_link, deps) do
         visitor = Visitor.new(Analysis.new, *deps)
@@ -426,7 +443,7 @@ module Savi::Compiler::Local
         f.body.try(&.accept(ctx, visitor))
 
         visitor.observe_predecessors(ctx)
-        visitor.emit_errors(ctx)
+        visitor.emit_errors(ctx, member_idents)
 
         visitor.analysis
       # end

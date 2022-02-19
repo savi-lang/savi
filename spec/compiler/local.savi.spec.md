@@ -78,12 +78,30 @@ This local variable has no assigned value yet:
 It complains differently for an identifier for which there is no solid proof that it is a local variable at all.
 
 ```savi
-  BOGUS
+  bogus
 ```
 ```error
-The identifier 'BOGUS' hasn't been defined yet:
-  BOGUS
+The identifier 'bogus' hasn't been defined yet:
+  bogus
   ^~~~~
+```
+
+---
+
+It complains differently for an identifier which exists as a member of the self type.
+
+```savi
+  my_field
+  :let my_field: "example"
+```
+```error
+A local variable with this name hasn't been defined yet:
+  my_field
+  ^~~~~~~~
+
+- if you want to access this member, prefix the identifier with the `@` symbol:
+  :let my_field: "example"
+       ^~~~~~~~
 ```
 
 ---
