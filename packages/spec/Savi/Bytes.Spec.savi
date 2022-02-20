@@ -240,6 +240,23 @@
     right_right ref = right.chop_right(100)
     assert: right_right == b"", assert: right == b"lel"
 
+  :it "chops into a null pointer on the right side when it runs out of space"
+    // Chopping at the right edge of the buffer correctly leaves the right
+    // Bytes with a null cpointer, rather than pointing out of bounds.
+    // If we did not guarantee this, then calling `reserve` could lead to
+    // attempting to reallocate in the heap from an out-of-bounds pointer.
+    buffer_a = Bytes.new_iso(8), buffer_b = Bytes.new_iso(8)
+    while (buffer_a.space > buffer_a.size) buffer_a.push('.')
+    while (buffer_b.space > buffer_b.size) buffer_b.push('.')
+
+    buffer_a_left = buffer_a.chop_left(buffer_a.size)
+    assert: buffer_a_left.cpointer.is_not_null
+    assert: buffer_a.cpointer.is_null
+
+    buffer_b_right = buffer_a.chop_right(buffer_b.size)
+    assert: buffer_b.cpointer.is_not_null
+    assert: buffer_b_right.cpointer.is_null
+
   :it "pushes a new byte onto the end of the buffer"
     assert: Bytes.new.push('o').push('k') == b"ok"
 

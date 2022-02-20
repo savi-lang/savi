@@ -423,9 +423,9 @@
   :fun ref chop_left(offset USize) Bytes'iso
     offset = offset.min(@_size)
     chopped = Bytes.iso_from_cpointer(@_ptr, offset, offset)
-    @_ptr = @_ptr._offset(offset)
     @_size -= offset
     @_space -= offset
+    @_ptr = if (@_space > 0) (@_ptr._offset(offset) | @_ptr._null)
     --chopped
 
   :: Split this byte buffer at the given offset, leaving the left side here
@@ -441,7 +441,7 @@
   :fun ref chop_right(offset USize) Bytes'iso
     offset = offset.min(@_size)
     chopped = Bytes.iso_from_cpointer(
-      @_ptr._offset(offset)
+      if (@_space > offset) (@_ptr._offset(offset) | @_ptr._null)
       @_size - offset
       @_space - offset
     )
