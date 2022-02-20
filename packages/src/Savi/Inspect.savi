@@ -63,6 +63,7 @@
       input.each -> (byte |
         case (
         | byte >= 0x7F | output = @_inspect_hex_byte_escape_into(--output, byte)
+        | byte == '"'  | output.push_byte('\\').push_byte('"')
         | byte >= 0x20 | output.push_byte(byte)
         | byte == '\n' | output.push_byte('\\').push_byte('n')
         | byte == '\r' | output.push_byte('\\').push_byte('r')
