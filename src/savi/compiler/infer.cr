@@ -245,6 +245,27 @@ module Savi::Compiler::Infer
       }
     end
 
+    def can_reify_with?(
+      args : Array(MetaType),
+      call_cap : Cap,
+      is_constructor : Bool
+    )
+      type_partial_reification_sets =
+        func_partial_reification_sets[call_cap]? ||
+        func_partial_reification_sets.find { |(func_cap, _)|
+          MetaType::Capability.new(call_cap).subtype_of?(MetaType::Capability.new(func_cap)) ||
+          call_cap == Cap::ISO_ALIASED || # TODO: better way to handle auto recovery
+          is_constructor # TODO: better way to do this?
+        }.try(&.last?)
+
+      return false unless type_partial_reification_sets
+
+      arg_caps = args.map(&.cap_only_inner.value.as(Cap))
+      return false unless type_partial_reification_sets.has_key?(arg_caps)
+
+      true
+    end
+
     def deciding_reify_of(
       span : Span,
       args : Array(MetaType),

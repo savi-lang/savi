@@ -663,7 +663,12 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
 
         reflect_f_link = f.make_link(reflect_rt.link)
         reflect_rf = Infer::ReifiedFunction.new(reflect_rt, reflect_f_link, reflect_mt)
-        handle_func(ctx, reflect_rf)
+        reflect_infer = ctx.infer[reflect_rf.link]
+        handle_func(ctx, reflect_rf) if reflect_infer.can_reify_with?(
+          reflect_rt.args,
+          reflect_mt.cap_only_inner.value.as(Infer::Cap),
+          f.has_tag?(:constructor)
+        )
       end
     end
   end
