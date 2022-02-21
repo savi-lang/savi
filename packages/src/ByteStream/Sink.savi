@@ -58,3 +58,26 @@
     @_total_size = 0
 
     bytes_read
+
+:: This trait is an alternative to `ByteStream.Sink`, used when the sink is
+:: an actor that receives the bytes asynchronously instead of synchronously.
+:trait tag ByteStream.Sink.Actor
+  :: Write multiple chunks of bytes as a batch.
+  :be write_chunks(bytes Array(Bytes)'val)
+
+:: This class is an implementation of `ByteStream.Sink` which emits into a
+:: given `ByteStream.Sink.Actor`, calling `write_chunks` on each `write_flush!`.
+:class ByteStream.Sink.ToActor
+  :is ByteStream.Sink
+
+  :var _chunks Array(Bytes)'iso: []
+  :let actor ByteStream.Sink.Actor
+  :new (@actor)
+
+  :fun ref write_bytes(bytes Bytes'val)
+    @_chunks << bytes
+    @
+
+  :fun ref write_flush!
+    if @_chunks.is_not_empty @actor.write_chunks(@_chunks <<= [])
+    @

@@ -14,6 +14,9 @@
   :new to_reader(reader ByteStream.Reader)
     @target = ByteStream.Sink.ToReader.new(reader)
 
+  :new to_actor(actor ByteStream.Sink.Actor)
+    @target = ByteStream.Sink.ToActor.new(actor)
+
   :: Add a chunk of bytes to the stream.
   ::
   :: It won't actually get written until the `flush` method is called.

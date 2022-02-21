@@ -1,0 +1,10 @@
+:actor Main
+  :new (env)
+    env.out.write("Hello, ")
+    env.out.print("World!")
+
+    write_stream = ByteStream.Writer.to_actor(env.out)
+    write_stream << b"one "
+    write_stream << b"two "
+    write_stream << b"three\n"
+    try write_stream.flush!
