@@ -98,6 +98,7 @@ class Savi::Compiler::Context
   def compile_package(manifest : Packaging::Manifest)
     sources = compiler.source_service.get_sources_for_manifest(self, manifest)
     docs = sources.map { |source| Parser.parse(source) }
+    sources << Source.none if sources.empty?
     compile_package(sources.first.package, docs)
   end
 
