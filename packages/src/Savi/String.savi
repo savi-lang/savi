@@ -334,10 +334,10 @@
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
 
-  :fun val split(split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
-    result Array(String) = []
+  :fun val split(split_byte U8) Array(String)'iso // TODO: a byte shouldn't be the only thing we can split by...
+    result Array(String)'iso = []
     @each_split(split_byte) -> (s | result << s)
-    result
+    --result
 
   :fun val each_split(split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
     :yields String
@@ -434,7 +434,7 @@
       String.new_iso
     )
 
-  :fun non join(others Array(String), separator = "") String'iso
+  :fun non join(others Array(String)'box, separator = "") String'iso
     res = String.new_iso
     others.each_with_index -> (other, index |
       res << other
