@@ -1570,6 +1570,10 @@ class Savi::Compiler::CodeGen
     lhs_type = type_of(call.receiver)
     lhs_gtype, gfunc = resolve_call(call)
 
+    # Generate code for the receiver, whether we actually use it or not.
+    # We trust LLVM optimizations to eliminate dead code when it does nothing.
+    receiver = gen_expr(call.receiver)
+
     # For any args we are missing, try to find and use a default param value.
     gfunc.func.params.try do |params|
       while args.size < params.terms.size
@@ -1600,15 +1604,12 @@ class Savi::Compiler::CodeGen
           args << gen_source_code_pos(arg_exprs[found_index.not_nil!].not_nil!.pos)
         else
           gen_within_foreign_frame lhs_gtype, gfunc do
+            func_frame.receiver_value = receiver
             args << gen_expr(param_default)
           end
         end
       end
     end
-
-    # Generate code for the receiver, whether we actually use it or not.
-    # We trust LLVM optimizations to eliminate dead code when it does nothing.
-    receiver = gen_expr(call.receiver)
 
     # Determine if we need to use a virtual call and if we need the receiver.
     needs_virtual_call = lhs_type.is_abstract?(ctx)
