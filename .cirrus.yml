@@ -12,14 +12,14 @@ task:
   matrix:
     - name: x86_64-unknown-linux-gnu
       container:
-        image: ubuntu:21.04
+        image: ubuntu:20.04
       environment:
         TRIPLE: x86_64-unknown-linux-gnu
         DEPS_INSTALL: "\
           apt-get update && \
           apt-get install -y --no-install-recommends \
             apt-transport-https ca-certificates curl clang make \
-            libgc-dev libevent-dev libpcre3-dev && \
+            libgc-dev libevent-dev libpcre3-dev llvm-10-dev && \
           curl -fsSL https://crystal-lang.org/install.sh | bash"
         # Without this next environment var, apt-get will try to ask us
         # interactive questions, to which we will be unable to respond...
