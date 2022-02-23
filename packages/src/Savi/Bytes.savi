@@ -459,6 +459,25 @@
     if ((offset + U16.byte_width.usize) > @_size) error!
     CPointer(U16).from_usize(@_ptr._offset(offset).usize)._unsafe._get_at(0)
 
+  :: Write a U16 as bytes starting at the given offset, in native byte order.
+  :: This is not suitable for protocols using a platform-independent byte order.
+  :: Raises an error if there aren't enough bytes at that offset to fit a U16.
+  :: Use push_native_u16 instead if writing past the end is needed.
+  :fun ref write_native_u16!(offset USize, number U16)
+    if ((offset + U16.byte_width.usize) > @_size) error!
+    CPointer(U16).from_usize(@_ptr._offset(offset).usize)._unsafe
+      ._assign_at(0, number)
+    @
+
+  :: Add a U16 as bytes onto the end of the buffer, in native byte order.
+  :: This is not suitable for protocols using a platform-independent byte order.
+  :fun ref push_native_u16(number U16)
+    @reserve(@_size + U16.byte_width.usize)
+    CPointer(U16).from_usize(@_ptr._offset(@_size).usize)._unsafe
+      ._assign_at(0, number)
+    @_size += U16.byte_width.usize
+    @
+
   :: Read a U32 from the bytes at the given offset, with native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.

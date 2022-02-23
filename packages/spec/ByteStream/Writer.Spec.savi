@@ -20,6 +20,31 @@
     // After flush, now the data can be read.
     assert: read.extract_all == b"Hello, World!"
 
+  :it "writes U16, U32, and U64 values in native byte order"
+    read = ByteStream.Reader.new
+    write = ByteStream.Writer.to_reader(read)
+
+    // Write some data.
+    write.push_native_u16(0x0123)
+    write.push_native_u16(0x4567)
+    write.push_native_u32(0x01234567)
+    write.push_native_u32(0x89ABCDEF)
+    write.push_native_u64(0x012345678899AABB)
+    write.push_native_u64(0xCCDDEEFF76543210)
+
+    // Nothing is actually written until flush.
+    assert: read.bytes_ahead == 0
+    assert no_error: write.flush!
+    assert: read.bytes_ahead == 28
+
+    // After flush, now the data can be read.
+    assert: read.take_native_u16! == 0x0123
+    assert: read.take_native_u16! == 0x4567
+    assert: read.take_native_u32! == 0x01234567
+    assert: read.take_native_u32! == 0x89ABCDEF
+    assert: read.take_native_u64! == 0x012345678899AABB
+    assert: read.take_native_u64! == 0xCCDDEEFF76543210
+
   :it "efficiently groups individual bytes in the same chunk prior to flush"
     chunks = []
     write = ByteStream.Writer.new(_SinkToArray.new(chunks))

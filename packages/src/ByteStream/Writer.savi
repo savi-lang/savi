@@ -39,6 +39,27 @@
     @_current_chunk.push(byte)
     @
 
+  :: Write a `U16` value as bytes to the stream, in native byte order.
+  ::
+  :: For protocols using a platform-independent byte order, leverage the
+  :: `U16.native_to_be` or `U16.native_to_le` methods to convert the value
+  :: from its native byte order to the specified byte order first.
+  :fun ref push_native_u16(value): @_current_chunk.push_native_u16(value)
+
+  :: Write a `U32` value as bytes to the stream, in native byte order.
+  ::
+  :: For protocols using a platform-independent byte order, leverage the
+  :: `U32.native_to_be` or `U32.native_to_le` methods to convert the value
+  :: from its native byte order to the specified byte order first.
+  :fun ref push_native_u32(value): @_current_chunk.push_native_u32(value)
+
+  :: Write a `U64` value as bytes to the stream, in native byte order.
+  ::
+  :: For protocols using a platform-independent byte order, leverage the
+  :: `U64.native_to_be` or `U64.native_to_le` methods to convert the value
+  :: from its native byte order to the specified byte order first.
+  :fun ref push_native_u64(value): @_current_chunk.push_native_u64(value)
+
   :: Try to write all data that is currently buffered to the `target` sink.
   ::
   :: Raises an error if there is still some data buffered that could not yet be
