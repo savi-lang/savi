@@ -257,14 +257,62 @@
     while (yield @_data[@_offset]!) (@_offset += 1)
     @
 
+  :: Read the byte at the offset currently pointed to by the cursor,
+  :: and advance the cursor 1 byte forward to point to the next byte.
+  :: Raises an error if the end of the byte stream is reached prior to that.
+  :fun ref take_byte! U8
+    value = @_data.read_byte!(@_offset)
+    @_offset += 1
+    value
+
+  :: Read a `U16` value at the offset currently pointed to by the cursor,
+  :: in native byte order, and advance the cursor past the value.
+  :: Raises an error if the end of the byte stream is reached prior to that.
+  ::
+  :: For protocols using a platform-independent byte order, leverage the
+  :: `U16.be_to_native` or `U16.le_to_native` methods to convert the value
+  :: from its protocol-defined byte order to the native byte order.
+  :fun ref take_native_u16! U16
+    value = @_data.read_native_u16!(@_offset)
+    @_offset += U16.byte_width.usize
+    value
+
+  :: Read a `U32` value at the offset currently pointed to by the cursor,
+  :: in native byte order, and advance the cursor past the value.
+  :: Raises an error if the end of the byte stream is reached prior to that.
+  ::
+  :: For protocols using a platform-independent byte order, leverage the
+  :: `U32.be_to_native` or `U32.le_to_native` methods to convert the value
+  :: from its protocol-defined byte order to the native byte order.
+  :fun ref take_native_u32! U32
+    value = @_data.read_native_u32!(@_offset)
+    @_offset += U32.byte_width.usize
+    value
+
+  :: Read a `U64` value at the offset currently pointed to by the cursor,
+  :: in native byte order, and advance the cursor past the value.
+  :: Raises an error if the end of the byte stream is reached prior to that.
+  ::
+  :: For protocols using a platform-independent byte order, leverage the
+  :: `U64.be_to_native` or `U64.le_to_native` methods to convert the value
+  :: from its protocol-defined byte order to the native byte order.
+  :fun ref take_native_u64! U64
+    value = @_data.read_native_u64!(@_offset)
+    @_offset += U64.byte_width.usize
+    value
+
+  // TODO: consider removing in favor of `take_byte!`
   :fun read_byte!(offset USize) U8
     @_data.read_byte!(@_mark_offset + offset)
 
+  // TODO: consider removing in favor of `take_native_u16!`
   :fun read_native_u16!(offset USize) U16
     @_data.read_native_u16!(@_mark_offset + offset)
 
+  // TODO: consider removing in favor of `take_native_u32!`
   :fun read_native_u32!(offset USize) U32
     @_data.read_native_u32!(@_mark_offset + offset)
 
+  // TODO: consider removing in favor of `take_native_u64!`
   :fun read_native_u64!(offset USize) U64
     @_data.read_native_u64!(@_mark_offset + offset)
