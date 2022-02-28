@@ -1,7 +1,7 @@
 :manifest "example"
   :sources "src/*.savi"
 
-  :dependency StdIn "TODO: specify version"
-  :dependency IO "TODO: specify version"
-  :transitive dependency ByteStream "TODO: specify version"
-  :transitive dependency OSError "TODO: specify version"
+  :dependency StdIn v0
+  :dependency IO v0
+  :transitive dependency ByteStream v0
+  :transitive dependency OSError v0

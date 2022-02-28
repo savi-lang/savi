@@ -1,4 +1,4 @@
 :manifest "example"
   :sources "main.savi"
 
-  :dependency TCP "TODO: specify version"
+  :dependency TCP v0

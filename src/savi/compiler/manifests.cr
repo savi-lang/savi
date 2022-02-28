@@ -39,7 +39,7 @@ class Savi::Compiler::Manifests
 
     # Prove that all transitive dependencies are accounted for.
     manifest.dependencies.each { |dep|
-      @manifests_by_name[dep.name.value].dependencies.each { |dep_dep|
+      @manifests_by_name[dep.name.value]?.try(&.dependencies.each { |dep_dep|
         next if @manifests_by_name[dep_dep.name.value]?
 
         ctx.error_at manifest.name,
@@ -49,10 +49,10 @@ class Savi::Compiler::Manifests
           ], [
             {manifest.append_pos, [
               "\n",
-              "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version_node.value.inspect}"
+              "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version.value}"
             ].join("\n")}
           ]
-      }
+      })
     }
 
     basic_manifest_checks(ctx)
@@ -118,9 +118,16 @@ class Savi::Compiler::Manifests
     orig_manifests_size = manifests.size
 
     # Compile all manifests at the path where the dep is to be found.
-    # TODO: actually use the given path from the dep information.
-    # Currently, this assumes all dependencies come from the standard package.
-    dep_path = ctx.compiler.source_service.standard_package_path
+    dep_path = if dep.location_nodes.empty?
+      # If not specified assume it come from the standard packages path.
+      # TODO: In the future, we should remove this option and source all
+      # standard library packages from individual GitHub repos, so that they
+      # can be versioned independently of one another.
+      ctx.compiler.source_service.standard_package_path
+    else
+      ctx.compiler.source_service.find_latest_in_deps(ctx, dep)
+    end
+    return unless dep_path
     ctx.compile_manifests_at_path(dep_path)
 
     # Limit the manifests we look at to just the set of newly added ones.

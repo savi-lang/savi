@@ -5,5 +5,5 @@
   :copies Regex
   :sources "spec/Regex/**/*.savi"
 
-  :dependency Spec "TODO: specify version"
-  :transitive dependency Map "TODO: specify version"
+  :dependency Spec v0
+  :transitive dependency Map v0

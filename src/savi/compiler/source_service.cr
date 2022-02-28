@@ -250,8 +250,9 @@ class Savi::Compiler::SourceService
     sources
   end
 
-  # Given a directory name, load source objects for all the source files in it.
-  def get_manifest_sources_at_or_above(dirname)
+  # Given a directory name, load manifest sources in it, or in the nearest
+  # directory above it that contains manifest sources.
+  def get_manifest_sources_at_or_above(dirname : String)
     try_dirname = dirname
     sources = [] of Source
     while sources.empty?
@@ -267,6 +268,27 @@ class Savi::Compiler::SourceService
 
     Error.at Source::Pos.none,
       "No 'manifest.savi' source files found at or above this directory:\n#{dirname}" \
+        if sources.empty?
+
+    # Sort the sources by case-insensitive name, so that they always get loaded
+    # in a repeatable order regardless of platform implementation details, or
+    # the possible presence of source overrides shadowing some of the files.
+    sources.sort_by!(&.filename.downcase)
+
+    sources
+  end
+
+  # Given a directory name, load source objects for all the source files in it.
+  def get_manifest_sources_at(dirname : String)
+    sources = [] of Source
+    package = Source::Package.new(dirname)
+
+    each_manifest_savi_file_in(dirname) { |name, content|
+      sources << Source.new(dirname, name, content, package)
+    }
+
+    Error.at Source::Pos.none,
+      "No 'manifest.savi' source files found in this directory:\n#{dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded
@@ -335,5 +357,57 @@ class Savi::Compiler::SourceService
     # the possible presence of source overrides shadowing some of the files.
     sources.each(&.last.sort_by!(&.filename.downcase))
     sources.to_a.sort_by!(&.first.path.downcase)
+  end
+
+  # Find a dependency in the local `deps` dir which matches the given dep spec.
+  def find_latest_in_deps(ctx, dep : Packaging::Dependency) : String?
+    # TODO: Fail with an error if there is more than one location node.
+    location_node = dep.location_nodes.first
+
+    manifest_package = location_node.pos.source.package
+
+    deps_outer_path =
+      File.join(manifest_package.path, "deps", location_node.value)
+
+    # We'll use the relative path from current directory if we show in errors.
+    show_deps_outer_path = File.make_relative_path(
+      from_path: Dir.current,
+      to_path: deps_outer_path,
+    )
+
+    # Confirm that the directory which should contain versions does exist.
+    if !Dir.exists?(deps_outer_path) || Dir.children(deps_outer_path).empty?
+      ctx.error_at dep.name, "This dependency needs to be fetched", [
+        {location_node.pos, "expected to find a directory named " +
+          "#{show_deps_outer_path.inspect} with per-version subdirectories"}
+      ]
+      # TODO: Print the `savi fetch` command that could fetch missing deps.
+      # TODO: If `--fix` is specified, we should automatically run that command.
+      return nil
+    end
+
+    # List the version subdirectories and sort by version (with latest first),
+    # so we can find the latest version that the dependency spec will accept.
+    sorted_versions = Dir.children(deps_outer_path)
+      .sort_by(&.split(/\D+/).reject(&.empty?).map(&.to_i))
+      .reverse!
+    version = sorted_versions.find { |version| dep.accepts_version?(version) }
+
+    # Confirm that a compatible version was able to be selected.
+    if !version
+      ctx.error_at dep.name, "This dependency needs to be fetched", [
+        {location_node.pos, "none of the fetched versions in " +
+          "#{show_deps_outer_path.inspect} match the requirement"},
+        {dep.version.pos, "version #{dep.version.value.inspect} is required"},
+      ] + sorted_versions.map { |version|
+        {Source::Pos.none, "this version is present but doesn't " +
+          "match the requirement: #{version}"}
+      }
+      # TODO: Print the `savi fetch` command that could fetch missing deps.
+      # TODO: If `--fix` is specified, we should automatically run that command.
+      return nil
+    end
+
+    File.join(deps_outer_path, version)
   end
 end

@@ -1,22 +1,21 @@
 struct Savi::Packaging::Dependency
   getter ast : AST::Declare
   getter name : AST::Identifier
-  getter version_node : AST::LiteralString
-  getter version_major : Int32
-  getter version_minor : Int32
-  getter version_patch : Int32
+  getter version : AST::Identifier
 
-  getter location_nodes = [] of AST::Identifier
+  getter location_nodes = [] of AST::LiteralString
   getter revision_nodes = [] of AST::Identifier
   getter depends_on_nodes = [] of AST::Identifier
 
-  def initialize(@ast, @name, @version_node, @transitive = false)
-    @version_major = 0 # TODO
-    @version_minor = 0 # TODO
-    @version_patch = 0 # TODO
+  def initialize(@ast, @name, @version, @transitive = false)
   end
 
   def transitive?
     @transitive
+  end
+
+  def accepts_version?(version : String)
+    expected = @version.value
+    version == expected || (version.starts_with?("#{expected}."))
   end
 end

@@ -10,12 +10,12 @@ from ./manifest.savi:1:
 
 - this transitive dependency needs to be added:
   from ../../../packages/TCP.manifest.savi:4:
-  :dependency ByteStream "TODO: specify version"
+  :dependency ByteStream v0
               ^~~~~~~~~~
 
 - it is required by this existing dependency:
   from ./manifest.savi:4:
-  :dependency TCP "TODO: specify version"
+  :dependency TCP v0
               ^~~
 
 - run again with --fix to auto-fix this issue.
@@ -29,12 +29,12 @@ from ./manifest.savi:1:
 
 - this transitive dependency needs to be added:
   from ../../../packages/TCP.manifest.savi:5:
-  :dependency IO "TODO: specify version"
+  :dependency IO v0
               ^~
 
 - it is required by this existing dependency:
   from ./manifest.savi:4:
-  :dependency TCP "TODO: specify version"
+  :dependency TCP v0
               ^~~
 
 - run again with --fix to auto-fix this issue.
@@ -48,12 +48,12 @@ from ./manifest.savi:1:
 
 - this transitive dependency needs to be added:
   from ../../../packages/TCP.manifest.savi:6:
-  :dependency OSError "TODO: specify version"
+  :dependency OSError v0
               ^~~~~~~
 
 - it is required by this existing dependency:
   from ./manifest.savi:4:
-  :dependency TCP "TODO: specify version"
+  :dependency TCP v0
               ^~~
 
 - run again with --fix to auto-fix this issue.

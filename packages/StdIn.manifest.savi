@@ -1,6 +1,6 @@
 :manifest lib StdIn
   :sources "src/StdIn/**/*.savi"
 
-  :dependency ByteStream "TODO: specify version"
-  :dependency IO "TODO: specify version"
-  :transitive dependency OSError "TODO: specify version"
+  :dependency ByteStream v0
+  :dependency IO v0
+  :transitive dependency OSError v0

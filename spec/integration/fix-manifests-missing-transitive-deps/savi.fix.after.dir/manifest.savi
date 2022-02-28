@@ -1,10 +1,10 @@
 :manifest "example"
   :sources "main.savi"
 
-  :dependency TCP "TODO: specify version"
+  :dependency TCP v0
 
-  :transitive dependency ByteStream "TODO: specify version"
+  :transitive dependency ByteStream v0
 
-  :transitive dependency IO "TODO: specify version"
+  :transitive dependency IO v0
 
-  :transitive dependency OSError "TODO: specify version"
+  :transitive dependency OSError v0
