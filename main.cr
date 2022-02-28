@@ -121,6 +121,33 @@ module Savi
           Cli.compile options, opts.backtrace
         end
       end
+      sub "deps" do
+        run do
+          # TODO: How can we avoid definining this `run` block?
+        end
+        sub "update" do
+          desc "update dependencies"
+          usage "savi deps update [name] [options]"
+          help short: "-h"
+          argument "name", type: String, required: false, desc: "Name of the dependency to update"
+          option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+          option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
+          option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+          option "-C", "--cd=DIR", desc: "Change the working directory"
+          option "--for=MANIFEST", desc: "Specify the manifest to update dependencies for"
+          run do |opts, args|
+            options = Savi::Compiler::Options.new
+            options.print_perf = true if opts.print_perf
+            options.auto_fix = true if opts.fix
+            options.manifest_name = opts.for.not_nil! if opts.for
+            options.deps_update = args.name || "" # mark all or one dependency for update
+            options.target_pass = :load # stop after the :load pass is done
+            options.auto_fix = true # auto-fix changes due to updated deps
+            Dir.cd(opts.cd.not_nil!) if opts.cd
+            Cli.compile options, opts.backtrace
+          end
+        end
+      end
       sub "compilerspec" do
         desc "run compiler specs"
         usage "savi compilerspec [file] [options]"

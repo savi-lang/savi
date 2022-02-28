@@ -18,4 +18,22 @@ struct Savi::Packaging::Dependency
     expected = @version.value
     version == expected || (version.starts_with?("#{expected}."))
   end
+
+  def location
+    location_nodes.first?.try(&.value) || ""
+  end
+
+  def location_scheme : String
+    location = location()
+    return "" unless location.includes?(":")
+
+    location.split(":", 2).first
+  end
+
+  def location_without_scheme : String
+    location = location()
+    return location unless location.includes?(":")
+
+    location.split(":", 2).last
+  end
 end

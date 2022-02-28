@@ -13,6 +13,11 @@ class Savi::Compiler
     property manifest_name : String?
     property target_pass : Symbol?
 
+    # If set, then we want to update deps if any are out of date.
+    # An empty string means we want to update all deps. Otherwise, the specified
+    # dependency name will be updated, along with all its dependencies.
+    property deps_update : String?
+
     def initialize(
       @release = false,
       @no_debug = false,

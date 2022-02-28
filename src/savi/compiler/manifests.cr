@@ -32,6 +32,22 @@ class Savi::Compiler::Manifests
       @manifests_by_name[provides_name.value] = manifest
     }
 
+    # Update all listed dependencies, if it was requested that we do so.
+    deps_update = ctx.options.deps_update
+    if deps_update
+      # For now we only support updating all dependencies at once.
+      # To update one dependency and its transitive dependencies,
+      # we first need all of the proper `:depends on` declarations in place.
+      # TODO: Implement this, once `:depends on` checking is working.
+      raise NotImplementedError.new(
+        "updating one dependency (and its transitive dependencies) " + \
+        "is not yet supported"
+      ) unless deps_update.empty?
+
+      deps = manifest.dependencies.select(&.location_nodes.any?)
+      Packaging::RemoteService.update_all(ctx, deps, manifest.deps_path)
+    end
+
     # Resolve all the dependency manifests.
     manifest.dependencies.each { |dep|
       compile_and_resolve_dep_manifest(ctx, dep)
