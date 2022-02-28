@@ -89,7 +89,7 @@ class Savi::Compiler::Context
     return if @program.manifests.any?(&.name.pos.source.package.path.==(path))
 
     # Otherwise go ahead and load the manifests.
-    sources = compiler.source_service.get_manifest_sources_at_or_above(path)
+    sources = compiler.source_service.get_manifest_sources_at(path)
     docs = sources.map { |source| Parser.parse(source) }
     package = compile_package(sources.first.package, docs)
     self

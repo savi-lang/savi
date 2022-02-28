@@ -5,7 +5,7 @@
   :copies Random
   :sources "spec/Random/**/*.savi"
 
-  :dependency Spec "TODO: specify version"
-  :transitive dependency Map "TODO: specify version"
+  :dependency Spec v0
+  :transitive dependency Map v0
 
-  :dependency DeterministicRandom "TODO: specify version"
+  :dependency DeterministicRandom v0

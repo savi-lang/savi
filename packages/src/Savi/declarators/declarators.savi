@@ -502,7 +502,7 @@
   :begins manifest_dependency
 
   :term name Name
-  :term version String
+  :term version Name
 
 // TODO: Document this.
 :declarator transitive
@@ -512,7 +512,7 @@
 
   :keyword dependency
   :term name Name
-  :term version String
+  :term version Name
 
 // TODO: Document this.
 :declarator from

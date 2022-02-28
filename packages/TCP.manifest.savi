@@ -1,13 +1,13 @@
 :manifest lib TCP
   :sources "src/TCP/**/*.savi"
 
-  :dependency ByteStream "TODO: specify version"
-  :dependency IO "TODO: specify version"
-  :dependency OSError "TODO: specify version"
+  :dependency ByteStream v0
+  :dependency IO v0
+  :dependency OSError v0
 
 :manifest bin "spec-TCP"
   :copies TCP
   :sources "spec/TCP/**/*.savi"
 
-  :dependency Spec "TODO: specify version"
-  :transitive dependency Map "TODO: specify version"
+  :dependency Spec v0
+  :transitive dependency Map v0
