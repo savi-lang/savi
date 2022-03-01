@@ -14,6 +14,10 @@ struct Savi::Packaging::Manifest
     File.join(name.pos.source.dirname, "bin", name.value)
   end
 
+  def deps_path
+    File.join(name.pos.source.dirname, "deps")
+  end
+
   def is_main?
     @kind.value == "main"
   end
