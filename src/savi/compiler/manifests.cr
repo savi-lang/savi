@@ -55,20 +55,9 @@ class Savi::Compiler::Manifests
 
     # Prove that all transitive dependencies are accounted for.
     manifest.dependencies.each { |dep|
-      @manifests_by_name[dep.name.value]?.try(&.dependencies.each { |dep_dep|
-        next if @manifests_by_name[dep_dep.name.value]?
-
-        ctx.error_at manifest.name,
-          "A transitive dependency is missing from this manifest", [
-            {dep_dep.name.pos, "this transitive dependency needs to be added"},
-            {dep.name.pos, "it is required by this existing dependency"},
-          ], [
-            {manifest.append_pos, [
-              "\n",
-              "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version.value}"
-            ].join("\n")}
-          ]
-      })
+      @manifests_by_name[dep.name.value]?.try { |dep_manifest|
+        check_transitive_deps(ctx, manifest, dep, dep_manifest)
+      }
     }
 
     basic_manifest_checks(ctx)
@@ -280,6 +269,47 @@ class Savi::Compiler::Manifests
     manifests.each { |f| finder.test(f.name.value) }
     finder.best_match.try { |other_name|
       manifests.find(&.name.value.==(other_name))
+    }
+  end
+
+  private def check_transitive_deps(ctx, manifest, dep, dep_manifest)
+    dep_manifest.dependencies.each { |dep_dep|
+      # Check that the transitive dependency has been loaded.
+      if !@manifests_by_name.has_key?(dep_dep.name.value)
+        ctx.error_at manifest.name,
+          "A transitive dependency is missing from this manifest", [
+            {dep_dep.name.pos, "this transitive dependency needs to be added"},
+            {dep.name.pos, "it is required by this existing dependency"},
+          ], [
+            {manifest.append_pos, [
+              "\n",
+              "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version.value}"
+            ].join("\n")}
+          ]
+      end
+
+      # Check that the transitive dependency is marked on the via dependency.
+      if !dep.depends_on_nodes.any?(&.value.==(dep_dep.name.value))
+        ctx.error_at dep.name,
+          "A `:depends on` declaration is missing from this dependency", [
+            {dep_dep.name.pos, "this transitive dependency needs to be added"},
+          ], [
+            {dep.append_pos, "\n    :depends on #{dep_dep.name.value}"}
+          ]
+      end
+    }
+
+    # Check that there aren't any unnecessary `:depends on` declarations.
+    dep.depends_on_nodes.each { |depends_on_name|
+      if !dep_manifest.dependencies.any?(&.name.value.==(depends_on_name.value))
+        ctx.error_at depends_on_name,
+          "This `:depends on` declaration is not necessary", [
+            {dep_manifest.name.pos,
+              "this manifest does not include it as a dependency"},
+          ], [
+            {depends_on_name.pos.whole_containing_lines_as_pos, ""}
+          ]
+      end
     }
   end
 end

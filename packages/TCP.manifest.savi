@@ -2,7 +2,11 @@
   :sources "src/TCP/**/*.savi"
 
   :dependency ByteStream v0
+
   :dependency IO v0
+    :depends on ByteStream
+    :depends on OSError
+
   :dependency OSError v0
 
 :manifest bin "spec-TCP"
@@ -10,4 +14,6 @@
   :sources "spec/TCP/**/*.savi"
 
   :dependency Spec v0
+    :depends on Map
+
   :transitive dependency Map v0

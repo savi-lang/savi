@@ -2,6 +2,14 @@
   :sources "src/*.savi"
 
   :dependency StdIn v0
+    :depends on ByteStream
+    :depends on IO
+    :depends on OSError
+
   :dependency IO v0
+    :depends on ByteStream
+    :depends on OSError
+
   :transitive dependency ByteStream v0
+
   :transitive dependency OSError v0

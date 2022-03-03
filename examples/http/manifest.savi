@@ -2,7 +2,17 @@
   :sources "src/*.savi"
 
   :dependency HTTPServer v0
+    :depends on ByteStream
+
   :dependency TCP v0
+    :depends on ByteStream
+    :depends on IO
+    :depends on OSError
+
   :dependency IO v0
+    :depends on ByteStream
+    :depends on OSError
+
   :transitive dependency ByteStream v0
+
   :transitive dependency OSError v0

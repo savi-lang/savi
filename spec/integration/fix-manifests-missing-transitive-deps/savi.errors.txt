@@ -22,20 +22,15 @@ from ./manifest.savi:1:
 
 ---
 
-A transitive dependency is missing from this manifest:
-from ./manifest.savi:1:
-:manifest "example"
-          ^~~~~~~~~
-
-- this transitive dependency needs to be added:
-  from ../../../packages/TCP.manifest.savi:5:
-  :dependency IO v0
-              ^~
-
-- it is required by this existing dependency:
-  from ./manifest.savi:4:
+A `:depends on` declaration is missing from this dependency:
+from ./manifest.savi:4:
   :dependency TCP v0
               ^~~
+
+- this transitive dependency needs to be added:
+  from ../../../packages/TCP.manifest.savi:4:
+  :dependency ByteStream v0
+              ^~~~~~~~~~
 
 - run again with --fix to auto-fix this issue.
 
@@ -48,6 +43,39 @@ from ./manifest.savi:1:
 
 - this transitive dependency needs to be added:
   from ../../../packages/TCP.manifest.savi:6:
+  :dependency IO v0
+              ^~
+
+- it is required by this existing dependency:
+  from ./manifest.savi:4:
+  :dependency TCP v0
+              ^~~
+
+- run again with --fix to auto-fix this issue.
+
+---
+
+A `:depends on` declaration is missing from this dependency:
+from ./manifest.savi:4:
+  :dependency TCP v0
+              ^~~
+
+- this transitive dependency needs to be added:
+  from ../../../packages/TCP.manifest.savi:6:
+  :dependency IO v0
+              ^~
+
+- run again with --fix to auto-fix this issue.
+
+---
+
+A transitive dependency is missing from this manifest:
+from ./manifest.savi:1:
+:manifest "example"
+          ^~~~~~~~~
+
+- this transitive dependency needs to be added:
+  from ../../../packages/TCP.manifest.savi:10:
   :dependency OSError v0
               ^~~~~~~
 
@@ -55,5 +83,19 @@ from ./manifest.savi:1:
   from ./manifest.savi:4:
   :dependency TCP v0
               ^~~
+
+- run again with --fix to auto-fix this issue.
+
+---
+
+A `:depends on` declaration is missing from this dependency:
+from ./manifest.savi:4:
+  :dependency TCP v0
+              ^~~
+
+- this transitive dependency needs to be added:
+  from ../../../packages/TCP.manifest.savi:10:
+  :dependency OSError v0
+              ^~~~~~~
 
 - run again with --fix to auto-fix this issue.

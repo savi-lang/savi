@@ -6,4 +6,6 @@
   :sources "spec/ByteStream/**/*.savi"
 
   :dependency Spec v0
+    :depends on Map
+
   :transitive dependency Map v0
