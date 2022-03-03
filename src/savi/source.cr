@@ -260,6 +260,12 @@ struct Savi::Source::Pos
     Pos.point(source, index)
   end
 
+  def whole_containing_lines_as_pos
+    new_start = source.content.byte_rindex('\n', start).try(&.+(1)) || 0
+    new_finish = source.content.byte_index('\n', finish).try(&.+(1)) || source.content.bytesize
+    Pos.index_range(source, new_start, new_finish)
+  end
+
   def get_indent
     match = /\G[ \t]+/.match_at_byte_index(source.content, line_start)
     new_finish = match ? match.byte_end(0) : line_start

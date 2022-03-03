@@ -2,9 +2,14 @@
   :sources "main.savi"
 
   :dependency TCP v0
+    :depends on ByteStream
+    :depends on IO
+    :depends on OSError
 
   :transitive dependency ByteStream v0
 
   :transitive dependency IO v0
+    :depends on ByteStream
+    :depends on OSError
 
   :transitive dependency OSError v0

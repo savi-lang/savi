@@ -2,5 +2,6 @@
   :sources "src/*.savi"
 
   :dependency Spec v0
+    :depends on Map
   :dependency Map v0
   :dependency Time v0

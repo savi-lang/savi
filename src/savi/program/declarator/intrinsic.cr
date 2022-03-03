@@ -193,7 +193,7 @@ module Savi::Program::Intrinsic
         revision = terms["revision"].as(AST::Identifier)
         scope.current_manifest_dependency.revision_nodes << revision
       when "depends"
-        name = terms["name"].as(AST::Identifier)
+        name = terms["other"].as(AST::Identifier)
         scope.current_manifest_dependency.depends_on_nodes << name
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
