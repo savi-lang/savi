@@ -37,7 +37,7 @@ module Savi::Packaging::RemoteService
         repo_name = dep.location_without_scheme
         output = IO::Memory.new
         args = COMMAND_GIT_REMOTE_SORTED_TAGS.dup
-        args << "git@github.com:#{repo_name}.git"
+        args << "https://github.com/:#{repo_name}.git"
         process = Process.new("/usr/bin/env", args, output: output)
         {dep, process, output}
       }
