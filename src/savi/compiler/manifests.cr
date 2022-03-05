@@ -122,16 +122,16 @@ class Savi::Compiler::Manifests
     manifests = ctx.program.manifests
     orig_manifests_size = manifests.size
 
-    # Compile all manifests at the path where the dep is to be found.
-    dep_path = if dep.location_nodes.empty?
-      # If not specified assume it come from the standard packages path.
-      # TODO: In the future, we should remove this option and source all
-      # standard library packages from individual GitHub repos, so that they
-      # can be versioned independently of one another.
-      ctx.compiler.source_service.standard_package_path
-    else
-      ctx.compiler.source_service.find_latest_in_deps(ctx, dep)
+    # Ensure the dependency has a `:from` declaration (or fail early).
+    if dep.location_nodes.empty?
+      ctx.error_at dep.name, "This dependency needs a `:from` declaration " +
+        "to indicate where to fetch it from"
+      # TODO: can we auto-fix here using the same mechanism as `savi add`?
+      return
     end
+
+    # Compile all manifests at the path where the dep is to be found.
+    dep_path = ctx.compiler.source_service.find_latest_in_deps(ctx, dep)
     return unless dep_path
     ctx.compile_manifests_at_path(dep_path)
 
@@ -276,16 +276,20 @@ class Savi::Compiler::Manifests
     dep_manifest.dependencies.each { |dep_dep|
       # Check that the transitive dependency has been loaded.
       if !@manifests_by_name.has_key?(dep_dep.name.value)
+        can_fix = dep_dep.location_nodes.any?
+        fix_lines = ["\n"]
+        fix_lines << "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version.value}"
+        dep_dep.location_nodes.each { |location_node|
+          fix_lines << "    :from #{location_node.value.inspect}"
+        }
+
         ctx.error_at manifest.name,
           "A transitive dependency is missing from this manifest", [
             {dep_dep.name.pos, "this transitive dependency needs to be added"},
             {dep.name.pos, "it is required by this existing dependency"},
-          ], [
-            {manifest.append_pos, [
-              "\n",
-              "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version.value}"
-            ].join("\n")}
-          ]
+          ], can_fix ? [
+            {manifest.append_pos, fix_lines.join("\n")}
+          ] : nil
       end
 
       # Check that the transitive dependency is marked on the via dependency.

@@ -2,14 +2,19 @@
   :sources "main.savi"
 
   :dependency TCP v0
+    :from "github:savi-lang/TCP"
     :depends on ByteStream
     :depends on IO
     :depends on OSError
 
   :transitive dependency ByteStream v0
+    :from "github:savi-lang/ByteStream"
 
   :transitive dependency IO v0
-    :depends on ByteStream
+    :from "github:savi-lang/IO"
     :depends on OSError
+    :depends on ByteStream
 
   :transitive dependency OSError v0
+    :from "github:savi-lang/OSError"
+

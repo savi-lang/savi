@@ -16,7 +16,9 @@ CLANG?=clang
 # Run the full CI suite.
 ci: PHONY
 	${MAKE} format.check
+	${MAKE} spec.core.deps extra_args="--backtrace $(extra_args)"
 	${MAKE} spec.all extra_args="--backtrace $(extra_args)"
+	${MAKE} example.deps dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
 	${MAKE} example dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
 	${MAKE} example-eval
 
@@ -25,7 +27,7 @@ clean: PHONY
 	rm -rf $(BUILD) $(MAKE_VAR_CACHE) lib/libsavi_runtime
 
 # Run the full test suite.
-spec.all: PHONY spec.compiler.all spec.language spec.package.all spec.unit.all spec.integration.all
+spec.all: PHONY spec.compiler.all spec.language spec.core spec.unit.all spec.integration.all
 
 # Run the specs that are written in markdown (mostly compiler pass tests).
 # Run the given compiler-spec target (or all targets).
@@ -39,17 +41,18 @@ spec.compiler.all: PHONY $(SAVI)
 spec.language: PHONY $(SAVI)
 	echo && $(SAVI) run --cd spec/language $(extra_args)
 
-# Run the specs for the given package (or all packages).
-spec.package: PHONY $(SAVI)
-	echo && $(SAVI) run --cd packages "spec-$(name)" $(extra_args)
-spec.package.all: PHONY $(SAVI)
-	find packages/spec -mindepth 1 -maxdepth 1 | cut -d/ -f3 | sort | xargs -I'{}' sh -c \
-		"echo && $(SAVI) run --cd packages "spec-{}" $(extra_args) || exit 255"
+# Run the specs for the core package.
+spec.core: PHONY $(SAVI)
+	echo && $(SAVI) run --cd spec/core $(extra_args)
 
-# Run the specs for the given package in lldb for debugging.
-spec.package.lldb: PHONY $(SAVI)
-	echo && $(SAVI) build --cd packages "spec-$(name)" $(extra_args) && \
-		lldb -o run -- "packages/bin/spec-$(name)"
+# Update deps for the specs for the core package.
+spec.core.deps: PHONY $(SAVI)
+	echo && $(SAVI) deps update --cd spec/core $(extra_args)
+
+# Run the specs for the core package in lldb for debugging.
+spec.core.lldb: PHONY $(SAVI)
+	echo && $(SAVI) build --cd spec/core $(extra_args) && \
+		lldb -o run -- spec/core/bin/spec
 
 # Run the specs that are written in Crystal (mostly compiler unit tests),
 # narrowing to those with the given name (or all of them).
@@ -85,8 +88,12 @@ example: PHONY $(SAVI)
 	echo && $(SAVI) run --cd "$(dir)" $(extra_args)
 
 # Compile the files in the given directory.
-example-compile: PHONY $(SAVI)
+example.compile: PHONY $(SAVI)
 	echo && $(SAVI) --cd "$(dir)" $(extra_args)
+
+# Update deps for the specs for the given example directory.
+example.deps: PHONY $(SAVI)
+	echo && $(SAVI) deps update --cd "$(dir)" $(extra_args)
 
 # Compile the vscode extension.
 vscode: PHONY $(SAVI)

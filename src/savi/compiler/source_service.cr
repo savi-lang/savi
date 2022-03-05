@@ -1,6 +1,6 @@
 class Savi::Compiler::SourceService
-  property standard_package_internal_path =
-    File.expand_path("../../packages", Process.executable_path.not_nil!)
+  property core_package_internal_path =
+    File.expand_path("../../core", Process.executable_path.not_nil!)
 
   property standard_directory_remap : {String, String}?
   property main_directory_remap : {String, String}?
@@ -9,17 +9,14 @@ class Savi::Compiler::SourceService
     @source_overrides = {} of String => Hash(String, String)
   end
 
-  def standard_package_path
-    from_internal_path(standard_package_internal_path)
-  end
   def core_savi_package_path
-    File.join("#{standard_package_path}/src/Savi")
+    from_internal_path(core_package_internal_path)
   end
   def standard_declarators_package_path
-    File.join("#{standard_package_path}/src/Savi/declarators")
+    File.join(core_savi_package_path, "declarators")
   end
   def meta_declarators_package_path
-    File.join("#{standard_package_path}/src/Savi/declarators/meta")
+    File.join(core_savi_package_path, "declarators", "meta")
   end
 
   # Add/update a source override, which causes the SourceService to pretend as
@@ -82,7 +79,7 @@ class Savi::Compiler::SourceService
 
     @standard_directory_remap.try do |prefix, _|
       next unless path.starts_with?(prefix)
-      return path.sub(prefix, @standard_package_internal_path)
+      return path.sub(prefix, @core_package_internal_path)
     end
 
     path
@@ -98,8 +95,8 @@ class Savi::Compiler::SourceService
     end
 
     @standard_directory_remap.try do |prefix, _|
-      next unless path.starts_with?(@standard_package_internal_path)
-      return path.sub(@standard_package_internal_path, prefix)
+      next unless path.starts_with?(@core_package_internal_path)
+      return path.sub(@core_package_internal_path, prefix)
     end
 
     path

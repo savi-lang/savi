@@ -37,12 +37,12 @@ class Savi::Server
       # TODO: handle process errors here, probably via a cleaner abstraction.
       Process.run("cp", ["-r",
         File.join(
-          Savi.compiler.source_service.standard_package_internal_path,
+          Savi.compiler.source_service.core_package_internal_path,
           ".",
         ),
         dest_path,
       ])
-      Savi.compiler.source_service.standard_package_internal_path = dest_path
+      Savi.compiler.source_service.core_package_internal_path = dest_path
     }
 
     # Before we exit, say goodbye.

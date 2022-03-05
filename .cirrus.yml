@@ -131,9 +131,9 @@ task:
     - make build/savi-release SAVI_VERSION=${CIRRUS_TAG:-unknown} ${MAKE_EXTRA_ARGS}
     - mv build/savi-release out/bin/savi
 
-  copy_packages_script:
+  copy_core_script:
     - mkdir -p out
-    - cp -r packages out/packages
+    - cp -r core out/core
 
   copy_runtime_script:
     - mkdir -p out/lib

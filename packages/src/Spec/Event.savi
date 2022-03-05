@@ -1,9 +1,0 @@
-:class val Spec.Event
-  :let success Bool
-  :let pos SourceCodePosition
-  :let assert (Spec.Assert | None)
-
-  // TODO: refactor into the line below after #102 is fixed.
-  // :new (@success, @pos, @assert = None)
-  :new (@success, @pos, assert (Spec.Assert | None) = None)
-    @assert = assert

@@ -1,5 +1,0 @@
-:actor Main
-  :new (env)
-    Spec.Process.run(env, [
-      Spec.Run(Spec.Assert.Spec).new(env)
-    ])

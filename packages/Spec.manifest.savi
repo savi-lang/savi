@@ -1,8 +1,0 @@
-:manifest lib Spec
-  :sources "src/Spec/**/*.savi"
-
-  :dependency Map v0
-
-:manifest bin "spec-Spec"
-  :copies Spec
-  :sources "spec/Spec/**/*.savi"

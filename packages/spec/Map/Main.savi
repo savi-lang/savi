@@ -1,7 +1,0 @@
-:actor Main
-  :new (env)
-    Spec.Process.run(env, [
-      Spec.Run(Map.Spec).new(env)
-      Spec.Run(Map.Ordered.Spec).new(env)
-      Spec.Run(Map.Readable.Spec).new(env)
-    ])

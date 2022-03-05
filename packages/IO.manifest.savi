@@ -1,5 +1,0 @@
-:manifest lib IO
-  :sources "src/IO/**/*.savi"
-
-  :dependency ByteStream v0
-  :dependency OSError v0
