@@ -105,6 +105,8 @@ if [ -d "$subdir/savi.fix.before.dir" ] \
 && [ -d "$subdir/savi.fix.after.dir" ] \
 && [ -f "$subdir/savi.errors.txt" ]; then
   cp -r "$subdir/savi.fix.before.dir/"* $subdir/
+  "$SAVI" deps update --cd "$subdir"
+  cp -r "$subdir/savi.fix.before.dir/"* $subdir/
   cleanup_files=$(ls "$subdir/savi.fix.before.dir/"* | cut -d/ -f -1,3-)
 
   if ! test_error_output; then

@@ -1,7 +1,0 @@
-:: A type alias to the current best all-purpose purpose PRNG in this package.
-:: Currently this points to the xoroshiro128++ implementation.
-::
-:: Like all generators in this library, it should NOT be used for cryptographic
-:: purposes, or any other purpose where predictability can cause security flaws.
-:: Prefer using the SecureRandom package for those use cases.
-:alias DeterministicRandom.Default: DeterministicRandom.Xoroshiro128

@@ -2,3 +2,4 @@
   :sources "main.savi"
 
   :dependency TCP v0
+    :from "github:savi-lang/TCP"

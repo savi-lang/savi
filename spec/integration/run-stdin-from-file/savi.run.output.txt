@@ -1,5 +1,0 @@
-IO.Action.Opened
-IO.Action.Read
-foo
-bar
-IO.Action.Closed

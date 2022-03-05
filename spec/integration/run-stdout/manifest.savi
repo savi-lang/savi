@@ -1,4 +1,2 @@
 :manifest "example"
   :sources "src/*.savi"
-
-  :dependency ByteStream v0

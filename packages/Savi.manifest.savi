@@ -1,7 +1,0 @@
-:manifest bin "spec-Savi"
-  :sources "spec/Savi/**/*.savi"
-
-  :dependency Spec v0
-    :depends on Map
-
-  :transitive dependency Map v0

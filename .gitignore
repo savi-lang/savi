@@ -1,4 +1,5 @@
 bin
+deps
 /.make-var-cache
 /.make-var-cache-in-docker
 /build

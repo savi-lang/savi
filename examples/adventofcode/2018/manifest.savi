@@ -2,6 +2,11 @@
   :sources "src/*.savi"
 
   :dependency Spec v0
+    :from "github:savi-lang/Spec"
     :depends on Map
+
   :dependency Map v0
+    :from "github:savi-lang/Map"
+
   :dependency Time v0
+    :from "github:savi-lang/Time"
