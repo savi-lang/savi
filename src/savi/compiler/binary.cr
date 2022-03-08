@@ -210,6 +210,7 @@ class Savi::Compiler::Binary
           yield "/lib/x86_64-linux-gnu"
           yield "/usr/lib/gcc/x86_64-linux-gnu/*"
           yield "/usr/lib/x86_64-linux-gnu"
+          yield "/usr/lib/gcc/x86_64-redhat-linux/*"
         else
           raise NotImplementedError.new(target.inspect)
         end
