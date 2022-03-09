@@ -126,7 +126,7 @@ module Savi::Packaging::RemoteService
 
       # Fast exit if there's nothing new to be downloaded.
       return if download_list.empty?
-      puts "Downloading new library versions from GitHub..."
+      STDERR.puts "Downloading new library versions from GitHub..."
 
       # Spawn the sub-processes to shallow-clone the specified versions.
       process_list = download_list.map { |dep, version|
@@ -152,7 +152,7 @@ module Savi::Packaging::RemoteService
           next
         end
 
-        puts "Downloaded #{dep.name.value} #{version}"
+        STDERR.puts "Downloaded #{dep.name.value} #{version}"
       }
     end
 
@@ -167,7 +167,7 @@ module Savi::Packaging::RemoteService
       cached_location = @@location_cache[dep_name]?
       return cached_location if cached_location
 
-      puts "Finding a remote location for the #{dep_name} library..."
+      STDERR.puts "Finding a remote location for the #{dep_name} library..."
 
       # Choose a random temporary directory name.
       tmp_dir = File.join(Dir.tempdir, "savi-library-index-#{Random::Secure.hex}")
@@ -210,7 +210,7 @@ module Savi::Packaging::RemoteService
       case locations.size
       when 1
         location = locations.first
-        puts "Found a known location: #{location}"
+        STDERR.puts "Found a known location: #{location}"
         @@location_cache[dep_name] = location
         return location
       when 0
