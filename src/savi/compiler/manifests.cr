@@ -32,21 +32,11 @@ class Savi::Compiler::Manifests
       @manifests_by_name[provides_name.value] = manifest
     }
 
-    # Update all listed dependencies, if it was requested that we do so.
-    deps_update = ctx.options.deps_update
-    if deps_update
-      # For now we only support updating all dependencies at once.
-      # To update one dependency and its transitive dependencies,
-      # we first need all of the proper `:depends on` declarations in place.
-      # TODO: Implement this, once `:depends on` checking is working.
-      raise NotImplementedError.new(
-        "updating one dependency (and its transitive dependencies) " + \
-        "is not yet supported"
-      ) unless deps_update.empty?
+    # Add a dependency if it was requested that we do so.
+    maybe_deps_add(ctx, manifest)
 
-      deps = manifest.dependencies.select(&.location_nodes.any?)
-      Packaging::RemoteService.update_all(ctx, deps, manifest.deps_path)
-    end
+    # Update some or all dependencies, if it was requested that we do so.
+    maybe_deps_update(ctx, manifest)
 
     # Resolve all the dependency manifests.
     manifest.dependencies.each { |dep|
@@ -272,13 +262,86 @@ class Savi::Compiler::Manifests
     }
   end
 
+  private def maybe_deps_add(ctx, manifest)
+    deps_add = ctx.options.deps_add
+    return unless deps_add
+
+    # If no explicit fetch location was given by the user, try to find one.
+    # If we fail, return early, making the assumption that the RemoteService
+    # abstraction logged an appropriate error into the ctx.
+    deps_add_location = ctx.options.deps_add_location
+    deps_add_location ||= Packaging::RemoteService.find_location_for(ctx, deps_add)
+    return unless deps_add_location
+
+    # If we already have an existing dependency that matches the name and
+    # location, it doesn't need to be added as a new dependency.
+    existing_dependency = manifest.dependencies.find { |dep|
+      dep.name.value == deps_add &&
+      dep.location_nodes.any?(&.value.==(deps_add_location))
+    }
+    if existing_dependency
+      # If the existing dependency is transitive, we'll issue a "fix error"
+      # request to mark it as no longer transitive in its declaration
+      dep = existing_dependency
+      if dep.transitive?
+        ctx.error_at dep.name, "This dependency is no longer transitive",
+          [] of {Source::Pos, String},
+          [{dep.ast.terms[0].pos.from_start_until_start_of(dep.ast.terms[1].pos), ""}]
+      end
+
+      # Then we return - nothing left to do to add the dependency.
+      return
+    end
+
+    # Otherwise, we need to add it as a new dependency, via a "fix error".
+    fix_lines = ["\n"]
+    fix_lines << "  :dependency #{deps_add}"
+    fix_lines << "    :from #{deps_add_location.inspect}"
+    ctx.error_at manifest.name, "This manifest needs a new dependency",
+      [] of {Source::Pos, String},
+      [{manifest.append_pos, fix_lines.join("\n")}]
+  end
+
+  private def maybe_deps_update(ctx, manifest)
+    deps_update = ctx.options.deps_update
+    return unless deps_update
+
+    # Determine which dependencies should be updated.
+    fetchable_deps = manifest.dependencies.select(&.location_nodes.any?)
+    deps_to_update = Set(Packaging::Dependency).new
+    if deps_update.empty?
+      # If no explicit dependency was specified, then we'll update everything
+      # that is fetchable (that has a known location to fetch from).
+      fetchable_deps.each { |dep| deps_to_update.add(dep) }
+    else
+      # If an explicit dependency was specified to update, then we'll only
+      # update it and anything that it (directly or transitively) depends on.
+      fetchable_deps.each { |dep|
+        deps_to_update.add(dep) if dep.name.value == deps_update
+      }
+      previous_size = 0
+      while deps_to_update.size > previous_size
+        previous_size = deps_to_update.size
+        deps_to_update.to_a.each { |dep|
+          fetchable_deps.each { |dep_dep|
+            deps_to_update.add(dep_dep) \
+              if dep.depends_on_nodes.any?(&.value.==(dep_dep.name.value))
+          }
+        }
+      end
+    end
+
+    # Update the specified dependencies.
+    Packaging::RemoteService.update_all(ctx, deps_to_update.to_a, manifest.deps_path)
+  end
+
   private def check_transitive_deps(ctx, manifest, dep, dep_manifest)
     dep_manifest.dependencies.each { |dep_dep|
       # Check that the transitive dependency has been loaded.
       if !@manifests_by_name.has_key?(dep_dep.name.value)
         can_fix = dep_dep.location_nodes.any?
         fix_lines = ["\n"]
-        fix_lines << "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version.value}"
+        fix_lines << "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version.try(&.value)}"
         dep_dep.location_nodes.each { |location_node|
           fix_lines << "    :from #{location_node.value.inspect}"
         }

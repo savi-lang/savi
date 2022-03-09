@@ -503,6 +503,11 @@
 
   :term name Name
   :term version Name
+    :: This is not truly optional, but we have a "nice error" later
+    :: that can be auto-fixed by auto-specifying the latest version,
+    :: so here in the declarator we allow it to be optional so that
+    :: it can reach the later step of having a "nice error".
+    :optional
 
 // TODO: Document this.
 :declarator transitive

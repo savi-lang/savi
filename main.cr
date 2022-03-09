@@ -147,6 +147,31 @@ module Savi
             Cli.compile options, opts.backtrace
           end
         end
+        sub "add" do
+          desc "add a dependency"
+          usage "savi deps add NAME [options]"
+          help short: "-h"
+          argument "name", type: String, required: true, desc: "Name of the dependency to add"
+          option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+          option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
+          option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+          option "-C", "--cd=DIR", desc: "Change the working directory"
+          option "--for=MANIFEST", desc: "Specify the manifest to add the dependency to"
+          option "--from=LOCATION", desc: "Specify the location to fetch the dependency from"
+          run do |opts, args|
+            options = Savi::Compiler::Options.new
+            options.print_perf = true if opts.print_perf
+            options.auto_fix = true if opts.fix
+            options.manifest_name = opts.for.not_nil! if opts.for
+            options.deps_update = args.name
+            options.deps_add = args.name
+            options.deps_add_location = opts.from.not_nil! if opts.from
+            options.target_pass = :load # stop after the :load pass is done
+            options.auto_fix = true # auto-fix changes due to updated deps
+            Dir.cd(opts.cd.not_nil!) if opts.cd
+            Cli.compile options, opts.backtrace
+          end
+        end
       end
       sub "compilerspec" do
         desc "run compiler specs"
