@@ -2,6 +2,7 @@ require "./src/savi"
 
 require "clim"
 require "random"
+require "file_utils"
 
 module Savi
   class Cli < Clim
@@ -121,9 +122,59 @@ module Savi
           Cli.compile options, opts.backtrace
         end
       end
+      sub "init" do
+        run do
+          # TODO: How can we avoid defining this `run` block?
+          # And how can we prevent the no-op action that happens if the user
+          # runs this partial command instead of a full/proper command?
+        end
+        sub "lib" do
+          desc "initialize a new library project in the current directory"
+          usage "savi init lib NAME"
+          help short: "-h"
+          argument "name", type: String, required: true, desc: "Name of the library manifest to create"
+          option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+          option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+          option "-C", "--cd=DIR", desc: "Change the working directory"
+          run do |opts, args|
+            if opts.cd
+              FileUtils.mkdir_p(opts.cd.not_nil!)
+              Dir.cd(opts.cd.not_nil!)
+            end
+            exit 1 unless Savi::Init::Lib.run(args.name)
+
+            # Now also run `savi deps update --for spec` to fetch dependencies.
+            options = Savi::Compiler::Options.new
+            options.manifest_name = "spec"
+            options.print_perf = true if opts.print_perf
+            options.deps_update = "" # mark all dependencies for update
+            options.target_pass = :load # stop after the :load pass is done
+            options.auto_fix = true # auto-fix changes due to updated deps
+            Cli.compile options, opts.backtrace
+          end
+        end
+        sub "bin" do
+          desc "initialize a new executable binary project in the current directory"
+          usage "savi init bin NAME"
+          help short: "-h"
+          argument "name", type: String, required: true, desc: "Name of the binary manifest to create"
+          option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+          option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+          option "-C", "--cd=DIR", desc: "Change the working directory"
+          run do |opts, args|
+            if opts.cd
+              FileUtils.mkdir_p(opts.cd.not_nil!)
+              Dir.cd(opts.cd.not_nil!)
+            end
+            exit 1 unless Savi::Init::Bin.run(args.name)
+          end
+        end
+      end
       sub "deps" do
         run do
-          # TODO: How can we avoid definining this `run` block?
+          # TODO: How can we avoid defining this `run` block?
+          # And how can we prevent the no-op action that happens if the user
+          # runs this partial command instead of a full/proper command?
         end
         sub "update" do
           desc "update dependencies"
@@ -131,14 +182,12 @@ module Savi
           help short: "-h"
           argument "name", type: String, required: false, desc: "Name of the dependency to update"
           option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
-          option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
           option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
           option "-C", "--cd=DIR", desc: "Change the working directory"
           option "--for=MANIFEST", desc: "Specify the manifest to update dependencies for"
           run do |opts, args|
             options = Savi::Compiler::Options.new
             options.print_perf = true if opts.print_perf
-            options.auto_fix = true if opts.fix
             options.manifest_name = opts.for.not_nil! if opts.for
             options.deps_update = args.name || "" # mark all or one dependency for update
             options.target_pass = :load # stop after the :load pass is done
@@ -153,7 +202,6 @@ module Savi
           help short: "-h"
           argument "name", type: String, required: true, desc: "Name of the dependency to add"
           option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
-          option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
           option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
           option "-C", "--cd=DIR", desc: "Change the working directory"
           option "--for=MANIFEST", desc: "Specify the manifest to add the dependency to"
@@ -161,7 +209,6 @@ module Savi
           run do |opts, args|
             options = Savi::Compiler::Options.new
             options.print_perf = true if opts.print_perf
-            options.auto_fix = true if opts.fix
             options.manifest_name = opts.for.not_nil! if opts.for
             options.deps_update = args.name
             options.deps_add = args.name
