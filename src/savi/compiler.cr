@@ -18,6 +18,17 @@ class Savi::Compiler
     # dependency name will be updated, along with all its dependencies.
     property deps_update : String?
 
+    # If set, we will add a dependency with the given name.
+    property deps_add : String?
+
+    # If set, specifies the location that the dependency named in `deps_add`
+    # should be fetched from when it is time to fetch it.
+    # If left unset, then the central `savi-lang/library-index` GitHub repo
+    # will be used to try to look up a known location for that name.
+    # If that search fails to find exactly one location, an error will be
+    # given prompting the user to specify an explicit location next time.
+    property deps_add_location : String?
+
     def initialize(
       @release = false,
       @no_debug = false,

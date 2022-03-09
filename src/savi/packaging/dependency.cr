@@ -1,7 +1,7 @@
 struct Savi::Packaging::Dependency
   getter ast : AST::Declare
   getter name : AST::Identifier
-  getter version : AST::Identifier
+  getter version : AST::Identifier?
 
   getter location_nodes = [] of AST::LiteralString
   getter revision_nodes = [] of AST::Identifier
@@ -15,7 +15,11 @@ struct Savi::Packaging::Dependency
   end
 
   def accepts_version?(version : String)
-    expected = @version.value
+    expected = @version.try(&.value)
+
+    # If no version was specified, then every version is acceptable.
+    return true unless expected
+
     version == expected || (version.starts_with?("#{expected}."))
   end
 

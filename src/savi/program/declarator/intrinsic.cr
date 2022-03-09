@@ -159,13 +159,13 @@ module Savi::Program::Intrinsic
         scope.current_manifest.sources_paths << {path, [] of AST::LiteralString}
       when "dependency"
         name = terms["name"].as(AST::Identifier)
-        version = terms["version"].as(AST::Identifier)
+        version = terms["version"]?.try(&.as(AST::Identifier))
         scope.current_manifest_dependency = dep =
           Packaging::Dependency.new(declare, name, version)
         scope.current_manifest.dependencies << dep
       when "transitive"
         name = terms["name"].as(AST::Identifier)
-        version = terms["version"].as(AST::Identifier)
+        version = terms["version"]?.try(&.as(AST::Identifier))
         scope.current_manifest_dependency = dep =
           Packaging::Dependency.new(declare, name, version, transitive: true)
         scope.current_manifest.dependencies << dep

@@ -255,6 +255,10 @@ struct Savi::Source::Pos
     )
   end
 
+  def end_point_as_pos
+    Pos.point(source, finish)
+  end
+
   def next_line_start_as_pos
     index = source.content.byte_index('\n', finish) || source.content.bytesize
     Pos.point(source, index)
@@ -264,6 +268,14 @@ struct Savi::Source::Pos
     new_start = source.content.byte_rindex('\n', start).try(&.+(1)) || 0
     new_finish = source.content.byte_index('\n', finish).try(&.+(1)) || source.content.bytesize
     Pos.index_range(source, new_start, new_finish)
+  end
+
+  def from_start_until_start_of(other_pos : Source::Pos)
+    raise "#{other_pos} is not in the same source file as #{self}" \
+      unless other_pos.source == source
+    raise "#{other_pos} does not come after #{self}" \
+      unless other_pos.start > start
+    Pos.index_range(source, start, other_pos.start)
   end
 
   def get_indent

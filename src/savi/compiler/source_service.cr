@@ -390,12 +390,26 @@ class Savi::Compiler::SourceService
       .reverse!
     version = sorted_versions.find { |version| dep.accepts_version?(version) }
 
+    # If no version was specified, issue an error with suggested fix to use
+    # the latest available version (the first one that was accepted).
+    required_version = dep.version
+    if !required_version
+      latest_version_prefix = version.try(&.split('.').first)
+      ctx.error_at dep.name, "This dependency needs to specify a version", [
+        {location_node.pos, "the latest version available at this location " +
+          "is #{latest_version_prefix}"},
+      ], latest_version_prefix ? [
+        {dep.name.pos.end_point_as_pos, " #{latest_version_prefix}"}
+      ] : nil
+      return nil
+    end
+
     # Confirm that a compatible version was able to be selected.
     if !version
       ctx.error_at dep.name, "This dependency needs to be fetched", [
         {location_node.pos, "none of the fetched versions in " +
           "#{show_deps_outer_path.inspect} match the requirement"},
-        {dep.version.pos, "version #{dep.version.value.inspect} is required"},
+        {required_version.pos, "version #{required_version.value.inspect} is required"},
       ] + sorted_versions.map { |version|
         {Source::Pos.none, "this version is present but doesn't " +
           "match the requirement: #{version}"}
