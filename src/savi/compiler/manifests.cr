@@ -338,7 +338,7 @@ class Savi::Compiler::Manifests
   private def check_transitive_deps(ctx, manifest, dep, dep_manifest)
     dep_manifest.dependencies.each { |dep_dep|
       # Check that the transitive dependency has been loaded.
-      if !@manifests_by_name.has_key?(dep_dep.name.value)
+      if !manifest.dependencies.any?(&.name.value.==(dep_dep.name.value))
         can_fix = dep_dep.location_nodes.any?
         fix_lines = ["\n"]
         fix_lines << "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version.try(&.value)}"
