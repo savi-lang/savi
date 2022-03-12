@@ -9,7 +9,7 @@ from ./manifest.savi:1:
           ^~~~~~~~~
 
 - this transitive dependency needs to be added:
-  from ./deps/github:savi-lang/TCP/v0.20220309.0/manifest.savi:4:
+  from ./deps/github:savi-lang/TCP/v0/manifest.savi:4:
   :dependency ByteStream v0
               ^~~~~~~~~~
 
@@ -28,7 +28,7 @@ from ./manifest.savi:4:
               ^~~
 
 - this transitive dependency needs to be added:
-  from ./deps/github:savi-lang/TCP/v0.20220309.0/manifest.savi:4:
+  from ./deps/github:savi-lang/TCP/v0/manifest.savi:4:
   :dependency ByteStream v0
               ^~~~~~~~~~
 
@@ -42,7 +42,7 @@ from ./manifest.savi:1:
           ^~~~~~~~~
 
 - this transitive dependency needs to be added:
-  from ./deps/github:savi-lang/TCP/v0.20220309.0/manifest.savi:7:
+  from ./deps/github:savi-lang/TCP/v0/manifest.savi:7:
   :dependency IO v0
               ^~
 
@@ -61,7 +61,7 @@ from ./manifest.savi:4:
               ^~~
 
 - this transitive dependency needs to be added:
-  from ./deps/github:savi-lang/TCP/v0.20220309.0/manifest.savi:7:
+  from ./deps/github:savi-lang/TCP/v0/manifest.savi:7:
   :dependency IO v0
               ^~
 
@@ -75,7 +75,7 @@ from ./manifest.savi:1:
           ^~~~~~~~~
 
 - this transitive dependency needs to be added:
-  from ./deps/github:savi-lang/TCP/v0.20220309.0/manifest.savi:12:
+  from ./deps/github:savi-lang/TCP/v0/manifest.savi:12:
   :dependency OSError v0
               ^~~~~~~
 
@@ -94,7 +94,7 @@ from ./manifest.savi:4:
               ^~~
 
 - this transitive dependency needs to be added:
-  from ./deps/github:savi-lang/TCP/v0.20220309.0/manifest.savi:12:
+  from ./deps/github:savi-lang/TCP/v0/manifest.savi:12:
   :dependency OSError v0
               ^~~~~~~
 
