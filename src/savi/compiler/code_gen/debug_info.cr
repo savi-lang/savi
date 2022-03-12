@@ -297,7 +297,11 @@ class Savi::Compiler::CodeGen
             ),
           )
         elsif t.llvm_use_type(ctx) == :struct_value
-          di_create_fields_struct_type(t, llvm_type)
+          if llvm_type.kind == LLVM::Type::Kind::Pointer
+            di_create_object_struct_pointer_type(t, llvm_type)
+          else
+            di_create_fields_struct_type(t, llvm_type)
+          end
         elsif t.llvm_use_type(ctx) == :struct_ptr
           di_create_object_struct_pointer_type(t, llvm_type)
         elsif t.llvm_use_type(ctx) == :struct_ptr_opaque
