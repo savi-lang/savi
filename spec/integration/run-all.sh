@@ -12,7 +12,7 @@ cd -- "$(dirname -- "$0")"
 # Start running integation tests.
 echo "Running integration tests..."
 echo
-for subdir in $(find ./ -maxdepth 1 -mindepth 1 -type d | cut -b 3- | sort --ignore-case); do
+for subdir in $(find . -maxdepth 1 -mindepth 1 -type d | cut -b 3- | sort --ignore-case); do
   ./run-one.sh $subdir $SAVI || did_fail="X"
 done
 
