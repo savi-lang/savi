@@ -513,8 +513,6 @@ module Savi::Compiler::PreInfer
         @analysis[node] = info = Infer::FixedPrelude.new(node.pos, layer(node), "String")
       when "identity_digest_of"
         @analysis[node] = info = Infer::FixedPrelude.new(node.pos, layer(node), "USize")
-      when "address_of"
-        @analysis[node] = Infer::AddressOf.new(node.pos, layer(node), @analysis[node.term])
       when "--"
         @analysis[node] = Infer::Consume.new(node.pos, layer(node), @analysis[node.term])
       when "recover_UNSAFE"

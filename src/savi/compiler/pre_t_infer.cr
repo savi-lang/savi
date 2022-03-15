@@ -514,8 +514,6 @@ module Savi::Compiler::PreTInfer
         @analysis[node] = info = TInfer::FixedPrelude.new(node.pos, layer(node), "String")
       when "identity_digest_of"
         @analysis[node] = info = TInfer::FixedPrelude.new(node.pos, layer(node), "USize")
-      when "address_of"
-        @analysis[node] = TInfer::AddressOf.new(node.pos, layer(node), @analysis[node.term])
       when "--"
         @analysis[node] = TInfer::Consume.new(node.pos, layer(node), @analysis[node.term])
       when "recover_UNSAFE"
