@@ -74,10 +74,11 @@ class Savi::Compiler::Verify
   end
 
   class Visitor < Savi::AST::Visitor
+    getter refer : Refer::Analysis
     getter jumps : Jumps::Analysis
     getter inventory : Inventory::Analysis
 
-    def initialize(@jumps, @inventory)
+    def initialize(@refer, @jumps, @inventory)
     end
 
     def check_function(ctx, func, func_link)
@@ -147,6 +148,16 @@ class Savi::Compiler::Verify
       end
     end
 
+    # Verify that `stack_address_of_variable` is always used with a variable.
+    def touch(ctx, node : AST::Prefix)
+      return unless node.op.value == "stack_address_of_variable"
+
+      unless @refer[node.term]?.is_a? Refer::Local
+        ctx.error_at node.term,
+          "This is not a local variable, so it has no stack address"
+      end
+    end
+
     def touch(ctx, node : AST::Node)
       # Do nothing for all other AST::Nodes.
     end
@@ -202,9 +213,10 @@ class Savi::Compiler::Verify
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Nil
+      refer = ctx.refer[f_link]
       jumps = ctx.jumps[f_link]
       inventory = ctx.inventory[f_link]
-      deps = {jumps, inventory}
+      deps = {refer, jumps, inventory}
       prev = ctx.prev_ctx.try(&.verify)
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do

@@ -2492,6 +2492,8 @@ class Savi::Compiler::CodeGen
       gen_yield(expr)
     when AST::Prefix
       case expr.op.value
+      when "stack_address_of_variable"
+        gen_stack_address_of_variable(expr, expr.term)
       when "reflection_of_type"
         gen_reflection_of_type(expr, expr.term)
       when "reflection_of_runtime_type_name"
@@ -3035,6 +3037,14 @@ class Savi::Compiler::CodeGen
 
       @source_code_pos_globals[pos] = global
     end
+  end
+
+  def gen_stack_address_of_variable(expr, term_expr)
+    ref = func_frame.refer[term_expr].as Refer::Local
+
+    alloca = func_frame.current_locals[ref]
+
+    alloca
   end
 
   def gen_reflection_of_type(expr, term_expr)

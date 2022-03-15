@@ -1,0 +1,15 @@
+:module StackAddressOfVariableSpec
+  :fun run(test MicroTest)
+    foo = 99
+    bar = 99
+    foo_addr = stack_address_of_variable foo
+    bar_addr = stack_address_of_variable bar
+    foo_addr_2 = stack_address_of_variable foo
+
+    test["stack_address_of_variable foo not null"].pass = foo_addr.is_not_null
+
+    test["stack_address_of_variable foo != bar"].pass =
+      foo_addr.usize != bar_addr.usize
+
+    test["stack_address_of_variable foo == foo"].pass =
+      foo_addr.usize == foo_addr_2.usize

@@ -134,6 +134,12 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         "the parameter whose argument source code should be captured",
       ])
       visit_source_code_position_of_argument(node)
+    elsif Util.match_ident?(node, 0, "stack_address_of_variable")
+      Util.require_terms(node, [
+        nil,
+        "the local variable whose stack address should be captured",
+      ])
+      visit_stack_address_of_variable(node)
     elsif Util.match_ident?(node, 0, "reflection_of_type")
       Util.require_terms(node, [
         nil,
@@ -840,6 +846,21 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
             unless AST::Extract.params(@func.params).map(&.last).includes?(node)
 
     op = AST::Operator.new("source_code_position_of_argument").from(orig)
+
+    AST::Group.new("(", [
+      AST::Prefix.new(op, term).from(node),
+    ] of AST::Term).from(node)
+  end
+
+  def visit_stack_address_of_variable(node : AST::Group)
+    orig = node.terms[0]
+    term = node.terms[1]
+
+    Error.at term,
+      "Expected this term to be an identifier" \
+        unless term.is_a?(AST::Identifier)
+
+    op = AST::Operator.new("stack_address_of_variable").from(orig)
 
     AST::Group.new("(", [
       AST::Prefix.new(op, term).from(node),

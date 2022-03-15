@@ -443,6 +443,22 @@ module Savi::Compiler::TInfer
     end
   end
 
+  class StackAddressOfVariable < DynamicInfo
+    getter variable_type : Info
+
+    def describe_kind : String; "variable address" end
+
+    def initialize(@pos, @layer_index, @variable_type)
+    end
+
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
+      infer.core_savi_type_span(ctx, "CPointer")
+        .combine_mt(infer.resolve(ctx, @variable_type)) { |target_mt, arg_mt|
+          MetaType.new(ReifiedType.new(target_mt.single!.link, [arg_mt]))
+        }
+    end
+  end
+
   class ReflectionOfType < DynamicInfo
     getter reflect_type : Info
 
