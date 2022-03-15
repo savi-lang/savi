@@ -104,10 +104,19 @@ test_run_output() {
 if [ -d "$subdir/savi.fix.before.dir" ] \
 && [ -d "$subdir/savi.fix.after.dir" ] \
 && [ -f "$subdir/savi.errors.txt" ]; then
+  rm -rf "$subdir/deps"
   cp -r "$subdir/savi.fix.before.dir/"* $subdir/
   "$SAVI" deps update --cd "$subdir"
   cp -r "$subdir/savi.fix.before.dir/"* $subdir/
   cleanup_files=$(ls "$subdir/savi.fix.before.dir/"* | cut -d/ -f -1,3-)
+
+  # Convert dep version dirs to their short versions.
+  # This helps to stabilize file paths for testing error output,
+  # so that the error output doesn't change with each latest library version.
+  for versiondir in $(find "$subdir/deps" -name 'v*'); do
+    shortversiondir=$(echo $versiondir | sed s/$(basename $versiondir)/$(basename $versiondir | cut -d. -f1)/)
+    mv $versiondir $shortversiondir
+  done
 
   if ! test_error_output; then
     rm -rf ${cleanup_files}
