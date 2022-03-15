@@ -22,7 +22,7 @@ This type's name conflicts with a mandatory built-in type:
 It won't complain about sharing the name of a private built-in type.
 
 ```savi
-:ffi LibPony // also defined in core Savi, but private, so no conflict here
+:ffimodule LibPony // also defined in core Savi, but private, so no conflict here
 ```
 
 ---

@@ -49,7 +49,7 @@
     if !@get_disposable(event) @unsubscribe(event)
     event
 
-:ffi LibPonyAsioEvent
+:ffimodule LibPonyAsioEvent
   :fun pony_asio_event_create(
     owner AsioEventNotify
     fd U32, flags U32, nsec U64, noisy Bool

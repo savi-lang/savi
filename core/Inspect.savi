@@ -1,5 +1,5 @@
 // TODO: Get rid of this hack:
-:ffi InspectLibC
+:ffimodule InspectLibC
   :fun puts(string CPointer(U8)) I32
   :fun strlen(string CPointer(U8)) I32
   :fun variadic snprintf(buffer CPointer(U8), buffer_size I32, fmt CPointer(U8)) I32
