@@ -10,10 +10,9 @@ jobs:
           - crystal: "1.2.1"
             os: ubuntu-20.04
             deps: sudo apt-get install -y libgc-dev
-          # TODO: Enable MacOS after net tests are fixed to no longer hang.
-          # - crystal: "1.2.1"
-          #   os: macos-11
-          #   deps: echo no deps to download
+          - crystal: "1.2.1"
+            os: macos-11
+            deps: echo no system deps to download
     runs-on: ${{matrix.os}}
     steps:
       - name: Checkout Repository
