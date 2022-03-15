@@ -272,10 +272,10 @@
   :fun val total_one_bits U8: compiler intrinsic
   :fun val reverse_bits @: compiler intrinsic
   :fun val swap_bytes @: compiler intrinsic
-  :fun val native_to_be @: if Platform.big_endian (@ | @swap_bytes)
-  :fun val native_to_le @: if Platform.little_endian (@ | @swap_bytes)
-  :fun val be_to_native @: if Platform.big_endian (@ | @swap_bytes)
-  :fun val le_to_native @: if Platform.little_endian (@ | @swap_bytes)
+  :fun val native_to_be @: if Platform.is_big_endian (@ | @swap_bytes)
+  :fun val native_to_le @: if Platform.is_little_endian (@ | @swap_bytes)
+  :fun val be_to_native @: if Platform.is_big_endian (@ | @swap_bytes)
+  :fun val le_to_native @: if Platform.is_little_endian (@ | @swap_bytes)
 
   :is Integer.Countable(@)
   :fun val times

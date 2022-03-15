@@ -937,15 +937,23 @@ class Savi::Compiler::CodeGen
     gen_func_start(llvm_func, gtype, gfunc)
     params = llvm_func.params
 
+    target = Target.new(@target_machine.triple)
+
     @builder.ret \
       case gfunc.func.ident.value
-      when "ilp32"
+      when "is_linux"
+        gen_bool(target.linux?)
+      when "is_bsd"
+        gen_bool(target.bsd?)
+      when "is_macos"
+        gen_bool(target.macos?)
+      when "is_ilp32"
         gen_bool(abi_size_of(@isize) == 4)
-      when "lp64"
+      when "is_lp64"
         gen_bool(abi_size_of(@isize) == 8)
-      when "big_endian"
+      when "is_big_endian"
         gen_bool(@target_machine.data_layout.big_endian?)
-      when "little_endian"
+      when "is_little_endian"
         gen_bool(@target_machine.data_layout.little_endian?)
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
