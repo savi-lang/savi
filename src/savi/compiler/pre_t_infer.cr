@@ -506,6 +506,8 @@ module Savi::Compiler::PreTInfer
       case node.op.value
       when "source_code_position_of_argument"
         @analysis[node] = TInfer::FixedPrelude.new(node.pos, layer(node), "SourceCodePosition")
+      when "stack_address_of_variable"
+        @analysis[node] = TInfer::StackAddressOfVariable.new(node.pos, layer(node), @analysis[node.term])
       when "reflection_of_type"
         @analysis[node] = TInfer::ReflectionOfType.new(node.pos, layer(node), @analysis[node.term])
       when "reflection_of_runtime_type_name"

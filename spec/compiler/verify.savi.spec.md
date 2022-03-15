@@ -70,6 +70,21 @@ This try block is unnecessary:
 
 ---
 
+It complains if trying to take the stack address of a non-variable:
+
+```savi
+    foo = 99
+    stack_address_of_variable foo
+    stack_address_of_variable String
+```
+```error
+This is not a local variable, so it has no stack address:
+    stack_address_of_variable String
+                              ^~~~~~
+```
+
+---
+
 It complains when an async function declares or tries to yield:
 
 ```savi
