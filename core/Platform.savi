@@ -1,7 +1,27 @@
 :module Platform
-  :const ilp32 Bool: compiler intrinsic
-  :const lp64 Bool: compiler intrinsic
-  :const llp64 Bool: False // TODO: this is 65-but windows, instead of lp64
-  :const windows Bool: False // TODO: True on windows
-  :const big_endian Bool: compiler intrinsic
-  :const little_endian Bool: compiler intrinsic
+  :const is_linux Bool: compiler intrinsic
+  :const is_bsd Bool: compiler intrinsic
+  :const is_macos Bool: compiler intrinsic
+  :const is_posix Bool: True // TODO: False on windows
+  :const is_windows Bool: False // TODO: True on windows
+
+  :const is_ilp32 Bool: compiler intrinsic
+  :const is_lp64 Bool: compiler intrinsic
+  :const is_llp64 Bool: False // TODO: this is 64-bit windows, instead of lp64
+  :fun non is_32bit: @is_ilp32
+  :fun non is_64bit: @is_lp64 || @is_llp64
+  :fun non has_32bit_size: @is_32bit
+  :fun non has_64bit_size: @is_64bit
+  :fun non has_32bit_long: @is_ilp32 || @is_llp64
+  :fun non has_64bit_long: @is_lp64
+
+  :const is_big_endian Bool: compiler intrinsic
+  :const is_little_endian Bool: compiler intrinsic
+
+  // TODO: Remove these after libraries have been updated to use the new names.
+  :fun non ilp32 Bool: @is_ilp32
+  :fun non lp64 Bool: @is_lp64
+  :fun non llp64 Bool: @is_llp64
+  :fun non windows Bool: @is_windows
+  :fun non big_endian Bool: @is_big_endian
+  :fun non little_endian Bool: @is_little_endian

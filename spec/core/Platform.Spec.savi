@@ -2,11 +2,50 @@
   :is Spec
   :const describes: "Platform"
 
-  :it "returns True for exactly one of {ilp32, lp64, llp64}"
+  :it "returns True for exactly one of {is_linux, is_bsd, is_macos, is_windows}"
     assert: U8[1] == U8[0] +
-      if Platform.ilp32 (1 | 0) +
-      if Platform.lp64  (1 | 0) +
-      if Platform.llp64 (1 | 0)
+      if Platform.is_linux   (1 | 0) +
+      if Platform.is_bsd     (1 | 0) +
+      if Platform.is_macos   (1 | 0) +
+      if Platform.is_windows (1 | 0)
+
+  :it "returns True for is_posix on POSIX platforms"
+    if Platform.is_linux   (assert: Platform.is_posix)
+    if Platform.is_bsd     (assert: Platform.is_posix)
+    if Platform.is_macos   (assert: Platform.is_posix)
+    if Platform.is_windows (assert: Platform.is_posix.not)
+
+  :it "returns True for exactly one of {is_ilp32, is_lp64, is_llp64}"
+    assert: U8[1] == U8[0] +
+      if Platform.is_ilp32 (1 | 0) +
+      if Platform.is_lp64  (1 | 0) +
+      if Platform.is_llp64 (1 | 0)
+
+  :it "correctly identifies 64 bit vs 32 bit platform information"
+    if Platform.is_ilp32 (
+      assert: Platform.is_32bit
+      assert: Platform.is_64bit.not
+      assert: Platform.has_32bit_size
+      assert: Platform.has_64bit_size.not
+      assert: Platform.has_32bit_long
+      assert: Platform.has_64bit_long.not
+    )
+    if Platform.is_lp64 (
+      assert: Platform.is_32bit.not
+      assert: Platform.is_64bit
+      assert: Platform.has_32bit_size.not
+      assert: Platform.has_64bit_size
+      assert: Platform.has_32bit_long.not
+      assert: Platform.has_64bit_long
+    )
+    if Platform.is_llp64 (
+      assert: Platform.is_32bit.not
+      assert: Platform.is_64bit
+      assert: Platform.has_32bit_size.not
+      assert: Platform.has_64bit_size
+      assert: Platform.has_32bit_long
+      assert: Platform.has_64bit_long.not
+    )
 
   :it "is either big or little endian"
-    assert: Platform.big_endian == !Platform.little_endian
+    assert: Platform.is_big_endian != Platform.is_little_endian
