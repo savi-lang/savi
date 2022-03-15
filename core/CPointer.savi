@@ -143,5 +143,5 @@
   :: Return the address of this pointer as an integer.
   :fun tag usize USize: compiler intrinsic
 
-  :: Convert the given integer to a pointer with that as the address.
+  // TODO: Remove this method. It's not compatible with CHERI hardware.
   :fun non from_usize(number USize) @'tag: compiler intrinsic
