@@ -2500,8 +2500,6 @@ class Savi::Compiler::CodeGen
         gen_reflection_of_runtime_type_name(expr, expr.term)
       when "identity_digest_of"
         gen_identity_digest_of(expr.term)
-      when "address_of"
-        gen_address_of(expr.term)
       when "--", "recover_UNSAFE"
         gen_expr(expr.term, const_only)
       else

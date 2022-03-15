@@ -26,24 +26,6 @@ describe Savi::Compiler::Refer do
     ctx1.refer[f_link_m].should eq ctx2.refer[f_link_m]
   end
 
-  it "complains when trying to take address_of not local variable" do
-    source = Savi::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        t = address_of ""
-    SOURCE
-
-    expected = <<-MSG
-    address_of can be applied only to variable:
-    from (example):3:
-        t = address_of ""
-                       ^~
-    MSG
-
-    Savi.compiler.test_compile([source], :refer)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
   it "allows the use of branch-scoped variables to assign to outer ones" do
     source = Savi::Source.new_example <<-SOURCE
     :actor Main

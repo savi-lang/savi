@@ -108,17 +108,6 @@ module Savi::Compiler::Refer
       create_local(node)
     end
 
-    # TODO: Move this to the verify pass.
-    def touch(ctx, node : AST::Prefix)
-      case node.op.value
-      when "address_of"
-        unless @analysis[node.term]?.is_a? Local
-          Error.at node.term, "address_of can be applied only to variable"
-        end
-      else
-      end
-    end
-
     # For a FieldRead, FieldWrite, or FieldDisplace; take note of it by name.
     def touch(ctx, node : AST::FieldRead | AST::FieldWrite | AST::FieldDisplace)
       @analysis[node] = Field.new(node.value)
