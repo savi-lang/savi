@@ -1,4 +1,4 @@
-:ffi LibC
+:ffimodule LibC
   :fun variadic printf(format CPointer(U8)) I32
 
 :class Greeting

@@ -1,4 +1,4 @@
-:ffi LibPony
+:ffimodule LibPony
   :fun pony_exitcode(code I32) None
   :fun pony_os_stdout() CPointer(None)'ref
   :fun pony_os_stderr() CPointer(None)'ref

@@ -47,7 +47,7 @@ module Savi::Program::Intrinsic
           type_alias.target = body.terms.first
         }
       when "actor", "class", "struct", "trait",
-           "numeric", "enum", "module", "ffi"
+           "numeric", "enum", "module", "ffi", "ffimodule"
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
@@ -87,7 +87,7 @@ module Savi::Program::Intrinsic
         when "module"
           type.add_tag(:singleton)
           type.add_tag(:ignores_cap)
-        when "ffi"
+        when "ffi", "ffimodule"
           type.add_tag(:singleton)
           type.add_tag(:ignores_cap)
           type.add_tag(:private)
@@ -200,7 +200,7 @@ module Savi::Program::Intrinsic
       end
 
     # Declarations within a type definition.
-    when "type", "type_singleton", "ffi"
+    when "type", "type_singleton", "ffi", "ffimodule"
       case declarator.name.value
       when "it"
         name = terms["name"].as(AST::LiteralString)
@@ -493,7 +493,7 @@ module Savi::Program::Intrinsic
 
       scope.current_package.types << scope.current_type
       scope.current_type = nil
-    when "ffi"
+    when "ffi", "ffimodule"
       # An FFI type's functions should be tagged as "ffi" and body removed.
       scope.current_type.functions.each { |f|
         f.add_tag(:ffi)

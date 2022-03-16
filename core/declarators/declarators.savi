@@ -281,6 +281,15 @@
     :default non
   :term name_and_params NameMaybeWithParams
 
+:: This declarator is deprecated - use `:ffimodule` instead.
+:declarator ffi
+  :intrinsic
+  :begins ffi
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default non
+  :term name_and_params NameMaybeWithParams
+
 :: Declare a static singleton object exposing unsafe foreign functions (C-FFI).
 ::
 :: An `:ffi` declaration is similar to a `:module` in that it cannot be
@@ -291,7 +300,7 @@
 ::
 :: Each function signature in an `:ffi` declaration should directly correspond
 :: to a function exposed by a foreign package which is linked to the program.
-:declarator ffi
+:declarator ffimodule
   :intrinsic
   :begins ffi
 

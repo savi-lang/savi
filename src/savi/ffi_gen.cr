@@ -15,7 +15,7 @@ class Savi::FFIGen
   end
 
   def emit(io : IO)
-    io.puts ":ffi #{@savi_name}"
+    io.puts ":ffimodule #{@savi_name}"
     emit_function_decls(io)
   end
 
