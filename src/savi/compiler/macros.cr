@@ -827,11 +827,12 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         unless term.is_a?(AST::Identifier)
 
     Error.at term,
-      "Expected this term to be the identifier of a parameter",
+      "Expected this term to be the identifier of a parameter, or `yield`",
         [{@func.params.not_nil!.pos,
           "it is supposed to refer to one of the parameters listed here"}] \
             unless AST::Extract.params(@func.params).map(&.first)
-              .find { |param| param.value == term.value }
+              .find { |param| param.value == term.value } \
+                || term.value == "yield"
 
     Error.at node,
       "Expected this macro to be used as the default argument of a parameter",

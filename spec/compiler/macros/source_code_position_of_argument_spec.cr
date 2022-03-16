@@ -89,7 +89,7 @@ describe Savi::Compiler::Macros do
       SOURCE
 
       expected = <<-MSG
-      Expected this term to be the identifier of a parameter:
+      Expected this term to be the identifier of a parameter, or `yield`:
       from (example):4:
           bar SourceCodePosition = source_code_position_of_argument food
                                                                     ^~~~
@@ -102,6 +102,18 @@ describe Savi::Compiler::Macros do
 
       Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
+    end
+
+    it "won't complain if the identifier is yield" do
+      source = Savi::Source.new_example <<-SOURCE
+      :actor Main
+        :new (
+          foo String
+          bar SourceCodePosition = source_code_position_of_argument yield
+        )
+      SOURCE
+
+      Savi.compiler.test_compile([source], :macros).errors.should be_empty
     end
 
     it "complains if the macro isn't used as the default arg of a parameter" do

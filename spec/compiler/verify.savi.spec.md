@@ -70,6 +70,20 @@ This try block is unnecessary:
 
 ---
 
+It complains if trying to capture the source position of a yield block that is never yielded to:
+
+```savi
+  :fun non no_yield(pos = source_code_position_of_argument yield)
+    pos.string
+```
+```error
+This cannot collect the yield block source position, because the function does not yield:
+  :fun non no_yield(pos = source_code_position_of_argument yield)
+                                                           ^~~~~
+```
+
+---
+
 It complains if trying to take the stack address of a non-variable:
 
 ```savi

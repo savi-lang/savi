@@ -1609,7 +1609,12 @@ class Savi::Compiler::CodeGen
             params.terms.index { |o| foreign_refer[AST::Extract.param(o)[0]] == find_ref }
 
           # Now, generate a value representing the source code pos of that arg.
-          args << gen_source_code_pos(arg_exprs[found_index.not_nil!].not_nil!.pos)
+          if found_index
+            args << gen_source_code_pos(arg_exprs[found_index].not_nil!.pos)
+          else
+            # If there is no index of the arg, we must be referencing the yield.
+            args << gen_source_code_pos(call.yield_block.not_nil!.terms.last.pos)
+          end
         else
           gen_within_foreign_frame lhs_gtype, gfunc do
             func_frame.receiver_value = receiver
