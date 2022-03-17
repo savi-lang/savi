@@ -128,6 +128,16 @@ module Savi::Compiler::Classify
       @analysis.no_value!(op)
     end
 
+    def touch(ctx, prefix : AST::Prefix)
+      term = prefix.term
+      case prefix.op.value
+      when "source_code_position_of_argument"
+        @analysis.no_value!(term) \
+          if term.is_a?(AST::Identifier) && term.value == "yield"
+      else
+      end
+    end
+
     def touch(ctx, group : AST::Group)
       case group.style
       when "(", ":"

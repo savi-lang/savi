@@ -232,7 +232,8 @@ class Savi::AST::Format < Savi::AST::Visitor
 
   # Check for unnecessary parens within the terms of a Relate.
   def observe_relate_term_parens(ctx, relate : AST::Relate)
-    return if relate.op.value == "." # don't look at dot-relations
+    # Don't look at dot-relations or arrow-relations.
+    return if relate.op.value == "." || relate.op.value == "->"
 
     [relate.lhs, relate.rhs].each { |term|
       # Only consider a term that is a parens group.

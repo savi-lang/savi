@@ -148,13 +148,25 @@ class Savi::Compiler::Verify
       end
     end
 
-    # Verify that `stack_address_of_variable` is always used with a variable.
     def touch(ctx, node : AST::Prefix)
-      return unless node.op.value == "stack_address_of_variable"
+      term = node.term
 
-      unless @refer[node.term]?.is_a? Refer::Local
-        ctx.error_at node.term,
-          "This is not a local variable, so it has no stack address"
+      case node.op.value
+      # Verify that `source_code_position_of_argument yield` has yields.
+      when "source_code_position_of_argument"
+        if !@refer[term]?.is_a? Refer::Local \
+        && term.is_a?(AST::Identifier) && term.value == "yield" \
+        && @inventory.yield_count == 0
+          ctx.error_at term,
+            "This cannot collect the yield block source position, " +
+            "because the function does not yield"
+        end
+      # Verify that `stack_address_of_variable` is always used with a variable.
+      when "stack_address_of_variable"
+        if !@refer[term]?.is_a? Refer::Local
+          ctx.error_at term,
+            "This is not a local variable, so it has no stack address"
+        end
       end
     end
 
