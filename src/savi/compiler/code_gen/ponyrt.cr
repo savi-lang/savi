@@ -406,7 +406,7 @@ class Savi::Compiler::CodeGen::PonyRT
     type_def = gtype.type_def
 
     desc = g.mod.globals.add(gtype.desc_type, "#{type_def.llvm_name}.DESC")
-    desc.linkage = LLVM::Linkage::LinkerPrivate
+    desc.linkage = LLVM::Linkage::Private
     desc.global_constant = true
     desc
   end

@@ -376,6 +376,9 @@ class Savi::Compiler::CodeGen
     # Generate the wrapper main function for the JIT.
     gen_wrapper
 
+    # Do some last-minute tidying up.
+    gen_tidy_up
+
     # Finish up debugging info.
     @di.finish
 
@@ -413,7 +416,7 @@ class Savi::Compiler::CodeGen
     @mod.print_to_file("#{Binary.path_for(ctx)}.ll") if ctx.options.llvm_ir
   end
 
-  def gen_wrapper
+  def gen_wrapper # TODO: Bring back the JIT or remove this code.
     # Declare the wrapper function for the JIT.
     wrapper = @mod.functions.add("__savi_jit", ([] of LLVM::Type), @i32)
     wrapper.linkage = LLVM::Linkage::External
@@ -437,6 +440,20 @@ class Savi::Compiler::CodeGen
     # Call the main function with the constructed arguments.
     res = @builder.call(@mod.functions["main"], [argc, argv_0, envp_0], "res")
     @builder.ret(res)
+  end
+
+  # Do some basic housekeeping tasks to ensure LLVM doesn't yell at us.
+  def gen_tidy_up
+    # Any functions that have private linkage and no body need to have a
+    # dummy body inserted - otherwise LLVM will complain that they look
+    # like forward-declarations, which cannot have private linkage.
+    @mod.functions.each { |f|
+      next unless f.basic_blocks.last?.nil?           # skip defined functions
+      next unless f.linkage == LLVM::Linkage::Private # skip external functions
+      gen_func_start(f)
+      @builder.unreachable
+      gen_func_end
+    }
   end
 
   def gen_func_start(llvm_func, gtype : GenType? = nil, gfunc : GenFunc? = nil)
@@ -530,6 +547,30 @@ class Savi::Compiler::CodeGen
     frame.llvm_func.basic_blocks.append(name)
   end
 
+  def gen_llvm_func(name, param_types, ret_type)
+    @mod.functions.add(name, param_types, ret_type) { |f|
+      # Give the function private linkage unless the flag to keep all functions
+      # has been provided (in which case we use external linkage to preserve them)
+      f.linkage = ctx.options.llvm_keep_fns \
+        ? LLVM::Linkage::External \
+        : LLVM::Linkage::Private
+      f.unnamed_addr = true
+
+      yield f
+    }
+  end
+
+  def use_external_llvm_func(name, param_types, ret_type, is_variadic = false)
+    # Return the existing function if it already exists with external linkage.
+    existing = @mod.functions[name]?
+    return existing if existing && existing.linkage == LLVM::Linkage::External
+
+    # Otherwise, try to declare it here.
+    @mod.functions.add(name, param_types, ret_type, is_variadic) { |f|
+      f.linkage = LLVM::Linkage::External
+    }
+  end
+
   def gen_func_decl(gtype, gfunc)
     ret_type = gfunc.calling_convention.llvm_func_ret_type(self, gfunc)
 
@@ -555,8 +596,8 @@ class Savi::Compiler::CodeGen
       param_types.unshift(receiver_type)
     end
 
-    # Store the function declaration.
-    gfunc.llvm_func = @mod.functions.add(gfunc.llvm_name, param_types, ret_type)
+    # Store the function declaration. We'll generate the body later.
+    gfunc.llvm_func = gen_llvm_func(gfunc.llvm_name, param_types, ret_type) {}
 
     # We declare no additional virtual, send, or continue variants
     # if this is a hygienic function.
@@ -576,7 +617,7 @@ class Savi::Compiler::CodeGen
         vparam_types = param_types.dup
         vparam_types.unshift(gtype.struct_ptr)
 
-        @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
+        gen_llvm_func vtable_name, vparam_types, ret_type do |fn|
           next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
 
           gen_func_start(fn)
@@ -602,7 +643,7 @@ class Savi::Compiler::CodeGen
         vparam_types.shift
         vparam_types.unshift(gtype.struct_ptr)
 
-        @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
+        gen_llvm_func vtable_name, vparam_types, ret_type do |fn|
           next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
 
           gen_func_start(fn)
@@ -633,7 +674,7 @@ class Savi::Compiler::CodeGen
         vparam_types.shift
         vparam_types.unshift(gtype.struct_ptr)
 
-        @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
+        gen_llvm_func vtable_name, vparam_types, ret_type do |fn|
           next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
 
           gen_func_start(fn)
@@ -667,7 +708,7 @@ class Savi::Compiler::CodeGen
 
       # We'll fill in the implementation of this later, in gen_send_impl.
       gfunc.virtual_llvm_func = gfunc.send_llvm_func =
-        @mod.functions.add(send_name, param_types, @gtypes["None"].struct_ptr)
+        gen_llvm_func(send_name, param_types, @gtypes["None"].struct_ptr) {}
 
       # We also need to create a message type to use in the send operation.
       gfunc.send_msg_llvm_type =
@@ -687,7 +728,7 @@ class Savi::Compiler::CodeGen
       end
 
       gfunc.continue_llvm_func =
-        @mod.functions.add("#{gfunc.llvm_name}.CONTINUE", continue_param_types, ret_type)
+        gen_llvm_func("#{gfunc.llvm_name}.CONTINUE", continue_param_types, ret_type) {}
 
       # And declare the virtual continue function used to handle virtual continues.
       virtual_continue_param_types = [
@@ -699,7 +740,7 @@ class Savi::Compiler::CodeGen
         if virtual_continue_param_types == continue_param_types
           gfunc.continue_llvm_func
         else
-          @mod.functions.add "#{gfunc.llvm_name}.VIRTUAL.CONTINUE", virtual_continue_param_types, ret_type do |fn|
+          gen_llvm_func "#{gfunc.llvm_name}.VIRTUAL.CONTINUE", virtual_continue_param_types, ret_type do |fn|
             next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
 
             gen_func_start(fn)
@@ -795,14 +836,7 @@ class Savi::Compiler::CodeGen
 
     ffi_link_name = gfunc.func.metadata[:ffi_link_name].as(String)
 
-    # Prevent double-declaring for common FFI functions already known to us.
-    llvm_ffi_func = @mod.functions[ffi_link_name]?
-    if llvm_ffi_func
-      # TODO: verify that types and variadic-ness are compatible.
-      return @mod.functions[ffi_link_name]
-    end
-
-    @mod.functions.add(ffi_link_name, params, ret, is_variadic)
+    use_external_llvm_func(ffi_link_name, params, ret, is_variadic)
   end
 
   def gen_ffi_impl(gtype, gfunc, llvm_func)
@@ -1240,20 +1274,15 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 1
-            @mod.functions["llvm.bitreverse.i1"]? ||
-              @mod.functions.add("llvm.bitreverse.i1", [@i1], @i1)
+            use_external_llvm_func("llvm.bitreverse.i1", [@i1], @i1)
           when 8
-            @mod.functions["llvm.bitreverse.i8"]? ||
-              @mod.functions.add("llvm.bitreverse.i8", [@i8], @i8)
+            use_external_llvm_func("llvm.bitreverse.i8", [@i8], @i8)
           when 16
-            @mod.functions["llvm.bitreverse.i16"]? ||
-              @mod.functions.add("llvm.bitreverse.i16", [@i16], @i16)
+            use_external_llvm_func("llvm.bitreverse.i16", [@i16], @i16)
           when 32
-            @mod.functions["llvm.bitreverse.i32"]? ||
-              @mod.functions.add("llvm.bitreverse.i32", [@i32], @i32)
+            use_external_llvm_func("llvm.bitreverse.i32", [@i32], @i32)
           when 64
-            @mod.functions["llvm.bitreverse.i64"]? ||
-              @mod.functions.add("llvm.bitreverse.i64", [@i64], @i64)
+            use_external_llvm_func("llvm.bitreverse.i64", [@i64], @i64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         @builder.call(op_func, [params[0]])
@@ -1264,18 +1293,15 @@ class Savi::Compiler::CodeGen
           params[0]
         when 16
           op_func =
-            @mod.functions["llvm.bswap.i16"]? ||
-              @mod.functions.add("llvm.bswap.i16", [@i16], @i16)
+            use_external_llvm_func("llvm.bswap.i16", [@i16], @i16)
           @builder.call(op_func, [params[0]])
         when 32
           op_func =
-            @mod.functions["llvm.bswap.i32"]? ||
-              @mod.functions.add("llvm.bswap.i32", [@i32], @i32)
+            use_external_llvm_func("llvm.bswap.i32", [@i32], @i32)
           @builder.call(op_func, [params[0]])
         when 64
           op_func =
-            @mod.functions["llvm.bswap.i64"]? ||
-              @mod.functions.add("llvm.bswap.i64", [@i64], @i64)
+            use_external_llvm_func("llvm.bswap.i64", [@i64], @i64)
           @builder.call(op_func, [params[0]])
         else raise NotImplementedError.new(bit_width_of(gtype))
         end
@@ -1284,20 +1310,15 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 1
-            @mod.functions["llvm.ctlz.i1"]? ||
-              @mod.functions.add("llvm.ctlz.i1", [@i1, @i1], @i1)
+            use_external_llvm_func("llvm.ctlz.i1", [@i1, @i1], @i1)
           when 8
-            @mod.functions["llvm.ctlz.i8"]? ||
-              @mod.functions.add("llvm.ctlz.i8", [@i8, @i1], @i8)
+            use_external_llvm_func("llvm.ctlz.i8", [@i8, @i1], @i8)
           when 32
-            @mod.functions["llvm.ctlz.i32"]? ||
-              @mod.functions.add("llvm.ctlz.i32", [@i32, @i1], @i32)
+            use_external_llvm_func("llvm.ctlz.i32", [@i32, @i1], @i32)
           when 16
-            @mod.functions["llvm.ctlz.i16"]? ||
-              @mod.functions.add("llvm.ctlz.i16", [@i16, @i1], @i16)
+            use_external_llvm_func("llvm.ctlz.i16", [@i16, @i1], @i16)
           when 64
-            @mod.functions["llvm.ctlz.i64"]? ||
-              @mod.functions.add("llvm.ctlz.i64", [@i64, @i1], @i64)
+            use_external_llvm_func("llvm.ctlz.i64", [@i64, @i1], @i64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"],
@@ -1307,20 +1328,15 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 1
-            @mod.functions["llvm.cttz.i1"]? ||
-              @mod.functions.add("llvm.cttz.i1", [@i1, @i1], @i1)
+            use_external_llvm_func("llvm.cttz.i1", [@i1, @i1], @i1)
           when 8
-            @mod.functions["llvm.cttz.i8"]? ||
-              @mod.functions.add("llvm.cttz.i8", [@i8, @i1], @i8)
+            use_external_llvm_func("llvm.cttz.i8", [@i8, @i1], @i8)
           when 16
-            @mod.functions["llvm.cttz.i16"]? ||
-              @mod.functions.add("llvm.cttz.i16", [@i16, @i1], @i16)
+            use_external_llvm_func("llvm.cttz.i16", [@i16, @i1], @i16)
           when 32
-            @mod.functions["llvm.cttz.i32"]? ||
-              @mod.functions.add("llvm.cttz.i32", [@i32, @i1], @i32)
+            use_external_llvm_func("llvm.cttz.i32", [@i32, @i1], @i32)
           when 64
-            @mod.functions["llvm.cttz.i64"]? ||
-              @mod.functions.add("llvm.cttz.i64", [@i64, @i1], @i64)
+            use_external_llvm_func("llvm.cttz.i64", [@i64, @i1], @i64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"],
@@ -1330,20 +1346,15 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 1
-            @mod.functions["llvm.ctpop.i1"]? ||
-              @mod.functions.add("llvm.ctpop.i1", [@i1], @i1)
+            use_external_llvm_func("llvm.ctpop.i1", [@i1], @i1)
           when 8
-            @mod.functions["llvm.ctpop.i8"]? ||
-              @mod.functions.add("llvm.ctpop.i8", [@i8], @i8)
+            use_external_llvm_func("llvm.ctpop.i8", [@i8], @i8)
           when 16
-            @mod.functions["llvm.ctpop.i16"]? ||
-              @mod.functions.add("llvm.ctpop.i16", [@i16], @i16)
+            use_external_llvm_func("llvm.ctpop.i16", [@i16], @i16)
           when 32
-            @mod.functions["llvm.ctpop.i32"]? ||
-              @mod.functions.add("llvm.ctpop.i32", [@i32], @i32)
+            use_external_llvm_func("llvm.ctpop.i32", [@i32], @i32)
           when 64
-            @mod.functions["llvm.ctpop.i64"]? ||
-              @mod.functions.add("llvm.ctpop.i64", [@i64], @i64)
+            use_external_llvm_func("llvm.ctpop.i64", [@i64], @i64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"], \
@@ -1361,25 +1372,20 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 1
-            @mod.functions["llvm.#{basename}.with.overflow.i1"]? ||
-              @mod.functions.add("llvm.#{basename}.with.overflow.i1",
-                [@i1, @i1], @llvm.struct([@i1, @i1]))
+            use_external_llvm_func("llvm.#{basename}.with.overflow.i1",
+              [@i1, @i1], @llvm.struct([@i1, @i1]))
           when 8
-            @mod.functions["llvm.#{basename}.with.overflow.i8"]? ||
-              @mod.functions.add("llvm.#{basename}.with.overflow.i8",
-                [@i8, @i8], @llvm.struct([@i8, @i1]))
+            use_external_llvm_func("llvm.#{basename}.with.overflow.i8",
+              [@i8, @i8], @llvm.struct([@i8, @i1]))
           when 16
-            @mod.functions["llvm.#{basename}.with.overflow.i16"]? ||
-              @mod.functions.add("llvm.#{basename}.with.overflow.i16",
-                [@i16, @i16], @llvm.struct([@i16, @i1]))
+            use_external_llvm_func("llvm.#{basename}.with.overflow.i16",
+              [@i16, @i16], @llvm.struct([@i16, @i1]))
           when 32
-            @mod.functions["llvm.#{basename}.with.overflow.i32"]? ||
-              @mod.functions.add("llvm.#{basename}.with.overflow.i32",
-                [@i32, @i32], @llvm.struct([@i32, @i1]))
+            use_external_llvm_func("llvm.#{basename}.with.overflow.i32",
+              [@i32, @i32], @llvm.struct([@i32, @i1]))
           when 64
-            @mod.functions["llvm.#{basename}.with.overflow.i64"]? ||
-              @mod.functions.add("llvm.#{basename}.with.overflow.i64",
-                [@i64, @i64], @llvm.struct([@i64, @i1]))
+            use_external_llvm_func("llvm.#{basename}.with.overflow.i64",
+              [@i64, @i64], @llvm.struct([@i64, @i1]))
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
 
@@ -1418,11 +1424,9 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 32
-            @mod.functions["llvm.log.f32"]? ||
-              @mod.functions.add("llvm.log.f32", [@f32], @f32)
+            use_external_llvm_func("llvm.log.f32", [@f32], @f32)
           when 64
-            @mod.functions["llvm.log.f64"]? ||
-              @mod.functions.add("llvm.log.f64", [@f64], @f64)
+            use_external_llvm_func("llvm.log.f64", [@f64], @f64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         @builder.call(op_func, [params[0]])
@@ -1431,11 +1435,9 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 32
-            @mod.functions["llvm.log2.f32"]? ||
-              @mod.functions.add("llvm.log2.f32", [@f32], @f32)
+            use_external_llvm_func("llvm.log2.f32", [@f32], @f32)
           when 64
-            @mod.functions["llvm.log2.f64"]? ||
-              @mod.functions.add("llvm.log2.f64", [@f64], @f64)
+            use_external_llvm_func("llvm.log2.f64", [@f64], @f64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         @builder.call(op_func, [params[0]])
@@ -1444,11 +1446,9 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 32
-            @mod.functions["llvm.log10.f32"]? ||
-              @mod.functions.add("llvm.log10.f32", [@f32], @f32)
+            use_external_llvm_func("llvm.log10.f32", [@f32], @f32)
           when 64
-            @mod.functions["llvm.log10.f64"]? ||
-              @mod.functions.add("llvm.log10.f64", [@f64], @f64)
+            use_external_llvm_func("llvm.log10.f64", [@f64], @f64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         @builder.call(op_func, [params[0]])
@@ -1457,11 +1457,9 @@ class Savi::Compiler::CodeGen
         op_func =
           case bit_width_of(gtype)
           when 32
-            @mod.functions["llvm.pow.f32"]? ||
-              @mod.functions.add("llvm.pow.f32", [@f32, @f32], @f32)
+            use_external_llvm_func("llvm.pow.f32", [@f32, @f32], @f32)
           when 64
-            @mod.functions["llvm.pow.f64"]? ||
-              @mod.functions.add("llvm.pow.f64", [@f64, @f64], @f64)
+            use_external_llvm_func("llvm.pow.f64", [@f64, @f64], @f64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         @builder.call(op_func, [params[0], params[1]])
@@ -2958,7 +2956,7 @@ class Savi::Compiler::CodeGen
 
   def gen_global_for_const(const : LLVM::Value, name : String = "") : LLVM::Value
     global = @mod.globals.add(const.type, name)
-    global.linkage = LLVM::Linkage::External # TODO: Private linkage?
+    global.linkage = LLVM::Linkage::Private
     global.initializer = const
     global.global_constant = true
     global.unnamed_addr = true
@@ -3145,7 +3143,7 @@ class Savi::Compiler::CodeGen
     @builder.clear_insertion_position
 
     via_llvm_func =
-      @mod.functions.add(
+      gen_llvm_func(
         "#{gfunc.llvm_name}.VIA.#{mutator_gtype.type_def.llvm_name}",
         mutator_call_gfunc.virtual_llvm_func.function_type.params_types,
         mutator_call_gfunc.virtual_llvm_func.function_type.return_type,
@@ -3771,7 +3769,7 @@ class Savi::Compiler::CodeGen
   # For modules, this is the only value you'll ever see.
   def gen_singleton(gtype)
     global = @mod.globals.add(gtype.struct_type, gtype.type_def.llvm_name)
-    global.linkage = LLVM::Linkage::LinkerPrivate
+    global.linkage = LLVM::Linkage::Private
     global.global_constant = true
 
     # The first element is always the type descriptor.

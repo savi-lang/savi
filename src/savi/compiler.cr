@@ -9,6 +9,7 @@ class Savi::Compiler
     property print_perf
     property skip_manifest
     property llvm_ir = false
+    property llvm_keep_fns = false
     property auto_fix = false
     property manifest_name : String?
     property target_pass : Symbol?
