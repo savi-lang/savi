@@ -19,6 +19,7 @@ module Savi
       option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
       option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
       option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
+      option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
       option "-C", "--cd=DIR", desc: "Change the working directory"
       option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
@@ -29,6 +30,7 @@ module Savi
           print_perf: opts.print_perf,
         )
         options.llvm_ir = true if opts.llvm_ir
+        options.llvm_keep_fns = true if opts.llvm_keep_fns
         options.auto_fix = true if opts.fix
         options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
         Dir.cd(opts.cd.not_nil!) if opts.cd
@@ -77,6 +79,7 @@ module Savi
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
+        option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
@@ -87,6 +90,7 @@ module Savi
             print_perf: opts.print_perf,
           )
           options.llvm_ir = true if opts.llvm_ir
+          options.llvm_keep_fns = true if opts.llvm_keep_fns
           options.auto_fix = true if opts.fix
           options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
           options.manifest_name = args.name.not_nil! if args.name
@@ -105,6 +109,7 @@ module Savi
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
+        option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
@@ -114,6 +119,7 @@ module Savi
             print_perf: opts.print_perf,
           )
           options.llvm_ir = true if opts.llvm_ir
+          options.llvm_keep_fns = true if opts.llvm_keep_fns
           options.auto_fix = true if opts.fix
           options.manifest_name = args.name.not_nil! if args.name
           Dir.cd(opts.cd.not_nil!) if opts.cd
