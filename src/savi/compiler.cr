@@ -6,9 +6,9 @@ class Savi::Compiler
   class Options
     property release
     property no_debug
-    property print_ir
     property print_perf
     property skip_manifest
+    property llvm_ir = false
     property auto_fix = false
     property manifest_name : String?
     property target_pass : Symbol?
@@ -32,7 +32,6 @@ class Savi::Compiler
     def initialize(
       @release = false,
       @no_debug = false,
-      @print_ir = false,
       @print_perf = false,
       @skip_manifest = false,
       @manifest_name = nil,

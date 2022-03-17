@@ -13,13 +13,17 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Savi::Compiler::Binary
+  def self.path_for(ctx)
+    ctx.manifests.root.not_nil!.bin_path
+  end
+
   def self.run(ctx)
     new.run(ctx)
   end
 
   def run(ctx)
     target = Target.new(ctx.code_gen.target_machine.triple)
-    bin_path = ctx.manifests.root.not_nil!.bin_path
+    bin_path = Binary.path_for(ctx)
 
     # Compile a temporary binary object file, that we will remove after we
     # use it in the linker invocation to create the final binary.

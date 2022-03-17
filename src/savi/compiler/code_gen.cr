@@ -383,8 +383,12 @@ class Savi::Compiler::CodeGen
     begin
       @mod.verify
     rescue ex
-      @mod.dump
-      raise ex
+      @mod.print_to_file("#{Binary.path_for(ctx)}.ll")
+      Error.at Source::Pos.none, "LLVM #{ex.message}", [
+        {Source::Pos.none,
+          "please submit an issue ticket with this failure output and attach " +
+          "the dumped LLVM IR file located at: #{Binary.path_for(ctx)}.ll"}
+      ]
     end
 
     if ctx.options.release
@@ -406,7 +410,7 @@ class Savi::Compiler::CodeGen
       mod_pass_manager.run @mod
     end
 
-    @mod.dump if ctx.options.print_ir
+    @mod.print_to_file("#{Binary.path_for(ctx)}.ll") if ctx.options.llvm_ir
   end
 
   def gen_wrapper

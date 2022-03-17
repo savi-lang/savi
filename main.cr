@@ -18,7 +18,7 @@ module Savi
       option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
       option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
       option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
-      option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
+      option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
       option "-C", "--cd=DIR", desc: "Change the working directory"
       option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
@@ -26,9 +26,9 @@ module Savi
         options = Savi::Compiler::Options.new(
           release: opts.release,
           no_debug: opts.no_debug,
-          print_ir: opts.print_ir,
           print_perf: opts.print_perf,
         )
+        options.llvm_ir = true if opts.llvm_ir
         options.auto_fix = true if opts.fix
         options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
         Dir.cd(opts.cd.not_nil!) if opts.cd
@@ -53,14 +53,12 @@ module Savi
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
-        option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
           options = Savi::Compiler::Options.new(
             release: opts.release,
             no_debug: opts.no_debug,
-            print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
           options.auto_fix = true if opts.fix
@@ -78,7 +76,7 @@ module Savi
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
-        option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
+        option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
@@ -86,9 +84,9 @@ module Savi
           options = Savi::Compiler::Options.new(
             release: opts.release,
             no_debug: opts.no_debug,
-            print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
+          options.llvm_ir = true if opts.llvm_ir
           options.auto_fix = true if opts.fix
           options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
           options.manifest_name = args.name.not_nil! if args.name
@@ -106,16 +104,16 @@ module Savi
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
-        option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
+        option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
           options = Savi::Compiler::Options.new(
             release: opts.release,
             no_debug: opts.no_debug,
-            print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
+          options.llvm_ir = true if opts.llvm_ir
           options.auto_fix = true if opts.fix
           options.manifest_name = args.name.not_nil! if args.name
           Dir.cd(opts.cd.not_nil!) if opts.cd
