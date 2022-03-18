@@ -8,8 +8,8 @@ It generates C bindings for a basic function.
 unsigned sleep(unsigned seconds);
 ```
 ```savi
-:ffimodule LibExample
-  :fun sleep(
+:module _FFI
+  :ffi sleep(
     seconds U32
   ) U32
 ```
@@ -28,12 +28,12 @@ It picks up block-style comments as documentation.
 unsigned sleep(unsigned seconds);
 ```
 ```savi
-:ffimodule LibExample
+:module _FFI
   :: Sleep for the given number of seconds.
   ::
   :: Returns the number of seconds remaining in the sleep, if the sleep was
   :: interrupted by a signal. Otherwise, returns zero to indicate completion.
-  :fun sleep(
+  :ffi sleep(
     seconds U32
   ) U32
 ```
@@ -46,8 +46,8 @@ It handles functions with no arguments.
 int rand(void);
 ```
 ```savi
-:ffimodule LibExample
-  :fun rand I32
+:module _FFI
+  :ffi rand I32
 ```
 
 ---
@@ -58,8 +58,8 @@ It handles functions with no return value.
 void srand(unsigned int seed);
 ```
 ```savi
-:ffimodule LibExample
-  :fun srand(
+:module _FFI
+  :ffi srand(
     seed U32
   )
 ```

@@ -30,6 +30,30 @@ ExampleOnly2 isn't a subtype of TraitExample123, as it is required to be here:
 
 ---
 
+It won't allow FFI functions to be a subfunc to any abstract function:
+
+```savi
+:trait TraitCantMatchFFI
+  :fun puts(string CPointer(U8)) I32
+  :fun putz(string CPointer(U8)) I32
+
+:module ModuleWithFFI
+  :is TraitCantMatchFFI
+  :ffi puts(string CPointer(U8)) I32
+  :fun putz(string CPointer(U8)) I32: @puts(string)
+```
+```error
+ModuleWithFFI isn't a subtype of TraitCantMatchFFI, as it is required to be here:
+  :is TraitCantMatchFFI
+   ^~
+
+- an FFI function cannot be a subtype of an abstract function:
+  :ffi puts(string CPointer(U8)) I32
+       ^~~~
+```
+
+---
+
 It requires a sub-func to have the same constructor or constant tags:
 
 ```savi

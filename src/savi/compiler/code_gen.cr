@@ -609,6 +609,9 @@ class Savi::Compiler::CodeGen
     # if this is a hygienic function.
     return if gfunc.link.is_hygienic?
 
+    # Nor do we declare anything additional for an FFI function.
+    return if gfunc.func.has_tag?(:ffi)
+
     # Choose the strategy for the function that goes in the virtual table.
     # The virtual table is used for calling functions indirectly, and always
     # has an object-style receiver as the first parameter, for consistency.

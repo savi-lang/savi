@@ -167,7 +167,7 @@ class Savi::Compiler::Namespace
 
     @types_by_package_name["Savi"].each do |name, new_type_link|
       new_type = new_type_link.resolve(ctx)
-      next if new_type.has_tag?(:private)
+      next if new_type.ident.value.starts_with?("_") # skip private types
 
       already_type = source_analysis.types[name]?.try(&.resolve(ctx))
       if already_type
@@ -190,7 +190,7 @@ class Savi::Compiler::Namespace
 
       @types_by_package_name[dep_manifest.name.value].each { |name, new_type_link|
         new_type = new_type_link.resolve(ctx)
-        next if new_type.has_tag?(:private)
+        next if new_type.ident.value.starts_with?("_") # skip private types
 
         already_type = source_analysis.types[name]?.try(&.resolve(ctx))
         if already_type

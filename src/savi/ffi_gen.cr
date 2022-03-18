@@ -4,7 +4,7 @@ class Savi::FFIGen
   @header_name : String
 
   def initialize(@header_name)
-    @savi_name = "LibExample" # TODO: Configurable
+    @savi_name = "_FFI" # TODO: Configurable
     @need_struct_decls = [] of String
 
     base_name = File.basename(@header_name)
@@ -15,7 +15,7 @@ class Savi::FFIGen
   end
 
   def emit(io : IO)
-    io.puts ":ffimodule #{@savi_name}"
+    io.puts ":module #{@savi_name}"
     emit_function_decls(io)
   end
 
@@ -36,7 +36,8 @@ class Savi::FFIGen
       })
 
       # Emit function name.
-      io.print "  :fun #{cursor.spelling}"
+      # TODO: Handle optional variadic keyword here.
+      io.print "  :ffi #{cursor.spelling}"
 
       # Emit function arguments.
       io.puts "(" unless cursor.arguments.empty?

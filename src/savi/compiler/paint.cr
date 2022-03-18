@@ -30,6 +30,7 @@ class Savi::Compiler::Paint
     ctx.reach.each_type_def.each do |reach_def|
       ctx.reach.reached_funcs_for(reach_def).each do |reach_func|
         next if reach_func.link.is_hygienic?
+        next if reach_func.reified.func(ctx).has_tag?(:ffi)
 
         observe_func(ctx, reach_def, reach_func)
       end
@@ -49,7 +50,7 @@ class Savi::Compiler::Paint
   def []?(ctx, reach_func : Reach::Func, for_continue : Bool = false) : Color?
     name = reach_func.signature.codegen_compat_name(ctx)
     name = "#{name}.CONTINUE" if for_continue
-    @results[reach_func.reach_def][name]?
+    @results[reach_func.reach_def]?.try(&.[]?(name))
   end
 
   # Return the next color id to assign when we need a previously unused color.

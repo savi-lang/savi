@@ -47,7 +47,7 @@ module Savi::Program::Intrinsic
           type_alias.target = body.terms.first
         }
       when "actor", "class", "struct", "trait",
-           "numeric", "enum", "module", "ffi", "ffimodule"
+           "numeric", "enum", "module", "ffimodule"
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
@@ -87,10 +87,9 @@ module Savi::Program::Intrinsic
         when "module"
           type.add_tag(:singleton)
           type.add_tag(:ignores_cap)
-        when "ffi", "ffimodule"
+        when "ffimodule"
           type.add_tag(:singleton)
           type.add_tag(:ignores_cap)
-          type.add_tag(:private)
         else
           raise NotImplementedError.new(declarator.name.value)
         end
@@ -200,7 +199,7 @@ module Savi::Program::Intrinsic
       end
 
     # Declarations within a type definition.
-    when "type", "type_singleton", "ffi", "ffimodule"
+    when "type", "type_singleton", "ffimodule"
       case declarator.name.value
       when "it"
         name = terms["name"].as(AST::LiteralString)
@@ -224,8 +223,6 @@ module Savi::Program::Intrinsic
           params,
           terms["ret"]?.as(AST::Term?),
         )
-
-        function.add_tag(:variadic) if terms["variadic"]?
 
         scope.on_body { |body| function.body = body }
       when "be"
@@ -285,6 +282,26 @@ module Savi::Program::Intrinsic
         scope.current_type.functions << function
 
         scope.on_body { |body| function.body = body }
+      when "ffi"
+        name, params =
+          AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
+
+        scope.current_function = function = Program::Function.new(
+          AST::Identifier.new("non").from(declare.terms.first),
+          name,
+          params,
+          terms["ret"]?.as(AST::Term?),
+        )
+
+        function.add_tag(:ffi)
+        function.add_tag(:inline)
+        function.add_tag(:variadic) if terms["variadic"]?
+
+        ffi_link_name = function.ident.value
+        ffi_link_name = ffi_link_name[0...-1] if ffi_link_name.ends_with?("!")
+        function.metadata[:ffi_link_name] = ffi_link_name
+
+        function.body = nil
       when "let", "var"
         type = scope.current_type
 
@@ -471,7 +488,7 @@ module Savi::Program::Intrinsic
     when "term"
       scope.current_declarator.terms << scope.current_declarator_term
       scope.current_declarator_term = nil
-    when "fun", "be", "new"
+    when "fun", "be", "new", "ffi"
       scope.current_type.functions << scope.current_function
       scope.current_function = nil
     when "actor", "class", "struct", "module"
@@ -498,8 +515,8 @@ module Savi::Program::Intrinsic
 
       scope.current_package.types << scope.current_type
       scope.current_type = nil
-    when "ffi", "ffimodule"
-      # An FFI type's functions should be tagged as "ffi" and body removed.
+    when "ffimodule"
+      # An FFI module's functions should be tagged as "ffi" and body removed.
       scope.current_type.functions.each { |f|
         f.add_tag(:ffi)
         f.add_tag(:inline)
