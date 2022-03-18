@@ -1,45 +1,117 @@
+:: The `Platform` module contains a collection of constants that expose basic
+:: information about the target platform that the program is being compiled for.
+::
+:: These are mostly useful for FFI-using libraries that need to change their
+:: approach to the underlying C functions they call based on the platform.
+::
+:: They are also used internally by certain features of the core data types,
+:: such as the methods on `Integer.BitwiseArithmetic` that can convert numbers
+:: to/from a specified byte order based on the native byte order.
 :module Platform
+  :: SECTION: Byte Order
+
+  :: Returns `True` if the target platform uses a big-endian byte order.
+  ::
+  :: This is mutually exclusive with `is_little_endian`.
+  :const is_big_endian Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses a little-endian byte order.
+  ::
+  :: This is mutually exclusive with `is_big_endian`.
+  :const is_little_endian Bool: compiler intrinsic
+
+  :: SECTION: Operating Systems
+
+  :: Returns `True` if the target platform uses the Linux operating system.
+  ::
+  :: This is mutually exclusive with `is_bsd`, `is_macos`, and `is_windows`.
+  :: If true, it implies that `is_posix` is also true.
   :const is_linux Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses a BSD operating system.
+  ::
+  :: This is mutually exclusive with `is_linux`, `is_macos`, and `is_windows`.
+  :: If true, it implies that `is_posix` is also true.
   :const is_bsd Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses a MacOS operating system.
+  ::
+  :: This is mutually exclusive with `is_linux`, `is_bsd`, and `is_windows`.
+  :: If true, it implies that `is_posix` is also true.
   :const is_macos Bool: compiler intrinsic
-  :const is_posix Bool: True // TODO: False on windows
-  :const is_windows Bool: False // TODO: True on windows
 
+  :: Returns `True` if the target platform uses a POSIX operating system.
+  ::
+  :: This is always true if the platform `is_linux`, `is_bsd`, or `is_macos`.
+  :: It is mutually exclusive with `is_windows`.
+  :const is_posix Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses a Windows operating system.
+  ::
+  :: This is always false if the platform `is_linux`, `is_bsd`, or `is_macos`.
+  :: It is mutually exclusive with `is_posix`.
+  :const is_windows Bool: compiler intrinsic
+
+  :: SECTION: Data Type Sizes
+
+  :: Returns `True` if the target platform uses ILP32 data type sizes.
+  ::
+  :: This is mutually exclusive with `is_lp64` and `is_llp64`.
+  :: If true, it implies that `has_32bit_size` and `has_32bit_long` are true.
   :const is_ilp32 Bool: compiler intrinsic
-  :const is_lp64 Bool: compiler intrinsic
-  :const is_llp64 Bool: False // TODO: this is 64-bit windows, instead of lp64
 
-  :fun non is_32bit
+  :: Returns `True` if the target platform uses LP64 data type sizes.
+  ::
+  :: This is mutually exclusive with `is_ilp32` and `is_llp64`.
+  :: If true, it implies that `has_64bit_size` and `has_64bit_long` are true.
+  :const is_lp64 Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses LLP64 data type sizes.
+  ::
+  :: This is mutually exclusive with `is_lp64` and `is_llp64`.
+  :: If true, it implies that `has_64bit_size` and `has_32bit_long` are true.
+  :const is_llp64 Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform has a 32-bit `size_t` type in C.
+  ::
+  :: This is mutually exclusive with `has_64bit_size`.
+  :fun non has_32bit_size
     :inline always
     @is_ilp32
 
-  :fun non is_64bit
+  :: Returns `True` if the target platform has a 64-bit `size_t` type in C.
+  ::
+  :: This is mutually exclusive with `has_32bit_size`.
+  :fun non has_64bit_size
     :inline always
     @is_lp64 || @is_llp64
 
-  :fun non has_32bit_size
-    :inline always
-    @is_32bit
-
-  :fun non has_64bit_size
-    :inline always
-    @is_64bit
-
+  :: Returns `True` if the target platform has a 32-bit `long int` type in C.
+  ::
+  :: This is mutually exclusive with `has_64bit_long`.
   :fun non has_32bit_long
     :inline always
     @is_ilp32 || @is_llp64
 
+  :: Returns `True` if the target platform has a 64-bit `long int` type in C.
+  ::
+  :: This is mutually exclusive with `has_32bit_long`.
   :fun non has_64bit_long
     :inline always
     @is_lp64
 
-  :const is_big_endian Bool: compiler intrinsic
-  :const is_little_endian Bool: compiler intrinsic
+  :: Returns `True` if the target platform has a 32-bit address space.
+  ::
+  :: This is mutually exclusive with `is_64bit`.
+  :: This is currently a synonym for with `has_32bit_size`.
+  :fun non is_32bit
+    :inline always
+    @has_32bit_size
 
-  // TODO: Remove these after libraries have been updated to use the new names.
-  :fun non ilp32 Bool: @is_ilp32
-  :fun non lp64 Bool: @is_lp64
-  :fun non llp64 Bool: @is_llp64
-  :fun non windows Bool: @is_windows
-  :fun non big_endian Bool: @is_big_endian
-  :fun non little_endian Bool: @is_little_endian
+  :: Returns `True` if the target platform has a 64-bit address space.
+  ::
+  :: This is mutually exclusive with `is_32bit`.
+  :: This is currently a synonym for with `has_64bit_size`.
+  :fun non is_64bit
+    :inline always
+    @has_64bit_size

@@ -991,10 +991,16 @@ class Savi::Compiler::CodeGen
         gen_bool(target.bsd?)
       when "is_macos"
         gen_bool(target.macos?)
+      when "is_posix"
+        gen_bool(true) # TODO: false on windows
+      when "is_windows"
+        gen_bool(false) # TODO: true on windows
       when "is_ilp32"
         gen_bool(abi_size_of(@isize) == 4)
       when "is_lp64"
         gen_bool(abi_size_of(@isize) == 8)
+      when "is_llp64"
+        gen_bool(false) # TODO: this is 64-bit windows, instead of lp64
       when "is_big_endian"
         gen_bool(@target_machine.data_layout.big_endian?)
       when "is_little_endian"
