@@ -277,7 +277,10 @@ module Savi::Program::Intrinsic
           terms["name"].as(AST::Identifier),
           nil,
           terms["type"]?.as(AST::Term?),
-        ).tap(&.add_tag(:constant))
+        ).tap do |f|
+          f.add_tag(:constant)
+          f.add_tag(:inline)
+        end
 
         scope.current_type.functions << function
 
@@ -437,6 +440,8 @@ module Savi::Program::Intrinsic
     # Declarations within a function definition.
     when "function"
       case declarator.name.value
+      when "inline"
+        scope.current_function.add_tag(:inline)
       when "yields"
         scope.current_function.yield_out = terms["out"]?.as(AST::Term?)
         scope.current_function.yield_in  = terms["in"]?.as(AST::Term?)
@@ -497,6 +502,7 @@ module Savi::Program::Intrinsic
       # An FFI type's functions should be tagged as "ffi" and body removed.
       scope.current_type.functions.each { |f|
         f.add_tag(:ffi)
+        f.add_tag(:inline)
         ffi_link_name = f.ident.value
         ffi_link_name = ffi_link_name[0...-1] if ffi_link_name.ends_with?("!")
         f.metadata[:ffi_link_name] = ffi_link_name
