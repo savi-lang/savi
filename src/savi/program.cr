@@ -210,7 +210,6 @@ class Savi::Program
       :ignores_cap,
       :numeric,
       :pass_by_value,
-      :private,
       :no_field_reassign,
       :simple_value,
       :singleton,

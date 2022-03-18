@@ -259,6 +259,15 @@ class Savi::Compiler::SubtypingCache
       this_infer = ctx.infer[this_func.make_link(this.link)]
       that_infer = ctx.infer[that_func.make_link(that.link)]
 
+      # We don't allow FFI calls to be a subtype of anything.
+      # This prevents workarounds that could allow calling them outside of
+      # a library boundary, and also ensures that we don't have to generate
+      # virtual calls in the virtual table for them.
+      if this_func.has_tag?(:ffi)
+        errors << {this_func.ident.pos,
+          "an FFI function cannot be a subtype of an abstract function"}
+      end
+
       # A constructor can only match another constructor.
       case {this_func.has_tag?(:constructor), that_func.has_tag?(:constructor)}
       when {true, false}

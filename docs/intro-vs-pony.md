@@ -545,33 +545,33 @@ Generic functions are not yet in Savi. See [this ticket](https://github.com/savi
 
 #### FFI Block
 
-While in Pony we use `@` to mark that we are calling a C function, in Savi we declare an `:ffimodule` type:
+While in Pony we use `@` to mark that we are calling a C function, in Savi we declare an `:ffi` function instead of a normal `:fun` function:
 
 ```savi
-:ffimodule LibC
-  :fun puts(string CPointer(U8)) I32
+:module _FFI
+  :ffi puts(string CPointer(U8)) I32
 ```
 
-In the example above you see that we are declaring plain functions. You need to specify all types, just like in Pony. All FFI functions have the `non` reference capability.
+In the example above you see that it is nearly the same declaration syntax as normal functions. You need to specify all types, just like in Pony. All FFI functions have the `non` reference capability.
 
 To use a variadic function from C (one which can accept additional arguments that have no specific type requirements), add the word `variadic` to the declaration:
 
 ```savi
-:ffimodule LibC
-  :fun variadic printf(format CPointer(U8)) I32
+:module _FFI
+  :ffi variadic printf(format CPointer(U8)) I32
 ```
 
 Note that on some platforms, variadic functions use a different calling convention from non-variadic functions, so be sure to always mark FFI functions correctly - the Savi compiler can't prevent you from getting this wrong.
 
 #### Usage example
 
-In Savi, all FFI functions are namespaced by the `:ffimodule` type name you declared, so you can call them just like a method of a type is called:
+In Savi, all FFI functions are namespaced by the type name you declared, so you can call them just like you would call a `:fun non` on the type name:
 ```savi
 :class Greeting
   :let message String
   :new iso (@message)
   :fun say
-    LibC.printf("%s\n".cstring, @message.cstring)
+    _FFI.printf("%s\n".cstring, @message.cstring)
 ```
 
 ### [TODO: More Syntax Info...]

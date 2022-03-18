@@ -281,28 +281,21 @@
     :default non
   :term name_and_params NameMaybeWithParams
 
-:: This declarator is deprecated - use `:ffimodule` instead.
-:declarator ffi
-  :intrinsic
-  :begins ffi
-
-  :term cap enum (iso, val, ref, box, tag, non)
-    :default non
-  :term name_and_params NameMaybeWithParams
-
 :: Declare a static singleton object exposing unsafe foreign functions (C-FFI).
 ::
-:: An `:ffi` declaration is similar to a `:module` in that it cannot be
+:: An `:ffimodule` declaration is similar to a `:module` in that it cannot be
 :: instantiated, and it can only have `:fun non` functions.
 ::
-:: However, rather than implementing functions with bodies, `:ffi` declarations
+:: However, rather than implementing functions with bodies, FFI declarations
 :: are used for binding foreign functions, so they declare no function bodies.
 ::
-:: Each function signature in an `:ffi` declaration should directly correspond
+:: Each function signature in an FFI declaration should directly correspond
 :: to a function exposed by a foreign package which is linked to the program.
+::
+:: DEPRECATED: Use `:ffi` functions on a `:module` instead
 :declarator ffimodule
   :intrinsic
-  :begins ffi
+  :begins type_singleton
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default non
@@ -350,20 +343,6 @@
   :body optional
 
 // TODO: Document this.
-:declarator fun
-  :intrinsic
-  :context ffi
-  :begins function
-
-  :term cap enum (non)
-    :default non
-  :term variadic enum (variadic)
-    :optional
-  :term name_and_params NameMaybeWithParams
-  :term ret Type
-    :optional
-
-// TODO: Document this.
 :declarator be
   :intrinsic
   :context type
@@ -394,6 +373,17 @@
   :term params Params
     :optional
   :body optional
+
+// TODO: Document this.
+:declarator ffi
+  :intrinsic
+  :context type
+
+  :term variadic enum (variadic)
+    :optional
+  :term name_and_params NameMaybeWithParams
+  :term ret Type
+    :optional
 
 // TODO: Document this.
 :declarator inline

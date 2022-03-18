@@ -13,18 +13,21 @@ class Savi::Compiler::Privacy
   def self.check_reified_func(ctx, infer : Infer::FuncAnalysis)
     infer.each_called_func_link(ctx) { |info, called_func_link|
       pos = info.pos
+      called_func = called_func_link.resolve(ctx)
 
-      # Only handle private calls (beginning with an underscore).
-      return unless called_func_link.name.starts_with?("_")
+      # Only handle FFI calls and private calls (beginning with an underscore).
+      is_ffi = called_func.has_tag?(:ffi)
+      is_private = called_func_link.name.starts_with?("_")
+      next unless is_ffi || is_private
 
       # If the call site's package is the same as the function's package,
       # then there is no privacy issue and we can move on without error.
       next if pos.source.package == called_func_link.type.package.source_package
 
       # Otherwise we raise it as an error.
-      Error.at pos, "This function call breaks privacy boundaries", [{
-        called_func_link.resolve(ctx).ident.pos,
-        "this is a private function from another package"
+      ctx.error_at pos, "This function call breaks privacy boundaries", [{
+        called_func.ident.pos,
+        "this is #{is_ffi ? "an FFI" : "a private"} function from another package"
       }]
     }
   end

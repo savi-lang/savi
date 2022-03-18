@@ -59,6 +59,7 @@
 
   :fun size: @_size
   :fun space: @_space
+  :fun cpointer CPointer(U64)'tag: @_ptr
 
   :fun is_empty: @_size == 0
   :fun is_not_empty: @_size != 0

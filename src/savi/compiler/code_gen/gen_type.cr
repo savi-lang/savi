@@ -26,7 +26,7 @@ class Savi::Compiler::CodeGen
         unless rf.link.hygienic_id
           vtable_index = g.ctx.paint[g.ctx, reach_func]?
           vtable_index_continue = g.ctx.paint[g.ctx, reach_func, true]?
-          max_index = [vtable_index, vtable_index_continue].compact.max
+          max_index = [-1, vtable_index, vtable_index_continue].compact.max
           @vtable_size = (max_index + 1) if @vtable_size <= max_index
         end
 
