@@ -394,14 +394,15 @@ class Savi::Compiler::CodeGen
       ]
     end
 
-    if ctx.options.release
+    # Run the LLVM optimizer passes.
+    begin
       registry = LLVM::PassRegistry.instance
       registry.initialize_all
 
       pass_manager_builder = LLVM::PassManagerBuilder.new
-      pass_manager_builder.opt_level = 3
+      pass_manager_builder.opt_level = ctx.options.release ? 3 : 0
       pass_manager_builder.size_level = 0
-      pass_manager_builder.use_inliner_with_threshold = 275
+      pass_manager_builder.use_inliner_with_threshold = ctx.options.release ? 275 : 0
 
       fun_pass_manager = @mod.new_function_pass_manager
       pass_manager_builder.populate fun_pass_manager
@@ -598,6 +599,11 @@ class Savi::Compiler::CodeGen
 
     # Store the function declaration. We'll generate the body later.
     gfunc.llvm_func = gen_llvm_func(gfunc.llvm_name, param_types, ret_type) {}
+
+    # If the function is meant to always be inlined, mark the LLVM func as such.
+    if gfunc.func.has_tag?(:inline)
+      gfunc.llvm_func.add_attribute(LLVM::Attribute::AlwaysInline)
+    end
 
     # We declare no additional virtual, send, or continue variants
     # if this is a hygienic function.

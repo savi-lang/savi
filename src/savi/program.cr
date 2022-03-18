@@ -413,6 +413,7 @@ class Savi::Program
       :ffi,
       :field,
       :hygienic,
+      :inline,
       :is,
       :it,
       :let,

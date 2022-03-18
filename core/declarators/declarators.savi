@@ -396,6 +396,12 @@
   :body optional
 
 // TODO: Document this.
+:declarator inline
+  :intrinsic
+  :context function
+  :keyword always
+
+// TODO: Document this.
 :declarator yields
   :intrinsic
   :context function

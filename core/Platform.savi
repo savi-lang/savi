@@ -8,12 +8,30 @@
   :const is_ilp32 Bool: compiler intrinsic
   :const is_lp64 Bool: compiler intrinsic
   :const is_llp64 Bool: False // TODO: this is 64-bit windows, instead of lp64
-  :fun non is_32bit: @is_ilp32
-  :fun non is_64bit: @is_lp64 || @is_llp64
-  :fun non has_32bit_size: @is_32bit
-  :fun non has_64bit_size: @is_64bit
-  :fun non has_32bit_long: @is_ilp32 || @is_llp64
-  :fun non has_64bit_long: @is_lp64
+
+  :fun non is_32bit
+    :inline always
+    @is_ilp32
+
+  :fun non is_64bit
+    :inline always
+    @is_lp64 || @is_llp64
+
+  :fun non has_32bit_size
+    :inline always
+    @is_32bit
+
+  :fun non has_64bit_size
+    :inline always
+    @is_64bit
+
+  :fun non has_32bit_long
+    :inline always
+    @is_ilp32 || @is_llp64
+
+  :fun non has_64bit_long
+    :inline always
+    @is_lp64
 
   :const is_big_endian Bool: compiler intrinsic
   :const is_little_endian Bool: compiler intrinsic
