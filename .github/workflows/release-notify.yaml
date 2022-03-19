@@ -1,0 +1,31 @@
+# This workflow is responsible for sending out notifications to various feeds
+# whenever a new release of the language and compiler is published.
+#
+# The workflow is triggered on each published release in GitHub Releases.
+
+name: release-notify
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  # Publish a message in the notifications stream of the Savi instance of
+  # the Zulip chat service using the given bot credentials.
+  zulip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: zulip/github-actions-zulip/send-message@v1
+        with:
+          api-key: ${{ secrets.BOT_ZULIP_API_KEY }}
+          email: ${{ secrets.BOT_ZULIP_EMAIL }}
+          organization-url: https://savi.zulipchat.com
+          to: notifications
+          type: stream
+          topic: ${{ github.event.repository.full_name }} releases
+          content: "
+            [${{ github.event.release.name }}](${{ github.event.release.html_url }})
+            of
+            [${{ github.event.repository.full_name }}](${{ github.event.repository.html_url }})
+            has been released!\n\n
+            ${{ github.event.release.body }}"
