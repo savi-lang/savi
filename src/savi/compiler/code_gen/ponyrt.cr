@@ -445,7 +445,7 @@ class Savi::Compiler::CodeGen::PonyRT
     # a trait in the program, with types that implement that trait having
     # the corresponding bit set in their version of the bitmap.
     # This is used for runtime type matching against abstract types (traits).
-    is_asio_event_notify = false
+    is_asio_event_actor = false
     traits_bitmap = g.trait_bitmap_size.times.map { 0 }.to_a
     g.ctx.reach.each_type_def.each { |other_def|
       g.ctx.reach.each_reached_subtype_of(g.ctx, other_def) { |sub_def|
@@ -457,19 +457,19 @@ class Savi::Compiler::CodeGen::PonyRT
         bit = other_def.desc_id & (g.bitwidth - 1)
         traits_bitmap[index] |= (1 << bit)
 
-        # Take special note if this type is a subtype of AsioEventNotify.
-        is_asio_event_notify = true if other_def.llvm_name == "AsioEventNotify"
+        # Take special note if this type is a subtype of AsioEvent.Actor.
+        is_asio_event_actor = true if other_def.llvm_name == "AsioEvent.Actor"
       }
     }
     traits_bitmap_global = g.gen_global_for_const \
       @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) }),
       "#{type_def.llvm_name}.DESC.TRAITS"
 
-    # If this type is an AsioEventNotify, then take note of the vtable index
-    # of the _event_notify behaviour that the ASIO runtime will send to.
+    # If this type is an AsioEvent.Actor, then take note of the vtable index
+    # of the _asio_event behaviour that the ASIO runtime will send to.
     # Otherwise, an index of -1 indicates that the runtime should *not* send.
-    event_notify_vtable_index = @i32.const_int(
-      is_asio_event_notify ? gtype["_event_notify"].vtable_index : -1
+    asio_event_vtable_index = @i32.const_int(
+      is_asio_event_actor ? gtype["_asio_event"].vtable_index : -1
     )
 
     # Save the name of the gtype's type_def as a proper String,
@@ -491,7 +491,7 @@ class Savi::Compiler::CodeGen::PonyRT
       @custom_deserialise_fn_ptr.null,       # 10: custom deserialise fn
       dispatch_fn.to_value,                  # 11: dispatch fn
       @final_fn_ptr.null,                    # 12: final fn
-      event_notify_vtable_index,             # 13: event notify TODO
+      asio_event_vtable_index,               # 13: asio event message vtable index
       traits_bitmap_global,                  # 14: traits bitmap
       type_name_string_opaque,               # 15: type name (REPLACES unused field descriptors from Pony)
       @ptr.const_array(vtable),              # 16: vtable

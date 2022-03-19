@@ -368,15 +368,15 @@ module Savi::Compiler::Infer
         cap_ident = node.rhs.as(AST::Identifier)
         case cap_ident.value
         when "aliased"
-          type_expr_span(ctx, node.lhs, cap_only).transform_mt do |lhs_mt|
-            lhs_mt.aliased
-          end
+          unwrap_lazy_parts_of_type_expr_span(ctx,
+            type_expr_span(ctx, node.lhs, cap_only)
+          ).transform_mt(&.aliased)
         else
           cap = Infer.type_expr_cap(cap_ident)
           if cap
-            type_expr_span(ctx, node.lhs, cap_only).transform_mt do |lhs_mt|
-              lhs_mt.override_cap(cap.not_nil!)
-            end
+            unwrap_lazy_parts_of_type_expr_span(ctx,
+              type_expr_span(ctx, node.lhs, cap_only)
+            ).transform_mt(&.override_cap(cap.not_nil!))
           else
             Span.error cap_ident, "This type couldn't be resolved"
           end
@@ -542,6 +542,25 @@ module Savi::Compiler::Infer
 
     def lookup_type_param_partial_reified_span(ctx : Context, type_param : TypeParam)
       self_type_expr_span(ctx).transform_mt(&.single!.args[type_param.ref.index])
+    end
+
+    def unwrap_lazy_parts_of_type_expr_span(ctx : Context, span : Span) : Span
+      # Currently the only lazy part we handle here is type aliases.
+      span.transform_mt { |mt|
+        mt.substitute_each_type_alias_in_first_layer { |rta|
+          other_analysis = ctx.infer_edge.run_for_type_alias(ctx, rta.link.resolve(ctx), rta.link)
+          span = other_analysis.deciding_reify_of(other_analysis.target_span, rta.args)
+          span_inner = span.inner
+
+          # TODO: better way of dealing with ErrorPropagate, related to other TODO below:
+          raise span_inner.error if span_inner.is_a?(Span::ErrorPropagate)
+
+          # TODO: support dealing with the entire span instead of just asserting its singularity
+          span_inner.as(Span::Terminal).meta_type
+        }
+      }
+    rescue error : Error
+      Span.new(Span::ErrorPropagate.new(error))
     end
   end
 
@@ -810,25 +829,6 @@ module Savi::Compiler::Infer
       end
     rescue exc : Exception
       raise Error.compiler_hole_at(info, exc)
-    end
-
-    def unwrap_lazy_parts_of_type_expr_span(ctx : Context, span : Span) : Span
-      # Currently the only lazy part we handle here is type aliases.
-      span.transform_mt { |mt|
-        mt.substitute_each_type_alias_in_first_layer { |rta|
-          other_analysis = ctx.infer_edge.run_for_type_alias(ctx, rta.link.resolve(ctx), rta.link)
-          span = other_analysis.deciding_reify_of(other_analysis.target_span, rta.args)
-          span_inner = span.inner
-
-          # TODO: better way of dealing with ErrorPropagate, related to other TODO below:
-          raise span_inner.error if span_inner.is_a?(Span::ErrorPropagate)
-
-          # TODO: support dealing with the entire span instead of just asserting its singularity
-          span_inner.as(Span::Terminal).meta_type
-        }
-      }
-    rescue error : Error
-      Span.new(Span::ErrorPropagate.new(error))
     end
 
     def apply_substs_for_layer(ctx : Context, info : Info, span : Span) : Span
