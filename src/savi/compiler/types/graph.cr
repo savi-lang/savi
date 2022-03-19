@@ -566,6 +566,8 @@ module Savi::Compiler::Types::Graph
         @analysis.for_self
       when Refer::Type
         TypeNominal.new(ref.link)
+      when Refer::TypeAlias
+        TypeTop.instance # TODO: Lazy unwrapping of recursive type aliases
       when Refer::TypeParam
         analysis = @analysis
         while analysis.scope != ref.parent_link

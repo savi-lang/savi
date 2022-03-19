@@ -12,16 +12,3 @@
   :ffi pony_os_std_write(
     fp CPointer(None)'ref, buffer CPointer(U8), length USize
   ) None
-
-  :ffi pony_asio_event_create(
-    owner AsioEventNotify
-    fd U32, flags U32, nsec U64, noisy Bool
-  ) CPointer(AsioEvent)
-  :ffi pony_asio_event_fd(event CPointer(AsioEvent)) U32
-  :ffi pony_asio_event_unsubscribe(event CPointer(AsioEvent)) None
-  :ffi pony_asio_event_resubscribe_read(event CPointer(AsioEvent)) None
-  :ffi pony_asio_event_resubscribe_write(event CPointer(AsioEvent)) None
-  :ffi pony_asio_event_destroy(event CPointer(AsioEvent)) None
-  :ffi pony_asio_event_get_disposable(event CPointer(AsioEvent)) Bool
-  :ffi pony_asio_event_set_writeable(event CPointer(AsioEvent), bool Bool) None
-  :ffi pony_asio_event_set_readable(event CPointer(AsioEvent), bool Bool) None

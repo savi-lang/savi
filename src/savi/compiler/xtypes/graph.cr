@@ -403,6 +403,8 @@ module Savi::Compiler::XTypes::Graph
       when Refer::Type
         t = ref.link.resolve(ctx)
         NominalType.new(ref.link).intersect(read_type_expr_cap(t.cap).not_nil!)
+      when Refer::TypeAlias
+        NominalCap::NON # TODO: Lazy unwrapping of recursive type aliases
       when Refer::TypeParam
         analysis = @analysis
         while analysis.scope != ref.parent_link
