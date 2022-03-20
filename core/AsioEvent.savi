@@ -14,7 +14,7 @@
 :: Further, if the `AsioEvent.Actor` has registered a "noisy" event
 :: subscription, the program will not reach quiescence for natural termination.
 :: This is the mechanism that keeps a server program open as long as it is
-:: listening for new connections, or a keeps a program open to take periodic
+:: listening for new connections, or it keeps a program open to take periodic
 :: action on a timer interval. Once the listener or timer (and the associated
 :: noisy event subscription) are properly disposed of, the program would become
 :: free to terminate as soon as all other actors reach natural quiesence.
