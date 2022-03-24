@@ -135,17 +135,19 @@ class Savi::Compiler::TypeCheck
     # Get the AST node terms associated with the arguments, for error reporting.
     # Also get the AST node terms associated
     type_param_extracts = AST::Extract.type_params(rt.defn(ctx).params)
-    arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
+    arg_terms = node.is_a?(AST::Qualify) \
+      ? node.group.terms.map(&.as(AST::Node?)) \
+      : [] of AST::Node?
 
     # If some of the args come from defaults, go fetch those AST terms as well.
     if arg_terms.size < rt.args.size
-      arg_terms = arg_terms + type_param_extracts[arg_terms.size..-1].map(&.last.not_nil!)
+      arg_terms = arg_terms + type_param_extracts[arg_terms.size..-1].map(&.last)
     end
 
     raise "inconsistent arguments" if arg_terms.size != rt.args.size
 
     # Check each type arg against the bound of the corresponding type param.
-    arg_terms.zip(rt.args).each_with_index do |(arg_node, arg), index|
+    rt.args.each_with_index do |arg, index|
       # Skip checking type arguments that contain type parameters.
       next unless arg.type_params.empty?
 
@@ -154,12 +156,14 @@ class Savi::Compiler::TypeCheck
       arg_cap = arg.cap_only_inner.value.as(Cap)
       cap_set = infer.type_param_bound_cap_sets[index]
       unless cap_set.includes?(arg_cap)
+        arg_node = arg_terms[index]
         bound_pos = type_param_extracts[index][1].not_nil!.pos
         cap_set_string = "{" + cap_set.map(&.string).join(", ") + "}"
-        ctx.error_at arg_node,
+        ctx.error_at (arg_node || node),
           "This type argument won't satisfy the type parameter bound", [
             {bound_pos, "the allowed caps are #{cap_set_string}"},
-            {arg_node.pos, "the type argument cap is #{arg_cap.string}"},
+            {arg_node.try(&.pos) || Source::Pos.none,
+              "the type argument cap is #{arg_cap.string}"},
           ]
         next
       end
@@ -168,11 +172,13 @@ class Savi::Compiler::TypeCheck
       next unless param_bound
 
       unless arg.satisfies_bound?(ctx, param_bound)
+        arg_node = arg_terms[index]
         bound_pos = type_param_extracts[index][1].not_nil!.pos
-        ctx.error_at arg_node,
+        ctx.error_at (arg_node || node),
           "This type argument won't satisfy the type parameter bound", [
             {bound_pos, "the type parameter bound is #{param_bound.show_type}"},
-            {arg_node.pos, "the type argument is #{arg.show_type}"},
+            {arg_node.try(&.pos) || Source::Pos.none,
+              "the type argument is #{arg.show_type}"},
           ]
         next
       end
