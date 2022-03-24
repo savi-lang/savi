@@ -9,9 +9,9 @@
   :var event Day4Event
   :var time Time
   :new (@guard, @event, @time)
-  :new empty: @guard = "", @event = 0, @time = Time.seconds(0)
+  :new empty: @guard = "", @event = 0, @time = Time.zero
 
-  :fun _offset_time: @time + Time.hours(12)
+  :fun _offset_time: @time + Time.Duration.hours(12)
   :fun minute_id I32: @time.minute.i32 + (@_offset_time.hour.i32 - 12) * 60
   :fun night_id U32: @_offset_time.day.u32 + @_offset_time.month.u32 * 100
 

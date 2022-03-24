@@ -4,9 +4,15 @@
   :dependency Spec v0
     :from "github:savi-lang/Spec"
     :depends on Map
+    :depends on Time
+    :depends on Timer
 
   :dependency Map v0
     :from "github:savi-lang/Map"
 
   :dependency Time v0
     :from "github:savi-lang/Time"
+
+  :transitive dependency Timer v0
+    :from "github:savi-lang/Timer"
+    :depends on Time
