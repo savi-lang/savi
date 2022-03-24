@@ -18,6 +18,24 @@ It allows type aliases to pass along type parameters:
 
 ---
 
+It allows convenience type aliases to be used to imply type arguments:
+
+```savi
+:class GenericClassInNeedOfConvenience(A val, B val = String, C val = String)
+
+:alias ConvenienceAlias: GenericClassInNeedOfConvenience(U64, U8)
+
+:class UsesConvenienceAlias
+  :let a ConvenienceAlias
+  :new (@a)
+```
+```savi
+    a = ConvenienceAlias.new ::type=> GenericClassInNeedOfConvenience(U64, U8, String)
+    UsesConvenienceAlias.new(a)
+```
+
+---
+
 It handles type-parameter-recursive type aliases:
 
 ```savi
