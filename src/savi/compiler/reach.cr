@@ -90,11 +90,11 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     end
 
     def is_floating_point_numeric?(ctx)
-      is_numeric?(ctx) && single!.defn(ctx).const_bool("is_floating_point")
+      is_numeric?(ctx) && single!.defn(ctx).has_tag?(:numeric_floating_point)
     end
 
     def is_signed_numeric?(ctx)
-      is_numeric?(ctx) && single!.defn(ctx).const_bool("is_signed")
+      is_numeric?(ctx) && single!.defn(ctx).has_tag?(:numeric_signed)
     end
 
     def is_enum?(ctx)
@@ -117,16 +117,16 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
       else
         defn = single!.defn(ctx)
         if defn.has_tag?(:numeric)
-          if defn.ident.value == "USize" || defn.ident.value == "ISize"
-            :isize
-          elsif defn.const_bool("is_floating_point")
-            case defn.const_u64("bit_width")
+          if defn.has_tag?(:numeric_floating_point)
+            case defn.metadata[:numeric_bit_width].as(UInt64)
             when 32 then :f32
             when 64 then :f64
             else raise NotImplementedError.new(defn.inspect)
             end
+          elsif defn.metadata[:numeric_bit_width_of_c_type]?
+            :isize
           else
-            case defn.const_u64("bit_width")
+            case defn.metadata[:numeric_bit_width].as(UInt64)
             when 1 then :i1
             when 8 then :i8
             when 16 then :i16
@@ -507,11 +507,11 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     end
 
     def is_floating_point_numeric?(ctx)
-      is_numeric?(ctx) && @reified.defn(ctx).const_bool("is_floating_point")
+      is_numeric?(ctx) && @reified.defn(ctx).has_tag?(:numeric_floating_point)
     end
 
     def is_signed_numeric?(ctx)
-      is_numeric?(ctx) && @reified.defn(ctx).const_bool("is_signed")
+      is_numeric?(ctx) && @reified.defn(ctx).has_tag?(:numeric_signed)
     end
 
     def is_enum?(ctx)

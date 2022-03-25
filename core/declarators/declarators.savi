@@ -225,6 +225,7 @@
 :declarator numeric
   :intrinsic
   :begins type
+  :begins type_numeric
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default val
@@ -241,6 +242,7 @@
 :declarator enum
   :intrinsic
   :begins type
+  :begins type_numeric
   :begins type_enum
 
   :term cap enum (iso, val, ref, box, tag, non)
@@ -462,6 +464,32 @@
     :optional
 
 // TODO: Document this.
+:declarator signed
+  :intrinsic
+  :context type_numeric
+
+// TODO: Document this.
+:declarator floating_point
+  :intrinsic
+  :context type_numeric
+
+// TODO: Document this.
+:declarator bit_width
+  :intrinsic
+  :context type_numeric
+
+  :term value Integer
+
+// TODO: Document this.
+:declarator bit_width
+  :intrinsic
+  :context type_numeric
+
+  :keyword of
+  :keyword C
+  :term c_type enum (size_t) // TODO: Add other supported C types
+
+// TODO: Document this.
 :declarator member
   :intrinsic
   :context type_enum
@@ -469,7 +497,7 @@
   :term noprefix enum (noprefix)
     :optional
   :term name Name
-  :body required
+  :term value Integer
 
 // TODO: Document this.
 :declarator manifest

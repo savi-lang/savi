@@ -424,7 +424,92 @@ module Savi::Program::Intrinsic
         raise NotImplementedError.new(declarator.pretty_inspect)
       end
 
-    # Declarations within a enum type definition.
+    # Declarations within a numeric type definition.
+    when "type_numeric"
+      case declarator.name.value
+      when "signed"
+        scope.current_type.add_tag(:numeric_signed)
+        scope.current_type.functions << Program::Function.new(
+          AST::Identifier.new("non").from(declare.terms.first),
+          AST::Identifier.new("is_signed").from(declare.terms.first),
+          nil,
+          nil,
+          AST::Group.new(":", [
+            AST::Identifier.new("True").from(declare.terms.first).as(AST::Node)
+          ]).from(declare.terms.first)
+        ).tap do |f|
+          f.add_tag(:constant)
+          f.add_tag(:inline)
+        end
+      when "floating_point"
+        scope.current_type.add_tag(:numeric_signed)
+        scope.current_type.functions << Program::Function.new(
+          AST::Identifier.new("non").from(declare.terms.first),
+          AST::Identifier.new("is_signed").from(declare.terms.first),
+          nil,
+          nil,
+          AST::Group.new(":", [
+            AST::Identifier.new("True").from(declare.terms.first).as(AST::Node)
+          ]).from(declare.terms.first)
+        ).tap do |f|
+          f.add_tag(:constant)
+          f.add_tag(:inline)
+        end
+
+        scope.current_type.add_tag(:numeric_floating_point)
+        scope.current_type.functions << Program::Function.new(
+          AST::Identifier.new("non").from(declare.terms.first),
+          AST::Identifier.new("is_floating_point").from(declare.terms.first),
+          nil,
+          nil,
+          AST::Group.new(":", [
+            AST::Identifier.new("True").from(declare.terms.first).as(AST::Node)
+          ]).from(declare.terms.first)
+        ).tap do |f|
+          f.add_tag(:constant)
+          f.add_tag(:inline)
+        end
+      when "bit_width"
+        value_ast = terms["value"]?.as(AST::LiteralInteger?)
+        c_type_ast = terms["c_type"]?.as(AST::Identifier?)
+        if value_ast
+          scope.current_type.metadata[:numeric_bit_width] = value_ast.value.to_u64
+          scope.current_type.functions << Program::Function.new(
+            AST::Identifier.new("non").from(declare.terms.first),
+            AST::Identifier.new("bit_width").from(declare.terms.first),
+            nil,
+            AST::Identifier.new("U8").from(declare.terms.first),
+            AST::Group.new(":", [value_ast.as(AST::Node)]).from(value_ast)
+          ).tap do |f|
+            f.add_tag(:constant)
+            f.add_tag(:inline)
+          end
+        elsif c_type_ast
+          scope.current_type.metadata[:numeric_bit_width] = 0
+          scope.current_type.metadata[:numeric_bit_width_of_c_type] = true
+          scope.current_type.functions << Program::Function.new(
+            AST::Identifier.new("non").from(declare.terms.first),
+            AST::Identifier.new("bit_width").from(declare.terms.first),
+            nil,
+            AST::Identifier.new("U8").from(declare.terms.first),
+            AST::Group.new(":", [
+              AST::Group.new(" ", [
+                AST::Identifier.new("compiler").from(c_type_ast).as(AST::Node),
+                AST::Identifier.new("intrinsic").from(c_type_ast).as(AST::Node),
+              ]).from(c_type_ast).as(AST::Node)
+            ]).from(c_type_ast)
+          ).tap do |f|
+            f.add_tag(:constant)
+            f.add_tag(:inline)
+          end
+        else
+          raise NotImplementedError.new(declarator.pretty_inspect)
+        end
+      else
+        raise NotImplementedError.new(declarator.pretty_inspect)
+      end
+
+    # Declarations within an enum type definition.
     when "type_enum"
       case declarator.name.value
       when "member"
@@ -437,20 +522,8 @@ module Savi::Program::Intrinsic
           scope.current_type.make_link(scope.current_package),
         )
 
-        scope.on_body { |body|
-          term = body.terms[0]?
-          term = nil unless body.terms.size == 1
-
-          # TODO: Figure out why Crystal needs the `as` coercions here.
-          # I would have thought they'd be handled by the `is_a?` above them.
-          if term.is_a?(AST::LiteralInteger)
-            type_with_value.value = term.as(AST::LiteralInteger).value.to_u64
-          elsif term.is_a?(AST::LiteralCharacter)
-            type_with_value.value = term.as(AST::LiteralCharacter).value.to_u64
-          else
-            ctx.error_at body, "This member value must be a single integer"
-          end
-        }
+        type_with_value.value =
+          terms["value"].as(AST::LiteralInteger).value.to_u64
 
         scope.current_members << type_with_value # TODO: remove this line
         scope.current_package.enum_members << type_with_value
@@ -499,11 +572,13 @@ module Savi::Program::Intrinsic
       scope.current_package.types << scope.current_type
       scope.current_type = nil
     when "numeric"
+      scope.current_type.metadata[:numeric_bit_width] ||= 8
       declare_numeric_copies(ctx, scope, declarator)
 
       scope.current_package.types << scope.current_type
       scope.current_type = nil
     when "enum"
+      scope.current_type.metadata[:numeric_bit_width] ||= 8
       declare_numeric_copies(ctx, scope, declarator)
       declare_enum_member_name(ctx, scope, declarator)
       declare_enum_from_u64(ctx, scope, declarator)
@@ -570,10 +645,10 @@ module Savi::Program::Intrinsic
 
     # Add "is" for the trait of this specific flavor of numeric.
     trait2_name =
-      if !type.const_bool_true?("is_floating_point")
-        "Integer"
-      else
+      if type.has_tag?(:numeric_floating_point)
         "FloatingPoint"
+      else
+        "Integer"
       end
     trait2_cap = AST::Identifier.new("non").from(type.ident)
     trait2_is = AST::Identifier.new("is").from(type.ident)
@@ -591,9 +666,9 @@ module Savi::Program::Intrinsic
 
     # Also copy the base implementation for this specific flavor of numeric.
     copy2_name =
-      if !type.const_bool_true?("is_floating_point")
+      if !type.has_tag?(:numeric_floating_point)
         "Integer.BaseImplementation"
-      elsif type.const_u64_eq?("bit_width", 32)
+      elsif scope.current_type.metadata[:numeric_bit_width]? == 32
         "FloatingPoint.BaseImplementation32"
       else
         "FloatingPoint.BaseImplementation64"

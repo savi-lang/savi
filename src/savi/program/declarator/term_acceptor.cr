@@ -67,6 +67,13 @@ abstract class Savi::Program::Declarator::TermAcceptor
         term
       when "String"
         term if term.is_a?(AST::LiteralString)
+      when "Integer"
+        case term
+        when AST::LiteralInteger
+          term
+        when AST::LiteralCharacter
+          AST::LiteralInteger.new(term.value.to_u64).from(term)
+        end
       when "Name"
         case term
         when AST::Identifier
@@ -186,6 +193,8 @@ abstract class Savi::Program::Declarator::TermAcceptor
         "any term"
       when "String"
         "a string literal"
+      when "Integer"
+        "an integer literal"
       when "Name"
         "an identifier or string literal"
       when "Type"

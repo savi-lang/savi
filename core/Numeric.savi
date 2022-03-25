@@ -498,7 +498,7 @@
   :fun non "[]"(value @'val) @'val: value
 
   :is Numeric.Representable
-  :const bit_width U8: 64
+  :const bit_width U8: 8
   :const is_signed Bool: False
   :const is_floating_point Bool: False
 
@@ -556,19 +556,19 @@
 :: The standard 8-bit unsigned integer numeric type.
 :: This type is often used to represent a byte.
 :numeric U8
-  :const bit_width U8: 8
+  :bit_width 8
 
 :: The standard 16-bit unsigned integer numeric type.
 :numeric U16
-  :const bit_width U8: 16
+  :bit_width 16
 
 :: The standard 32-bit unsigned integer numeric type.
 :numeric U32
-  :const bit_width U8: 32
+  :bit_width 32
 
 :: The standard 64-bit unsigned integer numeric type.
 :numeric U64
-  :const bit_width U8: 64
+  :bit_width 64
 
 :: The standard platform-specific unsigned "size" numeric type.
 :: This type is often used for counting and indexing collections.
@@ -586,27 +586,27 @@
 :: To put it another way, `USize` is equivalent to the `size_t` type in C,
 :: but it is not guaranteed to be equivalent to the `uintptr_t` type in C.
 :numeric USize
-  :const bit_width U8: compiler intrinsic
+  :bit_width of C size_t
 
 :: The standard 8-bit signed integer numeric type.
 :numeric I8
-  :const bit_width U8: 8
-  :const is_signed: True
+  :signed
+  :bit_width 8
 
 :: The standard 16-bit signed integer numeric type.
 :numeric I16
-  :const bit_width U8: 16
-  :const is_signed: True
+  :signed
+  :bit_width 16
 
 :: The standard 32-bit signed integer numeric type.
 :numeric I32
-  :const bit_width U8: 32
-  :const is_signed: True
+  :signed
+  :bit_width 32
 
 :: The standard 64-bit signed integer numeric type.
 :numeric I64
-  :const bit_width U8: 64
-  :const is_signed: True
+  :signed
+  :bit_width 64
 
 :: The standard platform-specific signed "size" numeric type.
 :: This is the signed type corresponding to the unsigned type `USize`.
@@ -624,17 +624,15 @@
 :: To put it another way, `ISize` is equivalent to the `ssize_t` type in C,
 :: but it is not guaranteed to be equivalent to the `intptr_t` type in C.
 :numeric ISize
-  :const bit_width U8: compiler intrinsic
-  :const is_signed: True
+  :signed
+  :bit_width of C size_t
 
 :: The standard 32-bit floating-point numeric type.
 :numeric F32
-  :const bit_width U8: 32
-  :const is_signed: True
-  :const is_floating_point: True
+  :floating_point
+  :bit_width 32
 
 :: The standard 64-bit floating-point numeric type.
 :numeric F64
-  :const bit_width U8: 64
-  :const is_signed: True
-  :const is_floating_point: True
+  :floating_point
+  :bit_width 64

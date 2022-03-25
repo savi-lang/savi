@@ -1,7 +1,7 @@
 :enum Bool
-  :const bit_width U8: 1
-  :member noprefix False: 0
-  :member noprefix True: 1
+  :bit_width 1
+  :member noprefix False 0
+  :member noprefix True 1
   :fun val is_true: @
   :fun val is_false: @invert
   :fun val not: @invert
