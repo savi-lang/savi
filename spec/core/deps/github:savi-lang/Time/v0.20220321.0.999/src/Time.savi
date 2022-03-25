@@ -6,14 +6,14 @@
 :: with an additional 32-bit integer to specify nanoseconds within the second.
 
 :enum Time.DayOfWeek
-  :member NoDay: 0
-  :member Monday: 1
-  :member Tuesday: 2
-  :member Wednesday: 3
-  :member Thursday: 4
-  :member Friday: 5
-  :member Saturday: 6
-  :member Sunday: 7
+  :member NoDay 0
+  :member Monday 1
+  :member Tuesday 2
+  :member Wednesday 3
+  :member Thursday 4
+  :member Friday 5
+  :member Saturday 6
+  :member Sunday 7
 
   :fun non from_value(value U8)
     case value == (

@@ -735,6 +735,7 @@ class Savi::Compiler::TypeCheck
               # TODO: Remove this hacky special case.
               next if param_mt.show_type.starts_with? "CPointer"
 
+              # TODO: show the cap to let the user know why it's not sendable
               errs << {param.pos,
                 "this parameter type (#{param_mt.show_type}) is not sendable"}
             end

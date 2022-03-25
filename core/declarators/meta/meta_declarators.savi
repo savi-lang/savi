@@ -185,6 +185,7 @@
   :term type enum (
     Term     :: any possible declaration term
     String   :: a string literal
+    Integer  :: an integer literal
     Name     :: an identifier or string literal, coerced into an identifier
     Type     :: an algebraic type expression
     NameList :: a parenthesized group of Name terms

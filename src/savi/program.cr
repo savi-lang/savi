@@ -209,6 +209,8 @@ class Savi::Program
       :hygienic,
       :ignores_cap,
       :numeric,
+      :numeric_signed,
+      :numeric_floating_point,
       :pass_by_value,
       :no_field_reassign,
       :simple_value,
@@ -317,40 +319,6 @@ class Savi::Program
 
     def is_instantiable?
       has_tag?(:allocated) && is_concrete?
-    end
-
-    def const_u64(name) : UInt64
-      f = find_func!(name)
-      raise "#{ident.value}.#{name} not a constant" unless f.has_tag?(:constant)
-
-      f.body.not_nil!.terms.last.as(AST::LiteralInteger).value.to_u64
-    end
-
-    def const_bool(name) : Bool
-      f = find_func!(name)
-      raise "#{ident.value}.#{name} not a constant" unless f.has_tag?(:constant)
-
-      case f.body.not_nil!.terms.last.as(AST::Identifier).value
-      when "True" then true
-      when "False" then false
-      else raise NotImplementedError.new(f.body.not_nil!.to_a)
-      end
-    end
-
-    def const_u64_eq?(name, value : UInt64) : Bool
-      f = find_func?(name)
-      return false unless f && f.has_tag?(:constant)
-
-      term = f.body.try(&.terms[-1]?)
-      term.is_a?(AST::LiteralInteger) && term.value == value
-    end
-
-    def const_bool_true?(name) : Bool
-      f = find_func?(name)
-      return false unless f && f.has_tag?(:constant)
-
-      term = f.body.try(&.terms[-1]?)
-      term.is_a?(AST::Identifier) && term.value == "True"
     end
 
     def make_link(package : Package)

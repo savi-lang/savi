@@ -1,8 +1,7 @@
 :enum EnumExample
-  :const bit_width U8: 8
-  :member Integer48: 48
-  :member Hexadecimal49: 0x31
-  :member Char50: '2'
+  :member Integer48 48
+  :member Hexadecimal49 0x31
+  :member Char50 '2'
 
 :module EnumSpec
   :fun run(test MicroTest)
