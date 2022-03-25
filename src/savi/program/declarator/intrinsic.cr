@@ -428,8 +428,12 @@ module Savi::Program::Intrinsic
     when "type_enum"
       case declarator.name.value
       when "member"
+        name = terms["name"].as(AST::Identifier)
+        name.value = "#{scope.current_type.ident.value}.#{name.value}" \
+          unless terms["noprefix"]?
+
         type_with_value = Program::TypeWithValue.new(
-          terms["name"].as(AST::Identifier),
+          name,
           scope.current_type.make_link(scope.current_package),
         )
 

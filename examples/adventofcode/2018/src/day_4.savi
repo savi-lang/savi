@@ -1,8 +1,8 @@
 :enum Day4Event
   :const bit_width U8: 8 // TODO infer this from the number of members instead
-  :member Day4EventBegin: 0
-  :member Day4EventSleep: 1
-  :member Day4EventAwake: 2
+  :member Begin: 0
+  :member Sleep: 1
+  :member Awake: 2
 
 :class Day4Entry
   :var guard String
@@ -21,15 +21,15 @@
     // Parse the event type from the message.
     message = halves[1]!.trim(1)
     event = case (
-    | message.includes("begins shift") | Day4EventBegin
-    | message.includes("falls asleep") | Day4EventSleep
-    | message.includes("wakes up")     | Day4EventAwake
+    | message.includes("begins shift") | Day4Event.Begin
+    | message.includes("falls asleep") | Day4Event.Sleep
+    | message.includes("wakes up")     | Day4Event.Awake
     | error!
     )
 
     // Parse the guard id from the message (on "begin" events).
     guard = ""
-    if (event == Day4EventBegin) (
+    if (event == Day4Event.Begin) (
       guard = message.split('#')[1]!.split(' ')[0]!
     )
 
@@ -76,8 +76,8 @@
     sleeps = Map(String, Map(I32, Array(U32))).new
     last_entry = try (entries[0]! | Day4Entry.empty)
     entries.each -> (entry |
-      if (entry.event == Day4EventAwake) (
-        if (last_entry.event != Day4EventSleep) (
+      if (entry.event == Day4Event.Awake) (
+        if (last_entry.event != Day4Event.Sleep) (
           env.err.print("warning: awoke without first sleeping!")
         )
 
@@ -179,7 +179,7 @@
     assert no_error: (
       entry = Day4Entry.parse!("[1518-11-01 23:58] Guard #99 begins shift")
       assert: entry.guard       == "99"
-      assert: entry.event       == Day4EventBegin
+      assert: entry.event       == Day4Event.Begin
       assert: entry.time.year   == 1518
       assert: entry.time.month  == 11
       assert: entry.time.day    == 1
@@ -191,7 +191,7 @@
     assert no_error: (
       entry = Day4Entry.parse!("[1518-11-02 00:40] falls asleep")
       assert: entry.guard       == ""
-      assert: entry.event       == Day4EventSleep
+      assert: entry.event       == Day4Event.Sleep
       assert: entry.time.year   == 1518
       assert: entry.time.month  == 11
       assert: entry.time.day    == 2
@@ -203,7 +203,7 @@
     assert no_error: (
       entry = Day4Entry.parse!("[1518-11-02 00:50] wakes up")
       assert: entry.guard       == ""
-      assert: entry.event       == Day4EventAwake
+      assert: entry.event       == Day4Event.Awake
       assert: entry.time.year   == 1518
       assert: entry.time.month  == 11
       assert: entry.time.day    == 2

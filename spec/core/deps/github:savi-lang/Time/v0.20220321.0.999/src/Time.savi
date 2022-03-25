@@ -1,0 +1,414 @@
+:: Represents the amount of time elapsed since the beginning of the Common Era
+:: (`0001-01-01 00:00:00.0`), using the proleptic Gregorian calendar.
+:: Times prior to the beginning of the Common Era are not representable.
+::
+:: The number of seconds is represented with 64-bit integer precision,
+:: with an additional 32-bit integer to specify nanoseconds within the second.
+
+:enum Time.DayOfWeek
+  :member NoDay: 0
+  :member Monday: 1
+  :member Tuesday: 2
+  :member Wednesday: 3
+  :member Thursday: 4
+  :member Friday: 5
+  :member Saturday: 6
+  :member Sunday: 7
+
+  :fun non from_value(value U8)
+    case value == (
+    | 1 | Time.DayOfWeek.Monday
+    | 2 | Time.DayOfWeek.Tuesday
+    | 3 | Time.DayOfWeek.Wednesday
+    | 4 | Time.DayOfWeek.Thursday
+    | 5 | Time.DayOfWeek.Friday
+    | 6 | Time.DayOfWeek.Saturday
+    | 7 | Time.DayOfWeek.Sunday
+    | Time.DayOfWeek.NoDay
+    )
+
+:struct val Time
+  :is Comparable(Time)
+
+  :const _seconds_per_day U64: 86400
+  :const _seconds_per_hour U64: 3600
+  :const _seconds_per_minute U64: 60
+  :const _nanoseconds_per_second U32: 1000000000
+  :const _days_per_400_years U64: 146097
+  :const _days_per_100_years U64: 36524
+  :const _days_per_4_years U64: 1461
+
+  :const _unix_epoch U64: 62135596800
+  :fun non unix_epoch
+    @seconds(@_unix_epoch)
+
+  :: The total number of seconds since `0001-01-01 00:00:00.0` UTC
+  :let total_seconds U64
+  :: The number of nanoseconds of the second
+  :let nanosecond U32
+
+  :: An internal-only direct constructor.
+  :new val _new(@total_seconds, @nanosecond)
+
+  :: The maximum duration representable by this data type.
+  :fun non max_value: @_new(U64.max_value, Time._nanoseconds_per_second - 1)
+
+  :: The minimum duration representable by this data type (a.k.a `zero`).
+  :fun non min_value: @_new(0, 0)
+
+  :: A duration of zero length.
+  :fun non zero: @_new(0, 0)
+
+  :: Represent the moment in time indicated by the given year, month, day,
+  :: and optional hour, minute, second, and nanosecond (in the UTC time zone).
+  :new val utc(
+    year   U32
+    month  U8
+    day    U8
+    hour   U8 = 0
+    minute U8 = 0
+    second U8 = 0
+    @nanosecond = 0
+  )
+    @total_seconds =
+      @_seconds_per_day * @_absolute_days(year, month, day)
+      + @_seconds_per_hour * hour.u64
+      + @_seconds_per_minute * minute.u64
+      + second.u64
+
+  :: Represent a duration of the given number of nanoseconds.
+  :: DEPRECATED: Use `Time.Duration.nanoseconds` instead.
+  :new nanoseconds(n U32):
+    @total_seconds = 0
+    while (@_nanoseconds_per_second < n) (
+      n -= @_nanoseconds_per_second
+      @total_seconds += 1
+    )
+    @nanosecond = n
+
+  :: Represent a duration of the given number of seconds.
+  :: DEPRECATED: Use `Time.Duration.seconds` instead.
+  :new seconds(n): @nanosecond = 0, @total_seconds = n
+
+  :: Represent a duration of the given number of minutes.
+  :: DEPRECATED: Use `Time.Duration.minutes` instead.
+  :new minutes(n): @nanosecond = 0, @total_seconds = @_seconds_per_minute * n
+
+  :: Represent a duration of the given number of hours.
+  :: DEPRECATED: Use `Time.Duration.hours` instead.
+  :new hours(n): @nanosecond = 0, @total_seconds = @_seconds_per_hour * n
+
+  :: Represent a duration of the given number of days.
+  :: DEPRECATED: Use `Time.Duration.days` instead.
+  :new days(n): @nanosecond = 0, @total_seconds = @_seconds_per_day * n
+
+  :: Return True if the given time is exactly equivalent to this one.
+  :fun "=="(other Time'box)
+    @total_seconds == other.total_seconds
+    && @nanosecond == other.nanosecond
+
+  :: Return True if the given time is less than (earlier than) this one.
+  :fun "<"(other Time'box)
+    @total_seconds < other.total_seconds
+    || (@total_seconds == other.total_seconds && @nanosecond < other.nanosecond)
+
+  :: Return True if the given time is greater than (later than) this one.
+  :fun ">"(other Time'box)
+    @total_seconds > other.total_seconds
+    || (@total_seconds == other.total_seconds && @nanosecond > other.nanosecond)
+
+  :: Add the given duration to this time and return the result.
+  ::
+  :: Uses wrap-around overflow semantics if the result is more than `max_value`.
+  :: If an error on overflow is desired, use the `+!` method instead.
+  :fun "+"(other Time.Duration'box)
+    result = Time.Duration._new(@total_seconds, @nanosecond) + other
+    @_new(result.total_seconds, result.nanosecond)
+
+  :: Add the given duration to this time and return the result.
+  ::
+  :: Raises an error if the result would be more than `max_value`.
+  :: If wrap-around overflow semantics are desired, use the `+` method instead.
+  :fun "+!"(other Time.Duration'box)
+    result = Time.Duration._new(@total_seconds, @nanosecond) +! other
+    @_new(result.total_seconds, result.nanosecond)
+
+  :: Subtract the given duration from this time and return the result.
+  ::
+  :: Uses wrap-around underflow semantics if the result is less than `zero`.
+  :: If an error on underflow is desired, use the `-!` method instead.
+  :fun "-"(other Time.Duration'box)
+    result = Time.Duration._new(@total_seconds, @nanosecond) - other
+    @_new(result.total_seconds, result.nanosecond)
+
+  :: Subtract the given duration from this time and return the result.
+  ::
+  :: Raises an error if the result would be less than `zero`.
+  :: If wrap-around underflow semantics is desired, use the `-` method instead.
+  :fun "-!"(other Time.Duration'box)
+    result = Time.Duration._new(@total_seconds, @nanosecond) -! other
+    @_new(result.total_seconds, result.nanosecond)
+
+  :: Returns the year (a number greater than or equal to 1).
+  :fun year U32
+    @_year_month_day.bit_and(0xFFFF_FFFF).u32
+
+  :: Returns the month of the year (a number between 1 and 12).
+  :fun month U8
+    (@_year_month_day.bit_shr(32)).bit_and(0xFF).u8
+
+  :: Returns the day of the month (a number between 1 and 31).
+  :fun day U8
+    (@_year_month_day.bit_shr(40)).bit_and(0xFF).u8
+
+  :: Returns the hour of the day (a number between 0 and 23).
+  :fun hour U8
+    ((@total_seconds % @_seconds_per_day) / @_seconds_per_hour).u8
+
+  :: Returns the minute of the hour (a number between 0 and 59).
+  :fun minute U8
+    ((@total_seconds % @_seconds_per_hour) / @_seconds_per_minute).u8
+
+  :: Returns the second of the minute (a number between 0 and 59).
+  :fun second U8
+    (@total_seconds % @_seconds_per_minute).u8
+
+  :: Print the time data for human inspection (the format is subject to change).
+  :fun inspect_into(output String'iso)
+    // TODO: Properly pad numbers with zeros for a constant string width.
+    output = Inspect.into(--output, @year),       output.push_byte('-')
+    output = Inspect.into(--output, @month),      output.push_byte('-')
+    output = Inspect.into(--output, @day),        output.push_byte(' ')
+    output = Inspect.into(--output, @hour),       output.push_byte(':')
+    output = Inspect.into(--output, @minute),     output.push_byte(':')
+    output = Inspect.into(--output, @second),     output.push_byte('\'')
+    output = Inspect.into(--output, @nanosecond)
+    --output
+
+  :: Returns a bit-packed representation of the year, month, and day,
+  :: for internal reuse by other functions that need this information.
+  :fun _year_month_day U64 // TODO: Return tuple instead of packed U64 hack
+    total_days = (@total_seconds / @_seconds_per_day)
+
+    num400 = total_days / @_days_per_400_years
+    total_days -= num400 * @_days_per_400_years
+
+    num100 U64 = total_days / @_days_per_100_years // TODO: shouldn't need an explicit U64 here
+    if (num100 == 4) (num100 = 3) // account for leap years
+    total_days -= num100 * @_days_per_100_years
+
+    num4 = total_days / @_days_per_4_years
+    total_days -= num4 * @_days_per_4_years
+
+    numyears U64 = total_days / 365 // TODO: shouldn't need an explicit U64 here
+    if (numyears == 4) (numyears = 3) // account for leap years
+    total_days -= numyears * 365
+
+    year = (num400 * 400 + num100 * 100 + num4 * 4 + numyears + 1).u32
+
+    month U8 = 0
+    days_in_month U64 = 0
+    while (total_days >= days_in_month) (
+      total_days -= days_in_month
+      month += 1
+      days_in_month = @_days_in_month(month, year).u64
+    )
+
+    day = total_days.u8 + 1
+
+    year.u64
+      .bit_or(month.u64.bit_shl(32))
+      .bit_or(day.u64.bit_shl(40))
+
+  :: Returns True if the given year is a leap year.
+  :fun non _is_leap_year(year U32)
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+
+  :: Returns the number of days in the given month of the given year.
+  :fun non _days_in_month(month U8, year) U8
+    case month == (
+    |  1 | 31 // January
+    |  2 | if @_is_leap_year(year) (29 | 28) // Feb.
+    |  3 | 31 // March
+    |  4 | 30 // April
+    |  5 | 31 // May
+    |  6 | 30 // June
+    |  7 | 31 // July
+    |  8 | 31 // August
+    |  9 | 30 // September
+    | 10 | 31 // October
+    | 11 | 30 // November
+    | 12 | 31 // December
+    | 0 // months that don't exist have zero days
+    )
+
+  :: Returns the number of days from `0001-01-01` to the date indicated
+  :: by the given year, month, and day in the proleptic Gregorian calendar.
+  :fun non _absolute_days(year U32, month U8, day U8) U64
+    // Normalize the month index, treating months beyond 12 as additional years.
+    while (month > 12) (year += 1, month -= 12)
+
+    // Calculate the number of days since day 1 of the given year.
+    days_since_jan_1 = day.u64 - 1
+    scan_month U8 = 1
+    while (scan_month < month) (
+      days_since_jan_1 += @_days_in_month(scan_month, year).u64
+      scan_month += 1
+    )
+
+    // Finally, add in the number of days elapsed in the years already passed.
+    year -= 1
+    year.u64 * 365
+    + year.u64 / 4
+    - year.u64 / 100
+    + year.u64 / 400
+    + days_since_jan_1
+
+  :fun year_month_day_day_year Array(U64)
+    total_days U64 = (@total_seconds / @_seconds_per_day)
+
+    num400 U64 = (total_days / @_days_per_400_years)
+    total_days -= num400 * @_days_per_400_years
+
+    num100 U64 = (total_days / @_days_per_100_years)
+    if (num100 == 4) (// leap
+      num100 = 3
+    )
+    total_days -= num100 * @_days_per_100_years
+
+    num4 U64 = (total_days / @_days_per_4_years)
+    total_days -= num4 * @_days_per_4_years
+
+    numyears = (total_days / 365)
+    if (numyears == 4) (// leap
+      numyears = 3
+    )
+    total_days -= numyears * 365
+
+    year = num400 * 400 + num100 * 100 + num4 * 4 + numyears + 1
+
+    ordinal_day_in_year U64 = total_days + 1
+
+    month U64 = 1
+
+    try (
+      while True (
+        days_in_month = @_days_in_month(month.u8, year.u32).u64
+        if (total_days < days_in_month) (
+          error! // TODO use break
+        )
+
+        total_days -= days_in_month
+        month += 1
+      )
+    )
+
+    day U64 = total_days + 1
+
+    [year, month, day, ordinal_day_in_year]
+
+  :fun calendar_week Array(U64) // TODO USE TUPPLE INSTEAD
+    try (
+      tmp = @year_month_day_day_year
+
+      year = tmp[0]!
+
+      month = tmp[1]!
+      day = tmp[2]!
+      day_year = tmp[3]!
+
+      day_of_week = @day_of_week
+
+      // The week number can be calculated as number of Mondays in the year up to
+      // the ordinal date.
+      // The addition by +10 consists of +7 to start the week numbering with 1
+      // instead of 0 and +3 because the first week has already started in the
+      // previous year and the first Monday is actually in week 2.
+      week_number = ((day_year - day_of_week.u64 + 10) / 7).u64
+
+      if (week_number == 0) (
+        // Week number 0 means the date belongs to the last week of the previous year.
+        year -= 1
+
+        // The week number depends on whether the previous year has 52 or 53 weeks
+        // which can be determined by the day of week of January 1.
+        // The year has 53 weeks if Januar 1 is on a Friday or the year was a leap
+        // year and January 1 is on a Saturday.
+        jan1_day_of_week = Time.DayOfWeek.from_value(((day_of_week.u64 - day_year + 1) % 7).u8)
+
+        if ((jan1_day_of_week == Time.DayOfWeek.Friday) || (jan1_day_of_week == Time.DayOfWeek.Saturday && @_is_leap_year(year.u32))) (
+          week_number = 53
+        |
+          week_number = 52
+        )
+      |
+        if (week_number == 53) (
+          // Week number 53 is actually week number 1 of the following year, if
+          // December 31 is on a Monday, Tuesday or Wednesday.
+          dec31_day_of_week = (day_of_week.u64 + 31 - day) % 7
+
+          if (dec31_day_of_week <= Time.DayOfWeek.Wednesday.u64) (
+            year += 1
+            week_number = 1
+          )
+        )
+      )
+
+      [year, week_number]
+    |
+      // THIS SHOULD BE UNREACHABLE
+      []
+    )
+
+  :fun to_unix I64
+    (@total_seconds - @_unix_epoch).i64
+
+  :fun day_of_year U64
+    try (
+      @year_month_day_day_year[3]!
+    |
+      0
+    )
+
+  :fun day_of_week
+    days U64 = (@total_seconds / @_seconds_per_day)
+    Time.DayOfWeek.from_value((days % 7 + 1).u8)
+
+  :fun to_s
+    @format("%m/%d/%y")
+
+  :fun format(pattern String'box) String'val
+    Time.Formatter.new(pattern).format(@)
+
+  :: Get the current wall-clock adjusted system time (in UTC).
+  ::
+  :: Because this time is not monotonic and gets adjusted to match wall clocks,
+  :: it is not suitable for measuring intervals of time during the program.
+  :: To measure time intervals, use functions of `Time.Measure` instead.
+  :new now
+    case (
+    | Platform.is_windows |
+      // TODO: Windows support
+      @total_seconds = 0
+      @nanosecond = 0
+    | Platform.is_macos |
+      // MacOS gives us the seconds since unix epoch and microseconds as a pair.
+      // We could also get the time zone here, but we don't; we pass null there.
+      macos_pair = Pair(U64, U64).new(0, 0)
+      _FFI.gettimeofday(
+        stack_address_of_variable macos_pair
+        CPointer(Pair(I32, I32)).null
+      )
+      @total_seconds = macos_pair.first + @_unix_epoch
+      @nanosecond = macos_pair.last.u32 * 1000
+    |
+      // Other POSIX platforms give us the seconds since unix epoch and
+      // nanoseconds as a pair. We choose the "real time" clock type.
+      pair = Pair(USize, USize).new(0, 0)
+      _FFI.clock_gettime(
+        _FFI.ClockType.real_time
+        stack_address_of_variable pair
+      )
+      @total_seconds = pair.first.u64 + @_unix_epoch
+      @nanosecond = pair.last.u32
+    )
