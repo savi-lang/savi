@@ -10,10 +10,10 @@
     total U64 = 0
 
     test["can declare a member value as an integer"].pass =
-      Integer48.u8 == 48
+      EnumExample.Integer48.u8 == 48
 
     test["can declare a member value as a hexadecimal integer"].pass =
-      Hexadecimal49.u8 == 49
+      EnumExample.Hexadecimal49.u8 == 49
 
     test["can declare a member value as a char literal"].pass =
-      Char50.u8 == 50
+      EnumExample.Char50.u8 == 50

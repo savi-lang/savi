@@ -466,6 +466,8 @@
   :intrinsic
   :context type_enum
 
+  :term noprefix enum (noprefix)
+    :optional
   :term name Name
   :body required
 
