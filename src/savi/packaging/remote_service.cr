@@ -11,6 +11,8 @@ module Savi::Packaging::RemoteService
   def self.update_all(ctx, deps : Array(Dependency), into_dirname : String)
     deps.group_by(&.location_scheme).each { |scheme, scheme_deps|
       case scheme
+      when "relative"
+        # do nothing - expect the directory to be user-provided
       when "github"
         GitHub.update_all(ctx, scheme_deps, into_dirname)
       else

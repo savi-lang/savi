@@ -356,6 +356,26 @@ class Savi::Compiler::SourceService
     sources.to_a.sort_by!(&.first.path.downcase)
   end
 
+  # Find a dependency that has a local relative path as its location.
+  def find_relative_dep(ctx, dep : Packaging::Dependency) : String?
+    raise "inconsistent logic" unless dep.location_scheme == "relative"
+
+    relative_path = dep.location_without_scheme
+    absolute_path = File.join(Dir.current, relative_path)
+    location_node = dep.location_nodes.first
+
+    # Confirm that the directory does exist.
+    if !Dir.exists?(absolute_path)
+      ctx.error_at dep.name, "This relative dependency doesn't exist", [
+        {location_node.pos, "expected to find a relative path named " +
+          relative_path.inspect}
+      ]
+      return nil
+    end
+
+    absolute_path
+  end
+
   # Find a dependency in the local `deps` dir which matches the given dep spec.
   def find_latest_in_deps(ctx, dep : Packaging::Dependency) : String?
     # TODO: Fail with an error if there is more than one location node.
