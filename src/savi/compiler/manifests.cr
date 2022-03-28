@@ -121,7 +121,11 @@ class Savi::Compiler::Manifests
     end
 
     # Compile all manifests at the path where the dep is to be found.
-    dep_path = ctx.compiler.source_service.find_latest_in_deps(ctx, dep)
+    dep_path = if dep.is_location_relative_path?
+      ctx.compiler.source_service.find_relative_dep(ctx, dep)
+    else
+      ctx.compiler.source_service.find_latest_in_deps(ctx, dep)
+    end
     return unless dep_path
     ctx.compile_manifests_at_path(dep_path)
 

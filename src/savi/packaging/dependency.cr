@@ -41,6 +41,10 @@ struct Savi::Packaging::Dependency
     location.split(":", 2).last
   end
 
+  def is_location_relative_path?
+    location_scheme == "relative"
+  end
+
   def append_pos
     ast.span_pos(ast.pos.source).next_line_start_as_pos
   end
