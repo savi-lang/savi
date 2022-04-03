@@ -2,8 +2,8 @@
 	"name": "savi",
 	"displayName": "Savi Language",
 	"description": "Support for the Savi programming language.",
-	"version": "0.5.0",
-	"publisher": "savi-lang",
+	"version": "0.6.0",
+	"publisher": "savi",
 	"engines": {
 		"vscode": "^1.35.0"
 	},
@@ -93,7 +93,7 @@
 	},
 	"__metadata": {
 		"id": "474b763e-eb09-46fb-8b43-2a66c4e347fb",
-		"publisherDisplayName": "savi-lang",
+		"publisherDisplayName": "savi",
 		"publisherId": "2b952662-3ded-4c9b-996f-9d1725e09e24"
 	}
 }

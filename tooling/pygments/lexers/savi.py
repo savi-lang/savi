@@ -4,7 +4,7 @@
 
     Lexer for Savi.
 
-    :copyright: Copyright 2006-2021 by the Pygments team, see AUTHORS.
+    :copyright: Copyright 2006-2022 by the Pygments team, see AUTHORS.
     :license: BSD, see LICENSE for details.
 """
 
@@ -31,10 +31,13 @@ __all__ = ['SaviLexer']
 
 class SaviLexer(RegexLexer):
   """
-  For `Savi <https://github.com/savi-lang/savi>`_ source code.
+  For Savi source code.
+
+  .. versionadded: 2.10
   """
 
   name = 'Savi'
+  url = 'https://github.com/savi-lang/savi'
   aliases = ['savi']
   filenames = ['*.savi']
 
@@ -56,11 +59,11 @@ class SaviLexer(RegexLexer):
       (r"'", String.Char, "string.char"),
 
       # Class (or other type)
-      (r'([_A-Z]\w*)', Name.Class),
+      (r'(_?[A-Z]\w*)', Name.Class),
 
       # Declare
-      (r'^([ \t]*)(:)(\w+)',
-        bygroups(Whitespace, Name.Tag, Name.Tag),
+      (r'^([ \t]*)(:\w+)',
+        bygroups(Whitespace, Name.Tag),
         "decl"),
 
       # Error-Raising Calls/Names
@@ -135,6 +138,7 @@ class SaviLexer(RegexLexer):
 
     # Double-Quote String (nested rules)
     "string.double": [
+      (r'\\\(', String.Interpol, "string.interpolation"),
       (r'\\u[0-9a-fA-F]{4}', String.Escape),
       (r'\\x[0-9a-fA-F]{2}', String.Escape),
       (r'\\[bfnrt\\\']', String.Escape),
@@ -154,4 +158,10 @@ class SaviLexer(RegexLexer):
       (r"[^\\']+", String.Char),
       (r'.', Error),
     ],
+
+    # Interpolation inside String (nested rules)
+    "string.interpolation": [
+      (r"\)", String.Interpol, "#pop"),
+      include("root"),
+    ]
   }

@@ -27,6 +27,7 @@ patterns:
   begin: (\w?")
   end: (")
   patterns:
+  - include: '#interpolation'
   - name: constant.character.escape.savi
     match: \\.
 
@@ -40,7 +41,7 @@ patterns:
 
 - comment: Class (or other type)
   name: meta.class.savi
-  match: ([_A-Z]\w*)
+  match: (_?[A-Z]\w*)
   captures:
     '1': {name: support.class.savi}
 
@@ -157,3 +158,15 @@ patterns:
 - comment: Identifiers
   name: entity.name.identifier.savi
   match: \w+
+
+repository:
+  interpolation:
+    patterns:
+    - comment: String Interpolation
+      name: meta.embedded.savi
+      begin: (\\\()
+      end: (\))
+      beginCaptures: {'1': {name: punctuation.section.embedded.begin.savi}}
+      endCaptures:   {'1': {name: punctuation.section.embedded.end.savi}}
+      patterns:
+      - include: $self
