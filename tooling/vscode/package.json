@@ -2,7 +2,7 @@
 	"name": "savi",
 	"displayName": "Savi Language",
 	"description": "Support for the Savi programming language.",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"publisher": "savi",
 	"engines": {
 		"vscode": "^1.35.0"
