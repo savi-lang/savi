@@ -4,7 +4,7 @@
 
     Lexer for Savi.
 
-    :copyright: Copyright 2006-2021 by the Pygments team, see AUTHORS.
+    :copyright: Copyright 2006-2022 by the Pygments team, see AUTHORS.
     :license: BSD, see LICENSE for details.
 """
 
@@ -31,10 +31,13 @@ __all__ = ['SaviLexer']
 
 class SaviLexer(RegexLexer):
   """
-  For `Savi <https://github.com/savi-lang/savi>`_ source code.
+  For Savi source code.
+
+  .. versionadded: 2.10
   """
 
   name = 'Savi'
+  url = 'https://github.com/savi-lang/savi'
   aliases = ['savi']
   filenames = ['*.savi']
 
@@ -59,8 +62,8 @@ class SaviLexer(RegexLexer):
       (r'(_?[A-Z]\w*)', Name.Class),
 
       # Declare
-      (r'^([ \t]*)(:)(\w+)',
-        bygroups(Whitespace, Name.Tag, Name.Tag),
+      (r'^([ \t]*)(:\w+)',
+        bygroups(Whitespace, Name.Tag),
         "decl"),
 
       # Error-Raising Calls/Names

@@ -45,8 +45,8 @@ module Rouge
         rule %r{(_?[A-Z]\w*)}, Name::Class
 
         # Declare
-        rule %r{^([ \t]*)(:)(\w+)} do
-          groups Text::Whitespace, Name::Tag, Name::Tag
+        rule %r{^([ \t]*)(:\w+)} do
+          groups Text::Whitespace, Name::Tag
           push :decl
         end
 
