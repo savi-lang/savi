@@ -40,7 +40,7 @@ patterns:
 
 - comment: Class (or other type)
   name: meta.class.savi
-  match: ([_A-Z]\w*)
+  match: (_?[A-Z]\w*)
   captures:
     '1': {name: support.class.savi}
 

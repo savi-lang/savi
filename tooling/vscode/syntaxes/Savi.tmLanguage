@@ -99,7 +99,7 @@
         <key>name</key>
         <string>meta.class.savi</string>
         <key>match</key>
-        <string>([_A-Z]\w*)</string>
+        <string>(_?[A-Z]\w*)</string>
         <key>captures</key>
         <dict>
           <key>1</key>

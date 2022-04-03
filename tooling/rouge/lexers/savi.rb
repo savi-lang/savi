@@ -42,7 +42,7 @@ module Rouge
         rule %r{'}, Str::Char, :string_char
 
         # Class (or other type)
-        rule %r{([_A-Z]\w*)}, Name::Class
+        rule %r{(_?[A-Z]\w*)}, Name::Class
 
         # Declare
         rule %r{^([ \t]*)(:)(\w+)} do
