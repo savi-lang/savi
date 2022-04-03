@@ -129,13 +129,20 @@ module Savi::Parser::Builder
     terms = [] of AST::Term
 
     # See if this string has a nested identifier and/or string inside it.
+    # It may also have interpolated terms inside of it.
     child_ident : AST::Identifier? = nil
-    child_string : AST::LiteralString? = nil
+    child_string : (AST::LiteralString | AST::ComposeString)? = nil
+    child_interpolations = [] of AST::Term
+    child_interpolation_tokens = [] of Pegmatite::Token
     iter.while_next_is_child_of(main) do |child|
       term = build_term(child, iter, state)
       case term
       when AST::Identifier then child_ident = term
       when AST::LiteralString then child_string = term
+      when AST::ComposeString then child_string = term
+      when AST::Group
+        child_interpolations << term
+        child_interpolation_tokens << child
       else
         raise NotImplementedError.new(child)
       end
@@ -143,9 +150,35 @@ module Savi::Parser::Builder
 
     # If there were child elements inside, use those.
     # Otherwise, this is an inner string so we gather its slice directly.
-    if child_string
+    if child_string.is_a?(AST::LiteralString)
       child_string.prefix_ident = child_ident
       child_string.with_pos(state.pos(main))
+    elsif child_string.is_a?(AST::ComposeString)
+      child_string.prefix_ident = child_ident
+      child_string.with_pos(state.pos(main))
+    elsif child_interpolation_tokens.any?
+      compose = AST::ComposeString.new.with_pos(state.pos(main))
+      token_partition(main, child_interpolation_tokens) { |part, index_in_list, part_is_final|
+        if index_in_list
+          compose.terms << child_interpolations[index_in_list]
+        else
+          # If this isn't the final part, then it has a trailing '\' in it
+          # which is the prefix of the interpolated group that comes next.
+          # We don't want to count this `\` as being part of the literal string,
+          # so we amend the part tuple here to exclude it from consideration.
+          part = {part[0], part[1], part[2] - 1} unless part_is_final
+
+          # If this is an empty string literal, we need not include it.
+          # At best it will have no effect, and at worst it is wasteful.
+          part_is_empty = part[1] == part[2]
+          next if part_is_empty
+
+          compose.terms << AST::LiteralString.new(
+            state.slice_with_escapes(part)
+          ).with_pos(state.pos(part))
+        end
+      }
+      compose
     else
       value = state.slice_with_escapes(main)
       AST::LiteralString.new(value).with_pos(state.pos(main))
@@ -414,5 +447,47 @@ module Savi::Parser::Builder
     end
 
     term
+  end
+
+  # Given a "main" token and a list of tokens contained within its span,
+  # partition the main token into ordered sub-tokens, some of which are
+  # from the given list, and the rest of which are the parts between those.
+  #
+  # For example, this function is used to partition an interpolated string
+  # into its parts, including the dynamic value expressions in the list
+  # and the static value string literal portions between those expressions.
+  #
+  # Note that this function assumes the given list is in order.
+  # It also assumes that all list tokens are contained within the main token.
+  # If either of these invariants don't hold, the behavior is unspecified.
+  private def self.token_partition(
+    main : Pegmatite::Token,
+    list : Array(Pegmatite::Token)
+  )
+    # Begin from the start of the main token.
+    cursor = main[1]
+
+    list.each_with_index { |list_part, index_in_list|
+      # If the cursor hasn't reached the current list part token, then we will
+      # yield the portion of the main token that precedes the list part token,
+      # and move the cursor forward to the start of the list part token.
+      if cursor < list_part[1]
+        pre_part = {main[0], cursor, list_part[1]}
+        yield pre_part, nil, false
+        cursor = list_part[1]
+      end
+
+      # Now we yield the list part token itself, and move the cursor to its end.
+      yield list_part, index_in_list, false
+      cursor = list_part[2]
+    }
+
+    # If there is any content left in the main token, yield what remains.
+    if cursor < main[2]
+      post_part = {main[0], cursor, main[2]}
+      yield post_part, nil, true
+    end
+
+    nil
   end
 end

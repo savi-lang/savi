@@ -45,6 +45,17 @@
   :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_space)
   :fun val as_bytes: Bytes.from_string(@)
 
+  :fun into_string_space: @space
+
+  :fun into_string(out String'iso) String'iso
+    if (@_size > 0) (
+      new_size = out._size + @_size
+      out.reserve(new_size)
+      out._clone_from(@_ptr._unsafe_val, @_size, out._size)
+      out._size = new_size
+    )
+    --out
+
   :fun "=="(other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
 
@@ -87,8 +98,8 @@
     copy._size = @size
     --copy // TODO: auto-consume at end of the function?
 
-  :fun ref _clone_from(other_ptr CPointer(U8), size USize)
-    other_ptr._unsafe._copy_to(@_ptr, size)
+  :fun ref _clone_from(other_ptr CPointer(U8), size USize, to_offset = 0)
+    other_ptr._unsafe._copy_to(@_ptr._offset(to_offset), size)
 
   :fun includes(other): try (@offset_of!(other), True | False)
 

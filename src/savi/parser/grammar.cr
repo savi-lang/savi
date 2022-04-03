@@ -42,6 +42,11 @@ module Savi::Parser
       ) >> char('!').maybe
     ).named(:ident)
 
+    # We allow (escaped) parens inside of a string literal, so we need to
+    # forward-declare the grammar rule here so we can use it early and
+    # define it later in the grammar.
+    parens = declare()
+
     # Define what a string looks like.
     string_char =
       str("\\\"") | str("\\\\") |
@@ -49,6 +54,7 @@ module Savi::Parser
       str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (str("\\x") >> digithex >> digithex) |
+      str("\\") >> ~(~char('(')) >> parens |
       str("\\").maybe >> (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     string = (
       ident_letter.named(:ident).maybe >>
@@ -75,8 +81,6 @@ module Savi::Parser
       (heredoc_no_token | (~str(">>>") >> any)).repeat
 
     # Define an atom to be a single term with no binary operators.
-    parens = declare()
-    decl = declare()
     anystring = string | character | heredoc
     atom = parens | anystring | float | integer | ident
 
@@ -128,6 +132,7 @@ module Savi::Parser
     ).named(:relate_r) >> s
 
     # Define what a comma/newline-separated sequence of terms looks like.
+    decl = declare()
     term = decl | t
     termsl = term >> s >> (char(',') >> sn >> term >> s).repeat >> (char(',') >> s).maybe
     terms = (termsl >> sn).repeat

@@ -253,6 +253,81 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     raise Error.compiler_hole_at(node, exc)
   end
 
+  def visit_pre(ctx, node : AST::ComposeString)
+    # Because we have hygienic locals to set up, we have to run a sequence.
+    # The final expression of the sequence will be the actual string expression.
+    sequence = AST::Group.new("(").from(node)
+
+    # Use a hygienic local for each non-literal part of the composed string.
+    # The literal parts don't need a hygienic local because they are static.
+    parts = node.terms.map { |term|
+      if term.is_a? AST::LiteralString
+        term
+      else
+        local = AST::Identifier.new(next_local_name).from(term)
+        local_assign = AST::Relate.new(
+          AST::Relate.new(
+            local,
+            AST::Operator.new("EXPLICITTYPE").from(term),
+            AST::Identifier.new("box").from(term),
+          ).from(term),
+          AST::Operator.new("=").from(term),
+          term,
+        ).from(term)
+        sequence.terms << local_assign
+        local
+      end
+    }
+
+    # Add up the total space requested by each part, as an additive expression.
+    # We start with `USize.zero`, then chain `+ part.into_string_space` calls
+    # for each part in the composed string until we have the entire sum.
+    space_expr = AST::Call.new(
+      AST::Identifier.new("USize").from(node),
+      AST::Identifier.new("zero").from(node),
+    ).from(node)
+    parts.each { |part|
+      space_expr = AST::Call.new(
+        space_expr,
+        AST::Identifier.new("+").from(node),
+        AST::Group.new("(", [
+          AST::Call.new(
+            part,
+            AST::Identifier.new("into_string_space").from(part)
+          ).from(part),
+        ] of AST::Node).from(part),
+      ).from(node)
+    }
+
+    # Call each part's `into_string` method, passing the result of the previous
+    # part as the argument. The argument for the first call is `String.new_iso`
+    # with the space expression as its argument to allocate the requested space.
+    # The hope is that if the correct amount of space was requested, we won't
+    # need to re-allocate the string as its size grows (if its `space >= size`).
+    string_expr = AST::Call.new(
+      AST::Identifier.new("String").from(node),
+      AST::Identifier.new("new_iso").from(node),
+      AST::Group.new("(", [space_expr] of AST::Node).from(node),
+    ).from(node)
+    parts.each { |part|
+      string_expr = AST::Call.new(
+        part,
+        AST::Identifier.new("into_string").from(part),
+        AST::Group.new("(", [string_expr] of AST::Node).from(part),
+      ).from(part)
+    }
+
+    # Add the string expression to the sequence of terms.
+    # This is the final expression in the sequence, so it will
+    # be the result of the sequence when we return the sequence.
+    sequence.terms << string_expr
+    sequence
+
+  rescue exc : Exception
+    raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
+    raise Error.compiler_hole_at(node, exc)
+  end
+
   def visit_if(node : AST::Group)
     orig = node.terms[0]
     cond = node.terms[1]
