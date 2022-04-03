@@ -1,0 +1,6 @@
+:module StringSpec
+  :fun run(test MicroTest)
+    bar = "bar"
+
+    test["compose string 1"].pass = "foo \(bar) baz" == "foo bar baz"
+    test["compose string 2"].pass = "\(bar)\(bar)\(bar)" == "barbarbar"

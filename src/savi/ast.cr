@@ -252,7 +252,7 @@ module Savi::AST
 
   alias Term = Annotation | Identifier \
     | LiteralString | LiteralCharacter | LiteralInteger | LiteralFloat \
-    | Operator | Prefix | Relate | Group \
+    | ComposeString | Operator | Prefix | Relate | Group \
     | FieldRead | FieldWrite | FieldDisplace | Choice | Loop | Try
 
   # Annotation is a comment attached to an expression, such as a doc string.
@@ -371,6 +371,36 @@ module Savi::AST
     end
     def name; :float end
     def to_a: Array(A); [name, value] of A end
+  end
+
+  # A ComposeString is surrounded by double-quotes in source code much like
+  # a LiteralString, but rather than having a single static value, it is
+  # composed of some number of static string values (each a LiteralString) and
+  # some number of expressions bounded by escaped parentheses (each a Group).
+  # Together these static values and dynamic values are the list of terms.
+  #
+  # example = "color: \(color_value), size: \(size_value)"
+  #            ^~~~~~~              ^~~~~~~~              (static value terms)
+  #                    ^~~~~~~~~~~~~         ^~~~~~~~~~~~ (dynamic value terms)
+  #            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ (string compose)
+  #
+  class ComposeString < Node
+    property terms
+    property prefix_ident
+    def initialize(@terms = [] of Term, @prefix_ident : Identifier? = nil)
+    end
+    def name; :compose_string end
+    def to_a: Array(A); [name, *terms.map(&.to_a), prefix_ident.try(&.to_a)] of A end
+    def children_accept(ctx : Compiler::Context, visitor : Visitor)
+      @terms.each(&.accept(ctx, visitor))
+    end
+    def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
+      new_terms, terms_changed = children_list_accept(ctx, @terms, visitor)
+      return self unless terms_changed
+      dup.tap do |node|
+        node.terms = new_terms
+      end
+    end
   end
 
   # An Operator is a non-Identifier symbol used in Relate and Prefix nodes,
