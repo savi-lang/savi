@@ -67,6 +67,10 @@
         <key>patterns</key>
         <array>
           <dict>
+            <key>include</key>
+            <string>#interpolation</string>
+          </dict>
+          <dict>
             <key>name</key>
             <string>constant.character.escape.savi</string>
             <key>match</key>
@@ -419,5 +423,47 @@
         <string>\w+</string>
       </dict>
     </array>
+    <key>repository</key>
+    <dict>
+      <key>interpolation</key>
+      <dict>
+        <key>patterns</key>
+        <array>
+          <dict>
+            <key>comment</key>
+            <string>String Interpolation</string>
+            <key>name</key>
+            <string>meta.embedded.savi</string>
+            <key>begin</key>
+            <string>(\\\()</string>
+            <key>end</key>
+            <string>(\))</string>
+            <key>beginCaptures</key>
+            <dict>
+              <key>1</key>
+              <dict>
+                <key>name</key>
+                <string>punctuation.section.embedded.begin.savi</string>
+              </dict>
+            </dict>
+            <key>endCaptures</key>
+            <dict>
+              <key>1</key>
+              <dict>
+                <key>name</key>
+                <string>punctuation.section.embedded.end.savi</string>
+              </dict>
+            </dict>
+            <key>patterns</key>
+            <array>
+              <dict>
+                <key>include</key>
+                <string>$self</string>
+              </dict>
+            </array>
+          </dict>
+        </array>
+      </dict>
+    </dict>
   </dict>
 </plist>

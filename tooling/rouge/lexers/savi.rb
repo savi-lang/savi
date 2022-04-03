@@ -129,6 +129,7 @@ module Rouge
 
       # Double-Quote String (nested rules)
       state :string_double do
+        rule %r/\\\(/, Str::Interpol, :string_interpolation
         rule %r/\\u[0-9a-fA-F]{4}/, Str::Escape
         rule %r/\\x[0-9a-fA-F]{2}/, Str::Escape
         rule %r{\\[bfnrt\\"]}, Str::Escape
@@ -147,6 +148,12 @@ module Rouge
         rule %r{'}, Str::Char, :pop!
         rule %r{[^\\']+}, Str::Char
         rule %r{.}, Error
+      end
+
+      # Interpolation inside String (nested rules)
+      state :string_interpolation do
+        rule %r/\)/, Str::Interpol, :pop!
+        mixin :root
       end
     end
   end
