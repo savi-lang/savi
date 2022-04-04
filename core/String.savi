@@ -1,5 +1,6 @@
 :class val String
   :is Comparable(String'box)
+  :is IntoString
 
   :var _size USize
   :var _space USize
