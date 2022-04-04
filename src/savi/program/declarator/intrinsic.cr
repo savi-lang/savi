@@ -666,12 +666,16 @@ module Savi::Program::Intrinsic
 
     # Also copy the base implementation for this specific flavor of numeric.
     copy2_name =
-      if !type.has_tag?(:numeric_floating_point)
-        "Integer.BaseImplementation"
-      elsif scope.current_type.metadata[:numeric_bit_width]? == 32
-        "FloatingPoint.BaseImplementation32"
+      if type.has_tag?(:numeric_floating_point)
+        if scope.current_type.metadata[:numeric_bit_width]? == 32
+          "FloatingPoint.BaseImplementation32"
+        else
+          "FloatingPoint.BaseImplementation64"
+        end
+      elsif type.has_tag?(:enum)
+        "Integer.BaseImplementation.Enum"
       else
-        "FloatingPoint.BaseImplementation64"
+        "Integer.BaseImplementation"
       end
     copy2_cap = AST::Identifier.new("non").from(type.ident)
     copy2_is = AST::Identifier.new("copies").from(type.ident)

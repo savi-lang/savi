@@ -29,7 +29,7 @@ class Savi::Compiler::Populate
       dest = t
       dest_link = dest.make_link(package)
       orig_functions = dest.functions
-      copy_sources.each do |source_defn, visitor|
+      copy_sources.reverse_each do |source_defn, visitor|
         new_functions = copy_from(ctx, source_defn, dest)
         if new_functions.any?
           if dest.functions.same?(orig_functions)

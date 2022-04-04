@@ -1029,6 +1029,8 @@ class Savi::Compiler::CodeGen
     already_returned = false # set to true if the intrinsic does a return in it
     return_value =
       case gfunc.func.ident.value
+      when "as_val"
+        params[0]
       when "bit_width"
         @i8.const_int(
           abi_size_of(llvm_type_of(gtype)) * 8
@@ -2624,6 +2626,7 @@ class Savi::Compiler::CodeGen
   end
 
   def bit_width_of(llvm_type : LLVM::Type)
+    return 1 if llvm_type == @i1
     abi_size_of(llvm_type) * 8
   end
 

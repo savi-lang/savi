@@ -33,6 +33,8 @@
     assert: Inspect[F32[-0.0625]]     == "-0.0625"
     assert: Inspect[F64[0]]           == "0.0"
     assert: Inspect[F32[0]]           == "0.0"
+    assert: Inspect[F64[36.5]]        == "36.5"
+    assert: Inspect[F32[36.5]]        == "36.5"
     assert: Inspect[F64.infinity]     == "Infinity"
     assert: Inspect[F32.infinity]     == "Infinity"
     assert: Inspect[F64.neg_infinity] == "-Infinity"
