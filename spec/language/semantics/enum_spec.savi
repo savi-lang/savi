@@ -17,6 +17,5 @@
     test["can declare a member value as a char literal"].pass =
       EnumExample.Char50.u8 == 50
 
-    test.env.out.print("EnumExample.Integer48: \(EnumExample.Integer48)")
     test["can interpolate into a string with the member name"].pass =
       "\(EnumExample.Integer48)" == "EnumExample.Integer48"

@@ -382,6 +382,10 @@
 :trait val Integer.BaseImplementation.Enum // TODO: don't use :trait for this... `common`?
   :copies Integer.BaseImplementation
 
+  :const bit_width U8: 8
+  :const byte_width U8: compiler intrinsic
+
+  :fun non from_u64!(value U64) @'val
   :fun member_name String
 
   :is IntoString

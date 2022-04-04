@@ -1035,6 +1035,10 @@ class Savi::Compiler::CodeGen
         @i8.const_int(
           abi_size_of(llvm_type_of(gtype)) * 8
         )
+      when "byte_width"
+        @i8.const_int(
+          abi_size_of(llvm_type_of(gtype))
+        )
       when "zero"
         if gtype.type_def.is_floating_point_numeric?(ctx)
           case bit_width_of(gtype)

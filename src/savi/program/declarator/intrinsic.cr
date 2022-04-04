@@ -505,6 +505,22 @@ module Savi::Program::Intrinsic
         else
           raise NotImplementedError.new(declarator.pretty_inspect)
         end
+        either_width_ast = (value_ast || c_type_ast).not_nil!
+        scope.current_type.functions << Program::Function.new(
+          AST::Identifier.new("non").from(declare.terms.first),
+          AST::Identifier.new("byte_width").from(declare.terms.first),
+          nil,
+          AST::Identifier.new("U8").from(declare.terms.first),
+          AST::Group.new(":", [
+            AST::Group.new(" ", [
+              AST::Identifier.new("compiler").from(either_width_ast).as(AST::Node),
+              AST::Identifier.new("intrinsic").from(either_width_ast).as(AST::Node),
+            ]).from(either_width_ast).as(AST::Node)
+          ]).from(either_width_ast)
+        ).tap do |f|
+          f.add_tag(:constant)
+          f.add_tag(:inline)
+        end
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end
