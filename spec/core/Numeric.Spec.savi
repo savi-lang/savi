@@ -576,3 +576,12 @@
       assert: value.into_string_space >= "\(value)".size
     )
     assert: U64[0].into_string_space == 1
+
+  :it "can format integers in a standard hexadecimal representation"
+    assert: "\(False.format.hex)" == "0x0"
+    assert: "\(True.format.hex)"  == "0x1"
+    assert: "\(U8[0].format.hex)" == "0x00"
+    assert: "\(0.format.hex)"     == "0x00000000"
+    assert: "\(36.format.hex)"    == "0x00000024"
+    assert: "\((-36).format.hex)" == "0xFFFFFFDC"
+    assert: "\(U64[0x123456789ABCDEF0].format.hex)" == "0x123456789ABCDEF0"

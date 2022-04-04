@@ -1265,7 +1265,7 @@ class Savi::Compiler::CodeGen
         @builder.xor(params[0], params[1])
       when "bit_shl"
         raise "bit_shl float" if gtype.type_def.is_floating_point_numeric?(ctx)
-        bits = @builder.zext(params[1], llvm_type_of(gtype))
+        bits = gen_numeric_conv(@gtypes["U8"], gtype, params[1])
         clamp = llvm_type_of(gtype).const_int(bit_width_of(gtype) - 1)
         bits = @builder.select(
           @builder.icmp(LLVM::IntPredicate::ULE, bits, clamp),
@@ -1275,7 +1275,7 @@ class Savi::Compiler::CodeGen
         @builder.shl(params[0], bits)
       when "bit_shr"
         raise "bit_shr float" if gtype.type_def.is_floating_point_numeric?(ctx)
-        bits = @builder.zext(params[1], llvm_type_of(gtype))
+        bits = gen_numeric_conv(@gtypes["U8"], gtype, params[1])
         clamp = llvm_type_of(gtype).const_int(bit_width_of(gtype) - 1)
         bits = @builder.select(
           @builder.icmp(LLVM::IntPredicate::ULE, bits, clamp),
