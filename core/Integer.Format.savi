@@ -1,0 +1,142 @@
+:: Format the given integer value using one of the available format types.
+:: Call one of the methods of this struct to choose which format type to use.
+:struct val Integer.Format(T Integer(T)'val)
+  :let _value T
+  :new val _new(@_value)
+
+  :fun decimal: Integer.Format.Decimal(T)._new(@_value)
+  :fun hexadecimal: Integer.Format.Hexadecimal(T)._new(@_value)
+
+  :fun dec: @decimal
+  :fun hex: @hexadecimal
+
+:: Format the given integer into a variable number of decimal digits.
+:struct val Integer.Format.Decimal(T Integer(T)'val)
+  :is IntoString
+
+  :let _value T
+  :new val _new(@_value)
+
+  :fun into_string(out String'iso) String'iso
+    value = @_value
+
+    // TODO: Avoid this hacky workaround for lack of numeric literals here.
+    zero = value.zero
+    one = value.one
+    ten = one + one + one + one + one + one + one + one + one + one
+
+    // Fast path for zero - it always has exactly one digit.
+    if (value == zero) (
+      out.push_byte('0')
+      return --out
+    )
+
+    // If the value is less than zero, we need to negate it to make it positive
+    // before we try to append its representation into the given string,
+    // and we'll append a negative sign byte first.
+    if (value < zero) (
+      value = zero - value
+      out.push_byte('-')
+    )
+
+    // Collect the digits we need to print, from least to most significant.
+    // TODO: Avoid this temporary array allocation here.
+    digits Array(U8) = []
+    while (value > zero) (
+      digits << (value % ten).u8 + '0'
+      value = value / ten
+    )
+
+    // Print each digit in the expected order (from most to least significant).
+    // Then return the output string now that we are done.
+    digits.reverse_each -> (digit | out.push_byte(digit))
+    --out
+
+  :fun into_string_space USize
+    orig_value = value = @_value
+
+    // TODO: Avoid this hacky workaround for lack of numeric literals here.
+    zero = value.zero
+
+    // Fast path for zero - it always has exactly one digit.
+    return 1 if (value == zero)
+
+    // If the value is less than zero, we need to negate it to make it positive
+    // before we try to count the number of its significant bits.
+    if (value < zero) (value = zero - value)
+
+    // Count the number of significant bits, add 3, and multiply by (5 / 16),
+    // which is a rough heuristic arithmetic expression that conservatively
+    // estimates the number of decimal digits needed to print the number,
+    // while avoiding an actual division operation by using a bit shift
+    // (which is possible because the denominator is a power of 2).
+    bits = value.bit_width - value.leading_zero_bits
+    digits = ((bits + 3).usize * 5).bit_shr(4) + 1
+
+    // The number of bytes we need available to print the number is the
+    // same as the number of digits, with an added byte for the negative sign
+    // in the case that the number is a negative one.
+    if (orig_value < zero) (digits + 1 | digits)
+
+:: Format the given integer into a fixed width hexadecimal representation.
+::
+:: By default the digits are shown with a "0x" prefix, but this is adjustable.
+:struct val Integer.Format.Hexadecimal(T Integer(T)'val)
+  :is IntoString
+
+  :let _value T
+  :let _prefix String
+  :new val _new(@_value, @_prefix = "0x")
+
+  :: Format without the standard "0x" hexadecimal prefix.
+  :fun bare: @_new(@_value, "")
+
+  :: Use the given prefix instead of the standard "0x" hexadecimal prefix.
+  :fun with_prefix(prefix): @_new(@_value, prefix)
+
+  :fun into_string_space USize
+    @_prefix.size + if (T.bit_width == 1) (1 | T.bit_width.usize / 4)
+
+  :fun into_string(out String'iso) String'iso
+    out << @_prefix
+    case T.bit_width == (
+    | 1 |
+      out.push_byte(@_digit(@_value.u8))
+    | 8 |
+      out.push_byte(@_digit(@_value.bit_shr(4).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.u8.bit_and(0xF)))
+    | 16 |
+      out.push_byte(@_digit(@_value.bit_shr(12).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(8).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(4).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.u8.bit_and(0xF)))
+    | 32 |
+      out.push_byte(@_digit(@_value.bit_shr(28).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(24).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(20).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(16).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(12).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(8).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(4).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.u8.bit_and(0xF)))
+    | 64 |
+      out.push_byte(@_digit(@_value.bit_shr(60).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(56).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(52).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(48).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(44).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(40).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(36).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(32).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(28).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(24).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(20).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(16).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(12).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(8).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.bit_shr(4).u8.bit_and(0xF)))
+      out.push_byte(@_digit(@_value.u8.bit_and(0xF)))
+    )
+    --out
+
+  :fun non _digit(u4 U8): if (u4 <= 9) (u4 + '0' | u4 + 'A' - 0xA)

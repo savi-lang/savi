@@ -45,8 +45,8 @@
   :const bit_width U8
 
   :: The number of bytes that are used to represent values of this numeric type.
-  :: This is derived trivially from the `bit_width` constant.
-  :fun non byte_width: @bit_width / 8
+  :: For types smaller than a byte (like `Bool`), a full byte is pretended.
+  :const byte_width U8
 
   :: When true, values are signed, represented using "two's complement",
   ::

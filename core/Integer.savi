@@ -10,6 +10,7 @@
   :is Integer.WideArithmetic(T)
   :is Integer.BitwiseArithmetic(T)
   :is Integer.Countable(T)
+  :is Integer.Formattable(T)
 
 :: A type which conveys information about the machine-level representation
 :: of an integer numeric type, including the standard information about
@@ -222,6 +223,16 @@
   :fun val times T
     :yields T for None
 
+:: A type which can be formatted as the given integer type T.
+:trait val Integer.Formattable(T Integer(T)'val)
+  :fun as_val T
+
+  :fun format: Integer.Format(T)._new(@as_val)
+
+  :is IntoString
+  :fun into_string(out String'iso): @format.decimal.into_string(--out)
+  :fun into_string_space: @format.decimal.into_string_space
+
 :: This trait isn't meant to be used externally. It's just a base implementation
 :: of methods to be copied into every new integer `:numeric` type.
 :trait val Integer.BaseImplementation // TODO: don't use :trait for this... `common`?
@@ -294,61 +305,7 @@
     )
     @
 
-  :is IntoString
-
-  :fun into_string(out String'iso) String'iso
-    // Fast path for zero - it always has exactly one digit.
-    if (@ == @zero) (
-      out.push_byte('0')
-      return --out
-    )
-
-    // If the value is less than zero, we need to negate it to make it positive
-    // before we try to append its representation into the given string,
-    // and we'll append a negative sign byte first.
-    value = @as_val
-    if (@ < @zero) (
-      value = @zero - value
-      out.push_byte('-')
-    )
-
-    // TODO: Avoid this hacky workaround for lack of numeric literals here.
-    ten = @one + @one + @one + @one + @one + @one + @one + @one + @one + @one
-
-    // Collect the digits we need to print, from least to most significant.
-    // TODO: Avoid this temporary array allocation here.
-    digits Array(U8) = []
-    while (value > @zero) (
-      digits << (value % ten).u8 + '0'
-      value = value / ten
-    )
-
-    // Print each digit in the expected order (from most to least significant).
-    // Then return the output string now that we are done.
-    digits.reverse_each -> (digit | out.push_byte(digit))
-    --out
-
-  :fun into_string_space USize
-    // Fast path for zero - it always has exactly one digit.
-    return 1 if (@ == @zero)
-
-    // If the value is less than zero, we need to negate it to make it positive
-    // before we try to count the number of its significant bits.
-    value = @as_val
-    if (@ < @zero) (value = @zero - value)
-
-    // Count the number of significant bits, add 3, and multiply by (5 / 16),
-    // which is a rough heuristic arithmetic expression that conservatively
-    // estimates the number of decimal digits needed to print the number,
-    // while avoiding an actual division operation by using a bit shift
-    // (which is possible because the denominator is a power of 2).
-    bits = @bit_width - value.leading_zero_bits
-    digits = ((bits + 3).usize * 5).bit_shr(4) + 1
-
-    // The number of bytes we need available to print the number is the
-    // same as the number of digits, with an added byte for the negative sign
-    // in the case that the number is a negative one.
-    if (@ < @zero) (digits + 1 | digits)
+  :is Integer.Formattable(@'val)
 
   // TODO: explicit conformance to a particular trait for `hash`
   :fun hash USize
@@ -382,6 +339,10 @@
 :trait val Integer.BaseImplementation.Enum // TODO: don't use :trait for this... `common`?
   :copies Integer.BaseImplementation
 
+  :const bit_width U8: 8
+  :const byte_width U8: compiler intrinsic
+
+  :fun non from_u64!(value U64) @'val
   :fun member_name String
 
   :is IntoString

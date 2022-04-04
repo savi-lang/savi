@@ -28,13 +28,13 @@
       output.push_byte('"')
       input.each -> (byte |
         case (
-        | byte >= 0x7F | output = @_inspect_hex_byte_escape_into(--output, byte)
+        | byte >= 0x7F | output = byte.format.hex.with_prefix("\\x").into_string(--output)
         | byte == '"'  | output.push_byte('\\').push_byte('"')
         | byte >= 0x20 | output.push_byte(byte)
         | byte == '\n' | output.push_byte('\\').push_byte('n')
         | byte == '\r' | output.push_byte('\\').push_byte('r')
         | byte == '\t' | output.push_byte('\\').push_byte('t')
-        |                output = @_inspect_hex_byte_escape_into(--output, byte)
+        |                output = byte.format.hex.with_prefix("\\x").into_string(--output)
         )
       )
       output.push_byte('"')
@@ -61,18 +61,3 @@
       output << reflection_of_runtime_type_name input
       --output
     )
-
-  :fun non _inspect_hex_byte_escape_into(out String'iso, byte U8)
-    out.push_byte('\\')
-    out.push_byte('x')
-    out = @_inspect_hex_digit_into(--out, byte.bit_shr(4))
-    out = @_inspect_hex_digit_into(--out, byte.bit_and(0xF))
-    --out
-
-  :fun non _inspect_hex_digit_into(out String'iso, digit U8)
-    if (digit <= 9) (
-      out.push_byte(digit + '0')
-    |
-      out.push_byte(digit + 'A' - 0xA)
-    )
-    --out
