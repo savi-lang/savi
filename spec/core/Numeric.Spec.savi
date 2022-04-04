@@ -558,3 +558,21 @@
       assert: u64.be_to_native == u64
       assert: u64.le_to_native == u64_swapped
     )
+
+  :it "prints the decimal digits of the number value into a string"
+    assert: "\(0)" == "0"
+    assert: "\(36)" == "36"
+    assert: "\(-36)" == "-36"
+    assert: "\(9999)" == "9999"
+    assert: "\(-9999)" == "-9999"
+    assert: "\(0.0)" == "0.0"
+    assert: "\(333333.33333333)" == "333333.333333"
+    assert: "\(-5.5555546e-123)" == "-5.555555e-123"
+
+  :it "never under-estimates the amount of space to emit a U64 into a string"
+    value = U64.max_value
+    while (value > 0) (
+      value = value.bit_shr(1)
+      assert: value.into_string_space >= "\(value)".size
+    )
+    assert: U64[0].into_string_space == 1

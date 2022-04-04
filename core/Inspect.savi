@@ -3,9 +3,6 @@
   :fun size USize
   :fun "[]!"(index USize) Any'box // TODO: use `box` instead of `Any'box`
 
-:trait box _InspectEnum
-  :fun member_name String
-
 :trait box _InspectCustom
   :fun inspect_into(output String'iso) String'iso
 
@@ -21,31 +18,6 @@
   :fun into(output String'iso, input Any'box) String'iso // TODO: use `box` instead of `Any'box` // TODO: use something like Crystal IO instead of String?
     case input <: (
     | _InspectCustom | input.inspect_into(--output)
-    | _InspectEnum | output << input.member_name, --output
-    | U8'box    | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | U16'box   | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | U32'box   | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | USize'box | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | U64'box   |                            // TODO: unify into one integer clause?
-      u64 = input.u64
-      digits Array(U8) = []
-      while (u64 > 0) (
-        digits << (u64 % 10).u8 + '0'
-        u64 = u64 / 10
-      )
-      digits.reverse_each -> (digit | output.push_byte(digit), None) // TODO: None should not be needed here
-      if (digits.size == 0) output.push_byte('0')
-      --output
-    | I8'box    | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | I16'box   | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | I32'box   | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | ISize'box | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | I64'box   |                            // TODO: unify into one integer clause?
-      i64 = input.i64
-      positive = if (i64 >= 0) (i64 | output.push_byte('-'), i64.abs)
-      @into(--output, positive.u64)
-    | F32'box | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
-    | F64'box | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
     | String'box |
       output.push_byte('"')
       output << input.clone // TODO: show some characters as escaped.
@@ -80,7 +52,10 @@
       )
       output.push_byte(']')
       --output
-    // TODO: support inspection of more types
+    | IntoString |
+      // If there's nothing more specific, then our last option is to print
+      // the same representation that `into_string` gives for that value.
+      input.into_string(--output)
     |
       // Otherwise, fall back to just printing the name of the type.
       output << reflection_of_runtime_type_name input
@@ -101,33 +76,3 @@
       out.push_byte(digit + 'A' - 0xA)
     )
     --out
-
-  :fun non _inspect_float_into(out String'iso, value F64) String'iso
-    if (value < 0) (
-      out.push_byte('-')
-      value = value.negate
-    )
-    case (
-    | value == 0 | out << "0.0"
-    | value.is_finite | out = @_inspect_finite_positive_float_into(--out, value)
-    | value.is_infinite | out << "Infinity"
-    | out << "NaN"
-    )
-    --out
-
-  :const _inspect_float_buffer_size USize: 128
-
-  :fun non _inspect_finite_positive_float_into(out String'iso, value F64) String'iso
-    // TODO: use grisu3 algorithm like Crystal does, for better performance
-    // for those numbers that the algorithm handles, using this as a fallback:
-    out.reserve(out.size + @_inspect_float_buffer_size)
-    out_offset_cpointer = out.cpointer._unsafe._offset(out.size)
-    buffer = _FFI.snprintf(
-      out_offset_cpointer
-      @_inspect_float_buffer_size.i32
-      "%.17g".cstring
-      value
-    )
-    out._size += _FFI.strlen(out_offset_cpointer).usize
-    --out
-

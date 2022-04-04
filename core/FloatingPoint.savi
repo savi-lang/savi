@@ -87,8 +87,18 @@
 :: This trait isn't meant to be used externally. It's just a base implementation
 :: of methods to be copied into every new floating-point 32-bit `:numeric` type.
 :trait val FloatingPoint.BaseImplementation32 // TODO: don't use :trait for this... `common`?
+  :: An internal method for converting a `box` number value to a `val` one.
+  :: This is sometimes needed for `:fun box` uses of `val` methods.
+  :: It is safe because no builtin numeric type can have interior mutability.
+  :: TODO: Remove this hack in favor of a more generalized mechanism
+  :: for marking types which have no possibility of interior mutability,
+  :: allowing them to treat any `box` reference as a `val` reference.
+  :fun as_val @'val: compiler intrinsic
+
   :fun non from_bits(bits U32) @'val: compiler intrinsic
   :fun val bits U32: compiler intrinsic
+
+  :is Numeric.Convertible
 
   :is FloatingPoint.Representable
   :fun non exp_bit_width U8: 8
@@ -121,11 +131,25 @@
   :fun val is_finite
     @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
 
+  :is IntoString
+  :fun into_string_space: @f64.into_string_space
+  :fun into_string(out String'iso): @f64.into_string(--out) // TODO: 32-bit impl
+
 :: This trait isn't meant to be used externally. It's just a base implementation
 :: of methods to be copied into every new floating-point 64-bit `:numeric` type.
 :trait val FloatingPoint.BaseImplementation64 // TODO: don't use :trait for this... `common`?
+  :: An internal method for converting a `box` number value to a `val` one.
+  :: This is sometimes needed for `:fun box` uses of `val` methods.
+  :: It is safe because no builtin numeric type can have interior mutability.
+  :: TODO: Remove this hack in favor of a more generalized mechanism
+  :: for marking types which have no possibility of interior mutability,
+  :: allowing them to treat any `box` reference as a `val` reference.
+  :fun as_val @'val: compiler intrinsic
+
   :fun non from_bits(bits U64) @'val: compiler intrinsic
   :fun val bits U64: compiler intrinsic
+
+  :is Numeric.Convertible
 
   :is FloatingPoint.Representable
   :fun non exp_bit_width U8: 11
@@ -157,3 +181,46 @@
     @bits.bit_and(0x000F_FFFF_FFFF_FFFF) == 0                        // mantissa
   :fun val is_finite
     @bits.bit_and(0x7FF0_0000_0000_0000) != 0x7FF0_0000_0000_0000 // exponent
+
+  :is IntoString
+  :fun into_string_space USize: 14 // (max size of the below logic)
+  :fun into_string(out String'iso) String'iso
+    value = @as_val
+    case (
+    | value == @zero |
+      out << "0.0"
+    | value.is_finite |
+      // If the value is negative, begin with a negative symbol character.
+      // Then from here on we will work only with the absolute value.
+      if (value < @zero) out.push_byte('-')
+      value = value.abs
+
+      // TODO: Avoid this hacky workaround for lack of numeric literals here.
+      ten = @one + @one + @one + @one + @one + @one + @one + @one + @one + @one
+      million = ten * ten * ten * ten * ten * ten
+      hundredth = @one / ten / ten
+
+      // Decide which representation to use based on the magnitude of the
+      // value, limiting the left side of the decimal point so that it will
+      // have no more than 6 digits, and keeping the right side of the decimal
+      // (which is limited to 6 digits) having at least 5 significant digits.
+      use_scientific = value >= million || value < hundredth
+
+      // Cheat and use `snprintf` to print the value into the output string.
+      // TODO: use grisu3 algorithm like Crystal does, for better performance
+      // for those numbers that the algorithm handles, using this as a fallback:
+      out.reserve(out.size + @into_string_space)
+      out_offset_cpointer = out.cpointer._unsafe._offset(out.size)
+      buffer = _FFI.snprintf(
+        out_offset_cpointer
+        @into_string_space.i32
+        if use_scientific ("%.6e".cstring | "%.12g".cstring)
+        value
+      )
+      out._size += _FFI.strlen(out_offset_cpointer).usize
+    | value.is_infinite |
+      out << if (value > @zero) ("Infinity" | "-Infinity")
+    |
+      out << "NaN"
+    )
+    --out

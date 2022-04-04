@@ -225,6 +225,14 @@
 :: This trait isn't meant to be used externally. It's just a base implementation
 :: of methods to be copied into every new integer `:numeric` type.
 :trait val Integer.BaseImplementation // TODO: don't use :trait for this... `common`?
+  :: An internal method for converting a `box` number value to a `val` one.
+  :: This is sometimes needed for `:fun box` uses of `val` methods.
+  :: It is safe because no builtin numeric type can have interior mutability.
+  :: TODO: Remove this hack in favor of a more generalized mechanism
+  :: for marking types which have no possibility of interior mutability,
+  :: allowing them to treat any `box` reference as a `val` reference.
+  :fun as_val @'val: compiler intrinsic
+
   :is Integer.Representable
   :fun non mag_bit_width U8
     if @is_signed (@bit_width - 1 | @bit_width)
@@ -286,6 +294,62 @@
     )
     @
 
+  :is IntoString
+
+  :fun into_string(out String'iso) String'iso
+    // Fast path for zero - it always has exactly one digit.
+    if (@ == @zero) (
+      out.push_byte('0')
+      return --out
+    )
+
+    // If the value is less than zero, we need to negate it to make it positive
+    // before we try to append its representation into the given string,
+    // and we'll append a negative sign byte first.
+    value = @as_val
+    if (@ < @zero) (
+      value = @zero - value
+      out.push_byte('-')
+    )
+
+    // TODO: Avoid this hacky workaround for lack of numeric literals here.
+    ten = @one + @one + @one + @one + @one + @one + @one + @one + @one + @one
+
+    // Collect the digits we need to print, from least to most significant.
+    // TODO: Avoid this temporary array allocation here.
+    digits Array(U8) = []
+    while (value > @zero) (
+      digits << (value % ten).u8 + '0'
+      value = value / ten
+    )
+
+    // Print each digit in the expected order (from most to least significant).
+    // Then return the output string now that we are done.
+    digits.reverse_each -> (digit | out.push_byte(digit))
+    --out
+
+  :fun into_string_space USize
+    // Fast path for zero - it always has exactly one digit.
+    return 1 if (@ == @zero)
+
+    // If the value is less than zero, we need to negate it to make it positive
+    // before we try to count the number of its significant bits.
+    value = @as_val
+    if (@ < @zero) (value = @zero - value)
+
+    // Count the number of significant bits, add 3, and multiply by (5 / 16),
+    // which is a rough heuristic arithmetic expression that conservatively
+    // estimates the number of decimal digits needed to print the number,
+    // while avoiding an actual division operation by using a bit shift
+    // (which is possible because the denominator is a power of 2).
+    bits = @bit_width - value.leading_zero_bits
+    digits = ((bits + 3).usize * 5).bit_shr(4) + 1
+
+    // The number of bytes we need available to print the number is the
+    // same as the number of digits, with an added byte for the negative sign
+    // in the case that the number is a negative one.
+    if (@ < @zero) (digits + 1 | digits)
+
   // TODO: explicit conformance to a particular trait for `hash`
   :fun hash USize
     if (USize.bit_width == 32) (
@@ -312,3 +376,14 @@
     x = x.bit_xor(x.bit_shr(28))
     x = x + x.bit_shl(31)
     x
+
+:: This trait isn't meant to be used externally. It's just a base implementation
+:: of methods to be copied into every new integer `:enum` type.
+:trait val Integer.BaseImplementation.Enum // TODO: don't use :trait for this... `common`?
+  :copies Integer.BaseImplementation
+
+  :fun member_name String
+
+  :is IntoString
+  :fun into_string(out String'iso): @member_name.into_string(--out)
+  :fun into_string_space: @member_name.into_string_space
