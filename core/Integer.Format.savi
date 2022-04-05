@@ -86,57 +86,78 @@
 
   :let _value T
   :let _prefix String
-  :new val _new(@_value, @_prefix = "0x")
+  :let _is_uppercase Bool
+  :let _has_leading_zeros Bool
+  :new val _new(
+    @_value
+    @_prefix = "0x"
+    @_is_uppercase = True
+    @_has_leading_zeros = True
+  )
 
   :: Format without the standard "0x" hexadecimal prefix.
-  :fun bare: @_new(@_value, "")
+  :fun bare: @with_prefix("")
 
   :: Use the given prefix instead of the standard "0x" hexadecimal prefix.
-  :fun with_prefix(prefix): @_new(@_value, prefix)
+  :fun with_prefix(prefix)
+    @_new(@_value, prefix, @_is_uppercase, @_has_leading_zeros)
+
+  :: Use lowercase hexadecimal letters instead of the default uppercase.
+  :fun lowercase
+    @_new(@_value, @_prefix, False, @_has_leading_zeros)
+
+  :: Disable the default behavior of including all leading zeros.
+  :fun without_leading_zeros
+    @_new(@_value, @_prefix, @_is_uppercase, False)
 
   :fun into_string_space USize
+    // TODO: different strategy when `_has_leading_zeros` is False.
     @_prefix.size + if (T.bit_width == 1) (1 | T.bit_width.usize / 4)
 
   :fun into_string(out String'iso) String'iso
+    zeros = @_has_leading_zeros
     out << @_prefix
     case T.bit_width == (
     | 1 |
-      out.push_byte(@_digit(@_value.u8))
+      digit = @_digit(0), out.push_byte(digit)
     | 8 |
-      out.push_byte(@_digit(@_value.bit_shr(4).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.u8.bit_and(0xF)))
+      digit = @_digit(4), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(0), out.push_byte(digit)
     | 16 |
-      out.push_byte(@_digit(@_value.bit_shr(12).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(8).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(4).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.u8.bit_and(0xF)))
+      digit = @_digit(12), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(8),  if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(4),  if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(0), out.push_byte(digit)
     | 32 |
-      out.push_byte(@_digit(@_value.bit_shr(28).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(24).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(20).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(16).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(12).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(8).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(4).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.u8.bit_and(0xF)))
+      digit = @_digit(28), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(24), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(20), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(16), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(12), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(8),  if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(4),  if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(0), out.push_byte(digit)
     | 64 |
-      out.push_byte(@_digit(@_value.bit_shr(60).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(56).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(52).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(48).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(44).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(40).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(36).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(32).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(28).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(24).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(20).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(16).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(12).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(8).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.bit_shr(4).u8.bit_and(0xF)))
-      out.push_byte(@_digit(@_value.u8.bit_and(0xF)))
+      digit = @_digit(60), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(56), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(52), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(48), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(44), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(40), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(36), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(32), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(28), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(24), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(20), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(16), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(12), if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(8),  if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(4),  if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
+      digit = @_digit(0), out.push_byte(digit)
     )
     --out
 
-  :fun non _digit(u4 U8): if (u4 <= 9) (u4 + '0' | u4 + 'A' - 0xA)
+  :fun _digit(shr)
+    u4 = @_value.bit_shr(shr).u8.bit_and(0xF)
+    a = if @_is_uppercase ('A' | 'a')
+    if (u4 <= 9) (u4 + '0' | u4 + a - 0xA)
