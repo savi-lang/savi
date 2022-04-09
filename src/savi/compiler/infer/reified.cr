@@ -203,9 +203,9 @@ module Savi::Compiler::Infer
   struct ReifiedFunction
     getter type : ReifiedType
     getter link : Program::Function::Link
-    getter receiver : MetaType
+    getter receiver_cap : MetaType
 
-    def initialize(@type, @link, @receiver)
+    def initialize(@type, @link, @receiver_cap)
     end
 
     def func(ctx)
@@ -226,8 +226,8 @@ module Savi::Compiler::Infer
       @type.show_type + name
     end
 
-    def receiver_cap
-      receiver.cap_only
+    def receiver_mt
+      MetaType.new_nominal(@type).intersect(@receiver_cap)
     end
 
     def meta_type_of(

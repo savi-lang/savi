@@ -89,8 +89,7 @@ class Savi::Compiler::TypeCheck
     f : Program::Function::Link,
     cap : MetaType,
   ) : ForReifiedFunc
-    mt = MetaType.new(rt).override_cap(cap)
-    rf = ReifiedFunction.new(rt, f, mt)
+    rf = ReifiedFunction.new(rt, f, cap)
     @map[rf] ||= (
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
@@ -615,8 +614,7 @@ class Savi::Compiler::TypeCheck
 
         # Check if auto-recovery of the receiver is possible.
         if autorecover_needed
-          receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(Cap))
-          other_rf = ReifiedFunction.new(call_defn, call_func_link, receiver)
+          other_rf = ReifiedFunction.new(call_defn, call_func_link, reify_cap)
           TypeCheck.verify_call_autorecover(ctx, self, info, call_mt)
         end
       end

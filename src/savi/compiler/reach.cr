@@ -588,7 +588,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     if main_rt
       main_f_link = main_rt.defn(ctx).find_default_constructor?.try(&.make_link(main_rt.link))
       if main_f_link
-        main_rf = Infer::ReifiedFunction.new(main_rt, main_f_link, Infer::MetaType.new(main_rt, Infer::Cap::REF))
+        main_rf = Infer::ReifiedFunction.new(main_rt, main_f_link, Infer::MetaType.cap(Infer::Cap::REF))
         handle_func(ctx, main_rf)
       end
     end
@@ -597,11 +597,11 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     # even if they are not used/reached by the user-written program.
     env_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "Env"))
     env_f_link = env_rt.defn(ctx).find_func!("_create").make_link(env_rt.link)
-    env_rf = Infer::ReifiedFunction.new(env_rt, env_f_link, Infer::MetaType.new(env_rt, "val"))
+    env_rf = Infer::ReifiedFunction.new(env_rt, env_f_link, Infer::MetaType.cap(Infer::Cap::VAL))
     handle_func(ctx, env_rf)
     notify_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "AsioEvent.Actor"))
     notify_f_link = notify_rt.defn(ctx).find_func!("_asio_event").make_link(notify_rt.link)
-    notify_rf = Infer::ReifiedFunction.new(notify_rt, notify_f_link, Infer::MetaType.new(notify_rt, Infer::Cap::REF))
+    notify_rf = Infer::ReifiedFunction.new(notify_rt, notify_f_link, Infer::MetaType.cap(Infer::Cap::REF))
     handle_func(ctx, notify_rf)
     string_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "String"))
     handle_type_def(ctx, string_rt)
@@ -628,7 +628,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     # Give handle_type_def a chance to canonicalize the ReifiedType,
     # possibly giving us an altered ReifiedFunction.
     rt = handle_type_def(ctx, rf.type).reified
-    rf = Infer::ReifiedFunction.new(rt, rf.link, rf.receiver)
+    rf = Infer::ReifiedFunction.new(rt, rf.link, rf.receiver_cap)
 
     reach_funcs = Array(Func).new
     @seen_funcs[rf] = reach_funcs
@@ -662,7 +662,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
         next if f.ident.value.starts_with?("_")
 
         reflect_f_link = f.make_link(reflect_rt.link)
-        reflect_rf = Infer::ReifiedFunction.new(reflect_rt, reflect_f_link, reflect_mt)
+        reflect_rf = Infer::ReifiedFunction.new(reflect_rt, reflect_f_link, reflect_mt.cap_only)
         reflect_infer = ctx.infer[reflect_rf.link]
         handle_func(ctx, reflect_rf) if reflect_infer.can_reify_with?(
           reflect_rt.args,
@@ -678,12 +678,13 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     rf : Infer::ReifiedFunction,
     infer : Infer::FuncAnalysis
   ) : Signature
-    receiver = ctx.reach.handle_type_ref(ctx, rf.receiver)
+    receiver_mt = rf.receiver_mt
+    receiver = ctx.reach.handle_type_ref(ctx, receiver_mt)
 
     # If we encounter any broken types, just place this bogus one in their place
     # allowing us to continue forward while letting the error propagate to ctx.
     # We use the receiver as the replacement type because we know it's valid.
-    bogus_mt = rf.receiver
+    bogus_mt = receiver_mt
 
     params = infer.param_spans.map { |span|
       ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer) || bogus_mt)
@@ -699,7 +700,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
 
   def handle_field(ctx, rt : Infer::ReifiedType, f_link, ident) : {String, Ref}?
     # Reach the metatype of the field.
-    rf = Infer::ReifiedFunction.new(rt, f_link, Infer::MetaType.new(rt, Infer::Cap::REF))
+    rf = Infer::ReifiedFunction.new(rt, f_link, Infer::MetaType.cap(Infer::Cap::REF))
     mt = rf.meta_type_of(ctx, ident)
     return unless mt
     handle_type_ref(ctx, mt)
@@ -794,7 +795,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
           subtype_rf = Infer::ReifiedFunction.new(
             subtype_rt,
             Program::Function::Link.new(subtype_rt.link, abstract_rf.link.name, nil),
-            Infer::MetaType.new_nominal(subtype_rt).intersect(abstract_rf.receiver.cap_only)
+            abstract_rf.receiver_cap
           )
 
           handle_func(ctx, subtype_rf)
