@@ -240,7 +240,7 @@ class Savi::Compiler::TypeCheck
 
     receiver_okay =
       if required_cap.value.is_a?(Cap)
-        call_cap_mt.subtype_of?(ctx, MetaType.new(required_cap))
+        call_mt.subtype_of?(ctx, MetaType.new(required_cap))
       else
         call_cap_mt.satisfies_bound?(ctx, MetaType.new(required_cap))
       end
