@@ -46,7 +46,6 @@
     assert: Inspect[U8[0]] == "0"
 
   :it "inspects a module with its type name"
-    assert: Inspect[None] == "None"
     assert: Inspect[_InspectableTestModule] == "_InspectableTestModule"
 
   :it "inspects strings"

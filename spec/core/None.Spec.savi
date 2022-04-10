@@ -1,0 +1,9 @@
+:class Savi.None.Spec
+  :is Spec
+  :const describes: "None"
+
+  :it "emits nothing into a string"
+    assert: "\(None)" == ""
+
+  :it "inspects as its explicit name"
+    assert: Inspect[None] == "None"

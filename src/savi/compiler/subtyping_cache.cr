@@ -108,7 +108,7 @@ class Savi::Compiler::SubtypingCache
         # Get the MetaType of the asserted supertype trait
         f_link = f.make_link(@this.link)
         pre_infer = ctx.pre_infer[f_link]
-        rf = ReifiedFunction.new(@this, f_link, MetaType.new(@this, Infer::Cap::NON))
+        rf = ReifiedFunction.new(@this, f_link, MetaType.cap(Infer::Cap::NON))
         trait_mt = rf.meta_type_of(ctx, pre_infer[f.ret.not_nil!])
         next unless trait_mt
 
@@ -254,8 +254,8 @@ class Savi::Compiler::SubtypingCache
       raise "found hygienic function" if this_func.has_tag?(:hygienic)
 
       # Get the Infer instance for both this and that function, to compare them.
-      this_rf = ReifiedFunction.new(this, this_func.make_link(this.link), MetaType.new(this, this_cap.value.as(Infer::Cap)))
-      that_rf = ReifiedFunction.new(that, that_func.make_link(that.link), MetaType.new(that, that_cap.value.as(Infer::Cap)))
+      this_rf = ReifiedFunction.new(this, this_func.make_link(this.link), MetaType.cap(this_cap.value.as(Infer::Cap)))
+      that_rf = ReifiedFunction.new(that, that_func.make_link(that.link), MetaType.cap(that_cap.value.as(Infer::Cap)))
       this_infer = ctx.infer[this_func.make_link(this.link)]
       that_infer = ctx.infer[that_func.make_link(that.link)]
 
