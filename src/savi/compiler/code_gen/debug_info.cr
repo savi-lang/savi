@@ -26,7 +26,7 @@ class Savi::Compiler::CodeGen
       @di.end
 
       @mod.add_named_metadata_operand("llvm.module.flags", metadata([
-        LLVM::ModuleFlag::Warning.value,
+        2, # LLVM::ModuleFlag::Warning.value,
         "Debug Info Version",
         LLVM::DEBUG_METADATA_VERSION
       ])) if !ctx.options.no_debug
