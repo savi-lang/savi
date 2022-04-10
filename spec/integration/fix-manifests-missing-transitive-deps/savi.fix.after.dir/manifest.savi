@@ -6,6 +6,7 @@
     :depends on ByteStream
     :depends on IO
     :depends on OSError
+    :depends on IPAddress
 
   :transitive dependency ByteStream v0
     :from "github:savi-lang/ByteStream"
@@ -17,3 +18,6 @@
 
   :transitive dependency OSError v0
     :from "github:savi-lang/OSError"
+
+  :transitive dependency IPAddress v0
+    :from "github:savi-lang/IPAddress"

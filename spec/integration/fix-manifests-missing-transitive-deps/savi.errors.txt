@@ -99,3 +99,37 @@ from ./manifest.savi:4:
               ^~~~~~~
 
 - run again with --fix to auto-fix this issue.
+
+---
+
+A transitive dependency is missing from this manifest:
+from ./manifest.savi:1:
+:manifest "example"
+          ^~~~~~~~~
+
+- this transitive dependency needs to be added:
+  from ./deps/github:savi-lang/TCP/v0/manifest.savi:15:
+  :dependency IPAddress v0
+              ^~~~~~~~~
+
+- it is required by this existing dependency:
+  from ./manifest.savi:4:
+  :dependency TCP v0
+              ^~~
+
+- run again with --fix to auto-fix this issue.
+
+---
+
+A `:depends on` declaration is missing from this dependency:
+from ./manifest.savi:4:
+  :dependency TCP v0
+              ^~~
+
+- this transitive dependency needs to be added:
+  from ./deps/github:savi-lang/TCP/v0/manifest.savi:15:
+  :dependency IPAddress v0
+              ^~~~~~~~~
+
+- run again with --fix to auto-fix this issue.
+
