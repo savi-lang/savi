@@ -969,9 +969,9 @@ class Savi::Compiler::CodeGen
         @builder.is_null(params[0])
       when "is_not_null"
         @builder.is_not_null(params[0])
-      when "usize"
+      when "address"
         @builder.ptr_to_int(params[0], @isize)
-      when "from_usize"
+      when "from_address"
         @builder.int_to_ptr(params[0], llvm_type)
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
