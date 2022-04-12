@@ -213,6 +213,7 @@ class Savi::Compiler::Binary
           yield "/lib/gcc/x86_64-linux-gnu/*"
           yield "/lib/x86_64-linux-gnu"
           yield "/usr/lib/gcc/x86_64-linux-gnu/*"
+          yield "/usr/lib/gcc/x86_64-pc-linux-gnu/*"
           yield "/usr/lib/x86_64-linux-gnu"
           yield "/usr/lib/gcc/x86_64-redhat-linux/*"
         else
