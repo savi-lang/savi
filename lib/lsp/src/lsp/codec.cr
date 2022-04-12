@@ -43,7 +43,11 @@ module LSP::Codec
       if length.is_a? Int32
         body = IO::Sized.new(io, length).gets_to_end
         raise IO::EOFError.new if body.bytesize < length
-        return LSP::Message.from_json(body, outstanding)
+        begin
+          return LSP::Message.from_json(body, outstanding)
+        rescue
+          # keep looping until we get a valid, recognized message
+        end
       end
     end
   end

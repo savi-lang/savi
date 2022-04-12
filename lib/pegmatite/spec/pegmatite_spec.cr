@@ -69,9 +69,9 @@ describe Pegmatite do
         "overcomplicated" => JSON::Any.new(false),
         "worse-than"      => JSON::Any.new(nil),
         "problems"        => JSON::Any.new([] of JSON::Any),
-        "utf8" => JSON::Any.new(
+        "utf8"            => JSON::Any.new(
           [JSON::Any.new("Д"), JSON::Any.new("Ⴃ"), JSON::Any.new("𐀀")]
-        )
+        ),
       } of String => JSON::Any),
     } of String => JSON::Any)
   end
