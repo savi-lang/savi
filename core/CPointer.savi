@@ -140,8 +140,18 @@
   :: Return True unless this is a null pointer (i.e. a zero address).
   :fun tag is_not_null Bool: compiler intrinsic
 
-  :: Return the address of this pointer as an integer.
-  :fun tag usize USize: compiler intrinsic
+  :: Return the address of this pointer as an unsigned integer.
+  :fun tag address USize: compiler intrinsic
+
+  :: DEPRECATED: Use `address` instead.
+  :fun tag usize: @address
 
   // TODO: Remove this method. It's not compatible with CHERI hardware.
-  :fun non from_usize(number USize) @'tag: compiler intrinsic
+  // To replace it, we need a method to convert a pointer of one type
+  // into a (`tag`) pointer of another type, so we can replace the places
+  // where `address` and `from_address` are being used together for conversion.
+  // To do that, we need to have generic functions, which we don't have yet.
+  :fun non from_address(number USize) @'tag: compiler intrinsic
+
+  :: DEPRECATED: Use `from_address` instead.
+  :fun tag from_usize(number): @from_address(number)
