@@ -625,6 +625,57 @@ class Savi::Compiler::TypeCheck
       true
     end
 
+    def type_check_pre(ctx : Context, info : Infer::StaticAddressOfFunction, mt : MetaType) : Bool
+      receiver_mt = resolve(ctx, info.receiver_type)
+      return false if !receiver_mt
+
+      receiver_rt = receiver_mt.single?.try(&.defn)
+      if !receiver_rt
+        ctx.error_at info,
+          "A function address can only be taken from a single explicit type", [
+            {info.receiver_type.pos,
+              "#{receiver_mt.show_type} is not a single type"},
+          ]
+        return false
+      end
+
+      type =
+        case receiver_rt
+        when Infer::ReifiedType then receiver_rt.defn(ctx)
+        else
+          raise NotImplementedError.new(receiver_rt.inspect)
+        end
+      func = type.find_func?(info.function_name)
+      if !func
+        ctx.error_at info,
+          "The function trying to be addressed here does not exist", [
+            {type.ident.pos,
+              "#{type.ident.value} has no function named #{
+                info.function_name.inspect}"},
+          ]
+        return false
+      end
+
+      if func.cap.value != "non"
+        ctx.error_at info,
+          "A function address can only be taken when the cap is \"non\"", [
+            {func.cap.pos,
+              "this function has a cap of #{func.cap.value.inspect}"},
+          ]
+        return false
+      end
+
+      if !func.body
+        ctx.error_at info,
+          "A function address can only be taken from a function with a body", [
+            {func.ident.pos, "this function has no body"},
+          ]
+        return false
+      end
+
+      true
+    end
+
     # Other types of Info nodes do not have extra type checks.
     def type_check_pre(ctx : Context, info : Infer::Info, mt : MetaType) : Bool
       true # There is nothing extra here.

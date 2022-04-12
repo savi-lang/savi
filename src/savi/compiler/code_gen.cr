@@ -2503,6 +2503,7 @@ class Savi::Compiler::CodeGen
       when "!==" then gen_check_identity_is(expr, false)
       when "<:" then gen_check_subtype(expr, true)
       when "!<:" then gen_check_subtype(expr, false)
+      when "static_address_of_function" then gen_static_address_of_function(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Group
@@ -2566,6 +2567,10 @@ class Savi::Compiler::CodeGen
 
   def gen_none
     @gtypes["None"].singleton
+  end
+
+  def gen_none_type
+    @gtypes["None"].struct_type.pointer
   end
 
   def gen_bool(bool)
@@ -3080,6 +3085,20 @@ class Savi::Compiler::CodeGen
     alloca = func_frame.current_locals[ref]
 
     alloca
+  end
+
+  def gen_static_address_of_function(expr : AST::Relate)
+    receiver = gen_expr(expr.lhs)
+
+    gtype, gfunc = resolve_call(
+      AST::Call.new(expr.lhs, expr.rhs.as(AST::Identifier)).from(expr)
+    )
+
+    @builder.bit_cast(
+      gfunc.llvm_func.to_value,
+      gen_none_type.pointer,
+      "#{gfunc.llvm_name}.PTR"
+    )
   end
 
   def gen_reflection_of_type(expr, term_expr)
