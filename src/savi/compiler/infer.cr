@@ -31,6 +31,7 @@ module Savi::Compiler::Infer
     def initialize
       @spans = {} of Info => Span
       @reflections = Set(ReflectionOfType).new
+      @captured_function_pointers = Set(StaticAddressOfFunction).new
       @called_func_spans = {} of Info => {Span, String | Array(String)}
     end
 
@@ -158,6 +159,9 @@ module Savi::Compiler::Infer
 
     getter! yield_out_spans : Array(Span)
     protected setter yield_out_spans
+
+    protected getter captured_function_pointers
+    def each_captured_function_pointer; @captured_function_pointers.each; end
 
     protected getter reflections
     def each_reflection; @reflections.each; end
@@ -963,8 +967,11 @@ module Savi::Compiler::Infer
       ReifiedType.new(ctx.namespace.core_savi_type(ctx, name), args)
     end
 
-    def core_savi_type_span(ctx : Context, name : String)
-      Span.simple(MetaType.new(core_savi_reified_type(ctx, name)))
+    def core_savi_type_span(ctx : Context, name : String, type_arg_name : String? = nil)
+      args = type_arg_name.try { |t|
+        [MetaType.new(core_savi_reified_type(ctx, t))]
+      } || [] of MetaType
+      Span.simple(MetaType.new(core_savi_reified_type(ctx, name, args)))
     end
   end
 

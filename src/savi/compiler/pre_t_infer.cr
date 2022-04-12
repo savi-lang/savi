@@ -484,6 +484,14 @@ module Savi::Compiler::PreTInfer
           @analysis[node] = TInfer::TypeCondition.new(node.pos, layer(node), lhs_info, rhs_info, positive_check)
         end
 
+      when "static_address_of_function"
+        @analysis[node] = TInfer::StaticAddressOfFunction.new(
+          node.pos,
+          layer(node),
+          self[node.lhs],
+          node.rhs.as(AST::Identifier).value
+        )
+
       else raise NotImplementedError.new(node.op.value)
       end
     end

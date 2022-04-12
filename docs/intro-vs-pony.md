@@ -543,7 +543,7 @@ Generic functions are not yet in Savi. See [this ticket](https://github.com/savi
 
 ### C-FFI
 
-#### FFI Block
+#### FFI Functions
 
 While in Pony we use `@` to mark that we are calling a C function, in Savi we declare an `:ffi` function instead of a normal `:fun` function:
 
@@ -572,6 +572,25 @@ In Savi, all FFI functions are namespaced by the type name you declared, so you 
   :new iso (@message)
   :fun say
     _FFI.printf("%s\n".cstring, @message.cstring)
+```
+
+#### FFI Callbacks
+
+If an FFI function needs to accept a function pointer as a callback back into Savi code, you can define a `:fun non` and use the `static_address_of_function` macro to get the address of the function.
+
+The C code will be able to call it without a receiver, since a `:fun non` does not require the type instance to be passed as an implicit receiver argument. However, for many use cases you'll need to take a Savi object in some form as an explicit argument to the function (most C APIs with a callback take an extra void pointer for this purpose).
+
+```savi
+:class val MyObject
+  :let name String
+  :new val (@name)
+  :fun val pass_to_c
+    callback = static_address_of_function MyCallback.callback
+    _FFI.call_me_back_with(@, callback)
+
+:module MyCallback
+  :fun callback(object MyObject)
+    _FFI.puts("got called back from C with object: \(object.name)")
 ```
 
 ### [TODO: More Syntax Info...]

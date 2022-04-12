@@ -167,6 +167,8 @@ module Savi::Compiler::Classify
       case relate.op.value
       when "<:", "!<:", "EXPLICITTYPE"
         type_expr_visit(ctx, relate.rhs)
+      when "static_address_of_function"
+        @analysis.no_value!(relate.rhs)
       else
       end
     end

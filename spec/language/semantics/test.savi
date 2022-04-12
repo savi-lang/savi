@@ -16,6 +16,7 @@
     ReturnSpec.run(test)
     YieldingCallSpec.run(test)
     StackAddressOfVariableSpec.run(test)
+    StaticAddressOfFunctionSpec.run(test)
     ReflectionSpec.run(test)
     SourceCodeSpec.run(test)
     DisplacingAssignmentSpec.run(test)

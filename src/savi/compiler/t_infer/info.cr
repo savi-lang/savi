@@ -459,6 +459,23 @@ module Savi::Compiler::TInfer
     end
   end
 
+  class StaticAddressOfFunction < DynamicInfo
+    getter receiver_type : Info
+    getter function_name : String
+
+    def describe_kind : String; "function address" end
+
+    def initialize(@pos, @layer_index, @receiver_type, @function_name)
+    end
+
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
+      # Take note of this captured function pointer.
+      infer.analysis.captured_function_pointers.add(self)
+
+      infer.core_savi_type_span(ctx, "CPointer", "None")
+    end
+  end
+
   class ReflectionOfType < DynamicInfo
     getter reflect_type : Info
 

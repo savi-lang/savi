@@ -1,0 +1,16 @@
+:module StaticAddressOfFunctionSpec
+  :fun foo: "Foo"
+  :fun bar: "Bar"
+
+  :fun run(test MicroTest)
+    foo_addr = static_address_of_function @foo
+    bar_addr = static_address_of_function @bar
+    foo_addr_2 = static_address_of_function StaticAddressOfFunctionSpec.foo
+
+    test["static_address_of_function foo not null"].pass = foo_addr.is_not_null
+
+    test["static_address_of_function foo != bar"].pass =
+      foo_addr.address != bar_addr.address
+
+    test["static_address_of_function foo == foo"].pass =
+      foo_addr.address == foo_addr_2.address

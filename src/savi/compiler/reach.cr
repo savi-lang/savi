@@ -671,6 +671,25 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
         )
       end
     end
+
+    # Reach all functions callable via captured function pointers in this function.
+    infer.each_captured_function_pointer.each { |info|
+      reflect_mt = rf.meta_type_of(ctx, info.receiver_type, infer).not_nil!
+      reflect_rt = reflect_mt.single!
+
+      reflect_rt.defn(ctx).find_func?(info.function_name).try { |f|
+        next if f.body.nil?
+
+        reflect_f_link = f.make_link(reflect_rt.link)
+        reflect_rf = Infer::ReifiedFunction.new(reflect_rt, reflect_f_link, Infer::MetaType.cap(Infer::Cap::NON))
+        reflect_infer = ctx.infer[reflect_rf.link]
+        handle_func(ctx, reflect_rf) if reflect_infer.can_reify_with?(
+          reflect_rt.args,
+          Infer::Cap::NON,
+          f.has_tag?(:constructor)
+        )
+      }
+    }
   end
 
   def signature_for(

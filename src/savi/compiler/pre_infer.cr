@@ -483,6 +483,14 @@ module Savi::Compiler::PreInfer
           @analysis[node] = Infer::TypeCondition.new(node.pos, layer(node), lhs_info, rhs_info, positive_check)
         end
 
+      when "static_address_of_function"
+        @analysis[node] = Infer::StaticAddressOfFunction.new(
+          node.pos,
+          layer(node),
+          self[node.lhs],
+          node.rhs.as(AST::Identifier).value
+        )
+
       else raise NotImplementedError.new(node.op.value)
       end
     end

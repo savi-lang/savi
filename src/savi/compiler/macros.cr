@@ -140,6 +140,12 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         "the local variable whose stack address should be captured",
       ])
       visit_stack_address_of_variable(node)
+    elsif Util.match_ident?(node, 0, "static_address_of_function")
+      Util.require_terms(node, [
+        nil,
+        "the function whose static address should be captured",
+      ])
+      visit_static_address_of_function(node)
     elsif Util.match_ident?(node, 0, "reflection_of_type")
       Util.require_terms(node, [
         nil,
@@ -934,6 +940,27 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
 
     AST::Group.new("(", [
       AST::Prefix.new(op, term).from(node),
+    ] of AST::Term).from(node)
+  end
+
+  def visit_static_address_of_function(node : AST::Group)
+    orig = node.terms[0]
+    term = node.terms[1]
+
+    Error.at term,
+      "Expected this term to be a type name and function name " + \
+      "with a dot in between" \
+        unless term.is_a?(AST::Call)
+
+    term_args = term.args || term.yield_params || term.yield_block
+    Error.at term_args,
+      "Expected this function to have no arguments" \
+        if term_args
+
+    op = AST::Operator.new("static_address_of_function").from(orig)
+
+    AST::Group.new("(", [
+      AST::Relate.new(term.receiver, op, term.ident).from(node),
     ] of AST::Term).from(node)
   end
 
