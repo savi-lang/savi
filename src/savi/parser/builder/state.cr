@@ -113,6 +113,18 @@ module Savi::Parser::Builder
                 codepoint = 16 * codepoint + hex_value
               end
               result << codepoint
+            when '\r', '\n' then
+              while (
+                case reader.peek_next_char
+                when '\n' then true
+                when '\r' then true
+                when '\t' then true
+                when ' ' then true
+                else false
+                end
+              )
+                reader.next_char
+              end
             else
               # Not a valid escape character - pass it on as a literal slash
               # followed by that literal character, as if not an escape.
@@ -122,7 +134,10 @@ module Savi::Parser::Builder
           else
             result << reader.current_char
           end
-          reader.next_char
+          begin
+            reader.next_char
+          rescue
+          end
         end
       end
     end
