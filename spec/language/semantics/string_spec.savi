@@ -4,3 +4,14 @@
 
     test["compose string 1"].pass = "foo \(bar) baz" == "foo bar baz"
     test["compose string 2"].pass = "\(bar)\(bar)\(bar)" == "barbarbar"
+
+    test["line break escape 1"].pass = "\
+      Hello, \
+      World\
+      !\
+    " == "Hello, World!"
+
+    test["line break escape 2"].pass = b"\
+      \x00\x11\x22\x33\x44\x55\x66\x77\
+      \x88\x99\xaa\xbb\xcc\xdd\xee\xff\
+    ".size == 16

@@ -54,6 +54,7 @@ module Savi::Parser
       str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (str("\\x") >> digithex >> digithex) |
+      (char('\\') >> char('\r').maybe >> char('\n') >> s) |
       str("\\") >> ~(~char('(')) >> parens |
       str("\\").maybe >> (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     string = (
