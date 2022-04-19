@@ -372,6 +372,39 @@
     assert: U16[0b1110010110001010].bit_rotl(5) == 0b1011000101011100
     assert: U16[0b1110010110001010].bit_shr(5)  == 0b0000011100101100
     assert: U16[0b1110010110001010].bit_rotr(5) == 0b0101011100101100
+    assert: True.bit_shl(0) == True
+    assert: True.bit_shl(1) == False
+    assert: True.bit_shr(0) == True
+    assert: True.bit_shr(1) == False
+    assert: False.bit_shl(0) == False
+    assert: False.bit_shl(1) == False
+    assert: False.bit_shr(0) == False
+    assert: False.bit_shr(1) == False
+
+  :it "uses logical bit shift right, even for signed integers"
+    // Some languages/compilers use "arithmetic right shift" for signed integers
+    // in which the sign bit is preserved during shifting, such that shifting
+    // by one can be treated as a proxy for dividing by two, even for
+    // negative numbers (which must keep the sign bit as 1 to remain negative).
+    //
+    // However, in Savi, we use only "logical right shift", wherein for any
+    // non-zero shift amount, the new most significant bits will always be zero.
+    // This makes bit shifting operations work consistently for signed and
+    // unsigned integers, but makes it not a tenable practice to use shifting
+    // as a proxy for dividing by two. Just use division instead, and let LLVM
+    // optimize division by twos into arithmetic bit shifts where appropriate.
+
+    assert: I16[0b1011011100111101].bit_shr(0)  == 0b1011011100111101
+    assert: I16[0b1011011100111101].bit_shr(1)  == 0b0101101110011110
+    assert: I16[0b1011011100111101].bit_shr(5)  == 0b0000010110111001
+    assert: I16[0b1011011100111101].bit_shr(13) == 0b0000000000000101
+    assert: I16[0b1011011100111101].bit_shr(16) == 0b0000000000000000
+
+    assert: U16[0b1011011100111101].bit_shr(0)  == 0b1011011100111101
+    assert: U16[0b1011011100111101].bit_shr(1)  == 0b0101101110011110
+    assert: U16[0b1011011100111101].bit_shr(5)  == 0b0000010110111001
+    assert: U16[0b1011011100111101].bit_shr(13) == 0b0000000000000101
+    assert: U16[0b1011011100111101].bit_shr(16) == 0b0000000000000000
 
   :it "implements special multiplication without overflow by returning a pair"
     product = U8[99].wide_multiply(200)
