@@ -6,9 +6,11 @@
 
   :fun decimal: Integer.Format.Decimal(T)._new(@_value)
   :fun hexadecimal: Integer.Format.Hexadecimal(T)._new(@_value)
+  :fun binary: Integer.Format.Binary(T)._new(@_value)
 
   :fun dec: @decimal
   :fun hex: @hexadecimal
+  :fun bin: @binary
 
 :: Format the given integer into a variable number of decimal digits.
 :struct val Integer.Format.Decimal(T Integer(T)'val)
@@ -161,3 +163,56 @@
     u4 = @_value.bit_shr(shr).u8.bit_and(0xF)
     a = if @_is_uppercase ('A' | 'a')
     if (u4 <= 9) (u4 + '0' | u4 + a - 0xA)
+
+:: Format the given integer into a fixed width binary representation.
+::
+:: By default the digits are shown with a "0b" prefix, but this is adjustable.
+:struct val Integer.Format.Binary(T Integer(T)'val)
+  :is IntoString
+
+  :let _value T
+  :let _prefix String
+  :let _has_leading_zeros Bool
+  :new val _new(
+    @_value
+    @_prefix = "0b"
+    @_has_leading_zeros = True
+  )
+
+  :: Format without the standard "0b" binary prefix.
+  :fun bare: @with_prefix("")
+
+  :: Use the given prefix instead of the standard "0b" binary prefix.
+  :fun with_prefix(prefix)
+    @_new(@_value, prefix, @_has_leading_zeros)
+
+  :: Disable the default behavior of including all leading zeros.
+  :fun without_leading_zeros
+    @_new(@_value, @_prefix, False)
+
+  :fun into_string_space USize
+    // TODO: different strategy when `_has_leading_zeros` is False.
+    @_prefix.size + T.bit_width.usize
+
+  :fun into_string(out String'iso) String'iso
+    show_zeros = @_has_leading_zeros
+    out << @_prefix
+
+    // Begin with a bit mask highlighting only the single most significant bit.
+    bit_mask = T.one.bit_shl(T.bit_width - 1)
+
+    // Iterate the bit mask downward toward the lest significant bit until it
+    // reaches zero, emitting the appropriate character to show each bit.
+    while (Inspect.out(bit_mask.i16.format.hex), bit_mask != T.zero) (
+      if (@_value.bit_and(bit_mask) == T.zero) (
+        if show_zeros out.push_byte('0')
+      |
+        show_zeros = True, out.push_byte('1')
+      )
+      bit_mask = bit_mask.bit_shr(1)
+    )
+
+    // If we haven't seen any zeros or ones yet, show at least one zero
+    if !show_zeros out.push_byte('0')
+
+    --out

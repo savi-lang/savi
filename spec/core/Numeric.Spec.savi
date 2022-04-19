@@ -628,3 +628,17 @@
     assert: "\(36.format.hex.without_leading_zeros)"    == "0x24"
     assert: "\((-36).format.hex.without_leading_zeros)" == "0xFFFFFFDC"
     assert: "\(1025.format.hex.without_leading_zeros)"  == "0x401"
+
+  :it "can format integers in a standard binary representation"
+    assert: "\(False.format.bin)" == "0b0"
+    assert: "\(True.format.bin)"  == "0b1"
+    assert: "\(U8[0].format.bin)" == "0b00000000"
+    assert: "\(I16[36].format.bin)" == "0b0000000000100100"
+    assert: "\(I16[-36].format.bin)" == "0b1111111111011100"
+
+  :it "can format integers in a binary without leading zeros"
+    assert: "\(False.format.bin.without_leading_zeros)" == "0b0"
+    assert: "\(True.format.bin.without_leading_zeros)"  == "0b1"
+    assert: "\(U8[0].format.bin.without_leading_zeros)" == "0b0"
+    assert: "\(I16[36].format.bin.without_leading_zeros)" == "0b100100"
+    assert: "\(I16[-36].format.bin.without_leading_zeros)" == "0b1111111111011100"
