@@ -9,6 +9,7 @@
   :is Integer.SafeArithmetic(T)
   :is Integer.WideArithmetic(T)
   :is Integer.BitwiseArithmetic(T)
+  :is Numeric.Comparable(T)
   :is Integer.Countable(T)
   :is Integer.Formattable(T)
 
