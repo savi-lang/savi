@@ -1265,28 +1265,36 @@ class Savi::Compiler::CodeGen
         @builder.xor(params[0], params[1])
       when "bit_shl"
         raise "bit_shl float" if gtype.type_def.is_floating_point_numeric?(ctx)
-        bits = gen_numeric_conv(@gtypes["U8"], gtype, params[1])
-        clamp = llvm_type_of(gtype).const_int(bit_width_of(gtype) - 1)
-        bits = @builder.select(
-          @builder.icmp(LLVM::IntPredicate::ULE, bits, clamp),
-          bits,
-          clamp,
-        )
-        @builder.shl(params[0], bits)
+
+        bits = params[1]
+        all_bits = @i8.const_int(bit_width_of(gtype))
+        is_all = @builder.icmp(LLVM::IntPredicate::UGE, bits, all_bits)
+
+        zero_block = gen_block("zero")
+        normal_block = gen_block("normal")
+        @builder.cond(is_all, zero_block, normal_block)
+
+        finish_block_and_move_to(zero_block)
+        @builder.ret(llvm_type_of(gtype).const_int(0))
+
+        finish_block_and_move_to(normal_block)
+        @builder.shl(params[0], gen_numeric_conv(@gtypes["U8"], gtype, bits))
       when "bit_shr"
         raise "bit_shr float" if gtype.type_def.is_floating_point_numeric?(ctx)
-        bits = gen_numeric_conv(@gtypes["U8"], gtype, params[1])
-        clamp = llvm_type_of(gtype).const_int(bit_width_of(gtype) - 1)
-        bits = @builder.select(
-          @builder.icmp(LLVM::IntPredicate::ULE, bits, clamp),
-          bits,
-          clamp,
-        )
-        if gtype.type_def.is_signed_numeric?(ctx)
-          @builder.ashr(params[0], bits)
-        else
-          @builder.lshr(params[0], bits)
-        end
+
+        bits = params[1]
+        all_bits = @i8.const_int(bit_width_of(gtype))
+        is_all = @builder.icmp(LLVM::IntPredicate::UGE, bits, all_bits)
+
+        zero_block = gen_block("zero")
+        normal_block = gen_block("normal")
+        @builder.cond(is_all, zero_block, normal_block)
+
+        finish_block_and_move_to(zero_block)
+        @builder.ret(llvm_type_of(gtype).const_int(0))
+
+        finish_block_and_move_to(normal_block)
+        @builder.lshr(params[0], gen_numeric_conv(@gtypes["U8"], gtype, bits))
       when "invert"
         raise "invert float" if gtype.type_def.is_floating_point_numeric?(ctx)
         @builder.not(params[0])

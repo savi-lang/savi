@@ -120,6 +120,8 @@
   :: highest bits shifting out of the bounds of the `bit_width` to disappear,
   :: and the lowest bits being filled by zeroes in the empty space left behind.
   ::
+  :: If more than `bit_width` bits are shifted, the result is all zero bits.
+  ::
   :: Because each bit represents a successive power of two, this operation is
   :: equivalent to multiplying the value by 2 the given number of times.
   :fun val bit_shl(bits U8) T
@@ -131,8 +133,12 @@
   :: lowest bits shifting out of the bounds of the `bit_width` to disappear,
   :: and the highest bits being filled by zeroes in the empty space left behind.
   ::
+  :: If more than `bit_width` bits are shifted, the result is all zero bits.
+  ::
   :: Because each bit represents a successive power of two, this operation is
-  :: equivalent to dividing the value by 2 the given number of times.
+  :: equivalent to dividing the value by 2 the given number of times, provided
+  :: that the value is a positive integer rather than a negative integer
+  :: (as a shifted negative integer will have its sign bit filled with a zero).
   :fun val bit_shr(bits U8) T
 
   :: Do a bitwise "rotate left" on this value by the given number of bits.
