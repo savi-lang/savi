@@ -239,6 +239,8 @@ module Savi::Compiler::Infer
       subtyping = ctx.subtyping.for_rf(rf)
 
       @spans.each { |info, span|
+        next if info.is_a?(FixedTypeExpr)
+
         next if subtyping.ignores_layer?(ctx, info.layer_index)
 
         next if seen_spans.includes?(span)

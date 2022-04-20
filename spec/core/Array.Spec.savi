@@ -134,6 +134,13 @@
     assert: ["foo", "bar", "baz"].includes("foo")
     assert: ["foo", "bar", "baz"].includes("f").is_false
 
+  :it "can check for inclusion even of `non` modules by type id"
+    array Array(Any'non) = []
+    assert: array.includes(None).is_false
+
+    array.push(None)
+    assert: array.includes(None)
+
   :it "replaces via a yield block the element at the given index, if it exists"
     array Array(String) = ["foo", "bar", "baz"]
 
