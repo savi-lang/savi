@@ -203,7 +203,7 @@
 
     // Iterate the bit mask downward toward the lest significant bit until it
     // reaches zero, emitting the appropriate character to show each bit.
-    while (Inspect.out(bit_mask.i16.format.hex), bit_mask != T.zero) (
+    while (bit_mask != T.zero) (
       if (@_value.bit_and(bit_mask) == T.zero) (
         if show_zeros out.push_byte('0')
       |
