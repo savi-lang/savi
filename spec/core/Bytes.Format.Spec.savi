@@ -1,0 +1,20 @@
+:class Savi.Bytes.Format.Spec
+  :is Spec
+  :const describes: "Bytes.Format"
+
+  :it "can format as a hex dump"
+    value = Bytes.new
+    U8[0x89].times -> (byte | value.push(byte))
+
+    assert: "\(value.format.hex_dump)" == String.join([
+      "00000000: 0001 0203 0405 0607 0809 0a0b 0c0d 0e0f ................"
+      "00000010: 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f ................"
+      "00000020: 2021 2223 2425 2627 2829 2a2b 2c2d 2e2f .!\"#$%&'()*+,-./"
+      "00000030: 3031 3233 3435 3637 3839 3a3b 3c3d 3e3f 0123456789:;<=>?"
+      "00000040: 4041 4243 4445 4647 4849 4a4b 4c4d 4e4f @ABCDEFGHIJKLMNO"
+      "00000050: 5051 5253 5455 5657 5859 5a5b 5c5d 5e5f PQRSTUVWXYZ[\\]^_"
+      "00000060: 6061 6263 6465 6667 6869 6a6b 6c6d 6e6f `abcdefghijklmno"
+      "00000070: 7071 7273 7475 7677 7879 7a7b 7c7d 7e7f pqrstuvwxyz{|}~."
+      "00000080: 8081 8283 8485 8687 88                  .........       "
+      ""
+    ], "\n")

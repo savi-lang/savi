@@ -84,6 +84,8 @@
 
   :fun ref clear: @_size = 0, @
 
+  :fun format: Bytes.Format._new(@)
+
   :fun clone @'iso
     copy = @new_iso(@size)
     _ptr_tag CPointer(U8)'tag = @_ptr // TODO: this indirection shouldn't be needed
