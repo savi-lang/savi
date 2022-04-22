@@ -162,7 +162,7 @@
     assert: b"bar food foo".includes(b"").is_false
 
   :it "hashes the bytes of the buffer"
-    assert: (b"string".hash == 0x4CF51F4A5B5CF110)
+    assert: (b"string".hash == 0x4cf51f4a5b5cf110)
 
   :it "returns the byte at the given byte offset"
     assert: b"example"[3]! == 'm'
@@ -348,28 +348,28 @@
     assert error: data.write_native_u64!(6, 0xfedcba9876543210)
 
   :it "reads integers in native, big and little endianness at specific offsets"
-    data = Bytes.from_array([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01])
+    data = Bytes.from_array([0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01])
 
     assert: data.read_native_u16!(0) == 0x2301
     assert: data.read_native_u16!(1) == 0x4523
     assert: data.read_native_u32!(0) == 0x67452301
     assert: data.read_native_u32!(1) == 0x89674523
-    assert: data.read_native_u64!(0) == 0xEFCDAB8967452301
-    assert: data.read_native_u64!(1) == 0x01EFCDAB89674523
+    assert: data.read_native_u64!(0) == 0xefcdab8967452301
+    assert: data.read_native_u64!(1) == 0x01efcdab89674523
 
     assert: data.read_le_u16!(0) == 0x2301
     assert: data.read_le_u16!(1) == 0x4523
     assert: data.read_le_u32!(0) == 0x67452301
     assert: data.read_le_u32!(1) == 0x89674523
-    assert: data.read_le_u64!(0) == 0xEFCDAB8967452301
-    assert: data.read_le_u64!(1) == 0x01EFCDAB89674523
+    assert: data.read_le_u64!(0) == 0xefcdab8967452301
+    assert: data.read_le_u64!(1) == 0x01efcdab89674523
 
     assert: data.read_be_u16!(0) == 0x0123
     assert: data.read_be_u16!(1) == 0x2345
     assert: data.read_be_u32!(0) == 0x01234567
     assert: data.read_be_u32!(1) == 0x23456789
-    assert: data.read_be_u64!(0) == 0x0123456789ABCDEF
-    assert: data.read_be_u64!(1) == 0x23456789ABCDEF01
+    assert: data.read_be_u64!(0) == 0x0123456789abcdef
+    assert: data.read_be_u64!(1) == 0x23456789abcdef01
 
   :it "joins an array of bytes"
     assert: Bytes.join([

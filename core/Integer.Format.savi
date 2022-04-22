@@ -88,12 +88,12 @@
 
   :let _value T
   :let _prefix String
-  :let _is_uppercase Bool
+  :let _is_lowercase Bool
   :let _has_leading_zeros Bool
   :new val _new(
     @_value
     @_prefix = "0x"
-    @_is_uppercase = True
+    @_is_lowercase = True
     @_has_leading_zeros = True
   )
 
@@ -102,15 +102,19 @@
 
   :: Use the given prefix instead of the standard "0x" hexadecimal prefix.
   :fun with_prefix(prefix)
-    @_new(@_value, prefix, @_is_uppercase, @_has_leading_zeros)
+    @_new(@_value, prefix, @_is_lowercase, @_has_leading_zeros)
 
-  :: Use lowercase hexadecimal letters instead of the default uppercase.
+  :: Use lowercase hexadecimal letters (which is the default).
   :fun lowercase
+    @_new(@_value, @_prefix, True, @_has_leading_zeros)
+
+  :: Use uppercase hexadecimal letters instead of the default lowercase.
+  :fun uppercase
     @_new(@_value, @_prefix, False, @_has_leading_zeros)
 
   :: Disable the default behavior of including all leading zeros.
   :fun without_leading_zeros
-    @_new(@_value, @_prefix, @_is_uppercase, False)
+    @_new(@_value, @_prefix, @_is_lowercase, False)
 
   :fun into_string_space USize
     // TODO: different strategy when `_has_leading_zeros` is False.
@@ -160,9 +164,9 @@
     --out
 
   :fun _digit(shr)
-    u4 = @_value.bit_shr(shr).u8.bit_and(0xF)
-    a = if @_is_uppercase ('A' | 'a')
-    if (u4 <= 9) (u4 + '0' | u4 + a - 0xA)
+    u4 = @_value.bit_shr(shr).u8.bit_and(0xf)
+    a = if @_is_lowercase ('a' | 'A')
+    if (u4 <= 9) (u4 + '0' | u4 + a - 0xa)
 
 :: Format the given integer into a fixed width binary representation.
 ::

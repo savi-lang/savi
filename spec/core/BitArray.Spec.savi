@@ -88,8 +88,8 @@
       << 0 << 1 << 1 << 1 << 1 << 1 << 0 << 1
 
     bytes = bits.as_bytes
-    assert: bytes.read_native_u64!(0) == 0xDEADBEEFBAADF00D
-    assert: bytes.read_native_u64!(8) == 0xBEEF5AFAAAADD00D
+    assert: bytes.read_native_u64!(0) == 0xdeadbeefbaadf00d
+    assert: bytes.read_native_u64!(8) == 0xbeef5afaaaadd00d
 
   :it "allows bit access only within the existing bounds of the array"
     bits = BitArray.new << 0 << 1 << 1

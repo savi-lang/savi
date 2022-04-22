@@ -1083,19 +1083,19 @@ class Savi::Compiler::CodeGen
           if gtype.type_def.is_signed_numeric?(ctx)
             case bit_width_of(gtype)
             when 1 then llvm_type_of(gtype).const_int(0)
-            when 8 then llvm_type_of(gtype).const_int(0x7F)
-            when 16 then llvm_type_of(gtype).const_int(0x7FFF)
-            when 32 then llvm_type_of(gtype).const_int(0x7FFFFFFF)
-            when 64 then llvm_type_of(gtype).const_int(0x7FFFFFFFFFFFFFFF)
+            when 8 then llvm_type_of(gtype).const_int(0x7f)
+            when 16 then llvm_type_of(gtype).const_int(0x7fff)
+            when 32 then llvm_type_of(gtype).const_int(0x7fffffff)
+            when 64 then llvm_type_of(gtype).const_int(0x7fffffffffffffff)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           else
             case bit_width_of(gtype)
             when 1 then llvm_type_of(gtype).const_int(1)
-            when 8 then llvm_type_of(gtype).const_int(0xFF)
-            when 16 then llvm_type_of(gtype).const_int(0xFFFF)
-            when 32 then llvm_type_of(gtype).const_int(0xFFFFFFFF)
-            when 64 then llvm_type_of(gtype).const_int(0xFFFFFFFFFFFFFFFF)
+            when 8 then llvm_type_of(gtype).const_int(0xff)
+            when 16 then llvm_type_of(gtype).const_int(0xffff)
+            when 32 then llvm_type_of(gtype).const_int(0xffffffff)
+            when 64 then llvm_type_of(gtype).const_int(0xffffffffffffffff)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           end
@@ -2913,8 +2913,8 @@ class Savi::Compiler::CodeGen
   def gen_numeric_conv_f64_to_f32(value : LLVM::Value, partial : Bool)
     # If the value is F64 NaN, return F32 NaN.
     test_overflow = gen_numeric_conv_float_handle_nan(
-      value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
-    gen_return_value(@llvm.const_bit_cast(@i32.const_int(0x7FC00000), @f32), nil)
+      value, @i64, 0x7ff0000000000000, 0x000fffffffffffff)
+    gen_return_value(@llvm.const_bit_cast(@i32.const_int(0x7fc00000), @f32), nil)
 
     overflow = gen_block("overflow")
     test_underflow = gen_block("test_underflow")
@@ -2923,7 +2923,7 @@ class Savi::Compiler::CodeGen
 
     # Check if the F64 value overflows the maximum F32 value.
     finish_block_and_move_to(test_overflow)
-    f32_max = @llvm.const_bit_cast(@i32.const_int(0x7F7FFFFF), @f32)
+    f32_max = @llvm.const_bit_cast(@i32.const_int(0x7f7fffff), @f32)
     f32_max = @builder.fpext(f32_max, @f64, "f32_max")
     is_overflow = @builder.fcmp(LLVM::RealPredicate::OGT, value, f32_max)
     @builder.cond(is_overflow, overflow, test_underflow)
@@ -2933,12 +2933,12 @@ class Savi::Compiler::CodeGen
     if partial
       gen_raise_error(gen_none, nil)
     else
-      gen_return_value(@llvm.const_bit_cast(@i32.const_int(0x7F800000), @f32), nil)
+      gen_return_value(@llvm.const_bit_cast(@i32.const_int(0x7f800000), @f32), nil)
     end
 
     # Check if the F64 value underflows the minimum F32 value.
     finish_block_and_move_to(test_underflow)
-    f32_min = @llvm.const_bit_cast(@i32.const_int(0xFF7FFFFF), @f32)
+    f32_min = @llvm.const_bit_cast(@i32.const_int(0xff7fffff), @f32)
     f32_min = @builder.fpext(f32_min, @f64, "f32_min")
     is_underflow = @builder.fcmp(LLVM::RealPredicate::OLT, value, f32_min)
     @builder.cond(is_underflow, underflow, normal)
@@ -2948,7 +2948,7 @@ class Savi::Compiler::CodeGen
     if partial
       gen_raise_error(gen_none, nil)
     else
-      gen_return_value(@llvm.const_bit_cast(@i32.const_int(0xFF800000), @f32), nil)
+      gen_return_value(@llvm.const_bit_cast(@i32.const_int(0xff800000), @f32), nil)
     end
 
     # Otherwise, proceed with the floating-point truncation as normal.
@@ -2958,7 +2958,7 @@ class Savi::Compiler::CodeGen
 
   def gen_numeric_conv_f32_to_sint(value : LLVM::Value, to_type : LLVM::Type, partial : Bool)
     test_overflow = gen_numeric_conv_float_handle_nan(
-      value, @i32, 0x7F800000, 0x007FFFFF)
+      value, @i32, 0x7f800000, 0x007fffff)
     if partial
       gen_raise_error(gen_none, nil)
     else
@@ -2975,7 +2975,7 @@ class Savi::Compiler::CodeGen
 
   def gen_numeric_conv_f64_to_sint(value : LLVM::Value, to_type : LLVM::Type, partial : Bool)
     test_overflow = gen_numeric_conv_float_handle_nan(
-      value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
+      value, @i64, 0x7ff0000000000000, 0x000fffffffffffff)
     if partial
       gen_raise_error(gen_none, nil)
     else
@@ -2992,7 +2992,7 @@ class Savi::Compiler::CodeGen
 
   def gen_numeric_conv_f32_to_uint(value : LLVM::Value, to_type : LLVM::Type, partial : Bool)
     test_overflow = gen_numeric_conv_float_handle_nan(
-      value, @i32, 0x7F800000, 0x007FFFFF)
+      value, @i32, 0x7f800000, 0x007fffff)
     if partial
       gen_raise_error(gen_none, nil)
     else
@@ -3008,7 +3008,7 @@ class Savi::Compiler::CodeGen
 
   def gen_numeric_conv_f64_to_uint(value : LLVM::Value, to_type : LLVM::Type, partial : Bool)
     test_overflow = gen_numeric_conv_float_handle_nan(
-      value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
+      value, @i64, 0x7ff0000000000000, 0x000fffffffffffff)
     if partial
       gen_raise_error(gen_none, nil)
     else
@@ -3252,7 +3252,7 @@ class Savi::Compiler::CodeGen
     raise NotImplementedError.new("gen_reflection_mutator_of_type in Verona") \
       if @runtime.is_a?(VeronaRT)
     desc = gen_global_for_const(mutator_gtype.desc_type.const_struct [
-      @i32.const_int(0xFFFF_FFFF),         # 0: id
+      @i32.const_int(0xffff_ffff),         # 0: id
       @i32.const_int(abi_size_of(@ptr)),   # 1: size
       @i32_0,                              # 2: field_count (tuples only)
       @i32_0,                              # 3: field_offset
