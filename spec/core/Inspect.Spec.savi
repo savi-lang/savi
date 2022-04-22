@@ -54,8 +54,8 @@
 
   :it "inspects bytes"
     assert: Inspect[b"example"] == "b\"example\""
-    assert: Inspect[b"\x00\x08\x1A ABC123\"\n\r\t\x7F\x80\xFF"] == <<<
-      b"\x00\x08\x1A ABC123\"\n\r\t\x7F\x80\xFF"
+    assert: Inspect[b"\x00\x08\x1a ABC123\"\n\r\t\x7f\x80\xff"] == <<<
+      b"\x00\x08\x1a ABC123\"\n\r\t\x7f\x80\xff"
     >>>
 
   :it "inspects arrays"

@@ -648,17 +648,17 @@
     assert: "\(U8[0].format.hex)" == "0x00"
     assert: "\(0.format.hex)"     == "0x00000000"
     assert: "\(36.format.hex)"    == "0x00000024"
-    assert: "\((-36).format.hex)" == "0xFFFFFFDC"
-    assert: "\(U64[0x123456789ABCDEF0].format.hex)" == "0x123456789ABCDEF0"
+    assert: "\((-36).format.hex)" == "0xffffffdc"
+    assert: "\(U64[0x123456789abcdef0].format.hex)" == "0x123456789abcdef0"
 
-  :it "can format integers in a lowercase hexadecimal representation"
-    assert: "\(36.format.hex.lowercase)"    == "0x00000024"
-    assert: "\((-36).format.hex.lowercase)" == "0xffffffdc"
+  :it "can format integers in an uppercase hexadecimal representation"
+    assert: "\(36.format.hex.uppercase)"    == "0x00000024"
+    assert: "\((-36).format.hex.uppercase)" == "0xFFFFFFDC"
 
   :it "can format integers in hexadecimal without leading zeros"
     assert: "\(0.format.hex.without_leading_zeros)"     == "0x0"
     assert: "\(36.format.hex.without_leading_zeros)"    == "0x24"
-    assert: "\((-36).format.hex.without_leading_zeros)" == "0xFFFFFFDC"
+    assert: "\((-36).format.hex.without_leading_zeros)" == "0xffffffdc"
     assert: "\(1025.format.hex.without_leading_zeros)"  == "0x401"
 
   :it "can format integers in a standard binary representation"
