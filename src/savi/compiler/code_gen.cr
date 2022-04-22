@@ -3074,8 +3074,8 @@ class Savi::Compiler::CodeGen
   def gen_bstring(value : String)
     @bstring_globals.fetch value do
       global = gen_global_const(@gtypes["Bytes"], {
-        "_size"  => @isize.const_int(value.size),
-        "_space" => @isize.const_int(value.size + 1),
+        "_size"  => @isize.const_int(value.bytesize),
+        "_space" => @isize.const_int(value.bytesize + 1),
         "_ptr"   => gen_cstring(value),
       })
 
