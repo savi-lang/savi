@@ -769,11 +769,13 @@ class Savi::Compiler::TypeCheck
       require_sendable =
         if @func.has_tag?(:async)
           "An asynchronous function"
-        elsif @func.has_tag?(:constructor) \
-        && !MetaType.cap(Cap::REF).subtype_of?(ctx,
-          resolve(ctx, @pre_infer[ret]).not_nil!.cap_only
-        )
-          "A constructor with elevated capability"
+        elsif @func.has_tag?(:constructor)
+          ret_mt = resolve(ctx, @pre_infer[ret]).not_nil!
+          ret_rt = ret_mt.single_rt?.not_nil!
+          if !MetaType.cap(Cap::REF).subtype_of?(ctx, ret_mt.cap_only) \
+          && ret_rt.defn(ctx).has_any_fields?
+            "A constructor with elevated capability"
+          end
         end
       if require_sendable
         @func.params.try do |params|
