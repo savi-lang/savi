@@ -52,22 +52,62 @@
 :: where handling the error case is important, rather than checking
 :: for safety pre-conditions using other means at the call site.
 :trait val Integer.SafeArithmetic(T Integer(T)'val)
-  // TODO: :fun val "/!"(other T) T
-
   :: Add this value to another value, resulting in a sum value.
-  :: Raises an error if the proper result would overflow the `max_value`.
+  :: Raises an error if the proper result would overflow the `max_value`
+  :: (or in a signed integer type, when adding a negative number,
+  :: if the proper result would underflow the `min_value`).
+  ::
   :: Use the `+` method instead if wrap-around overflow semantics are desired.
+  :: Use the `saturating_add` method instead if returning the `max_value`
+  :: on overflow or the `min_value` on underflow is the desired behavior.
   :fun val "+!"(other T) T
 
   :: Subtract another value from this value, resulting in a difference value.
-  :: Raises an error if the proper result would underflow the `max_value`.
-  :: Use the `-` method instead if wrap-around underflow semantics are desired.
+  :: Raises an error if the proper result would underflow the `min_value`
+  :: (or in a signed integer type, when subtracting a negative number,
+  :: if the proper result would overflow the `max_value`).
+  ::
+  :: Use the `-` method instead if wrap-around overflow semantics are desired.
+  :: Use the `saturating_subtract` method instead if returning the `max_value`
+  :: on overflow or the `min_value` on underflow is the desired behavior.
   :fun val "-!"(other T) T
 
   :: Multiply this value with another value, resulting in a product value.
-  :: Raises an error if the proper result would overflow or underflow.
+  :: Raises an error if the proper result would overflow the `max_value`
+  :: (or in a signed integer type, when one of the factors is a negative number,
+  :: if the proper result would underflow the `min_value`).
+  ::
   :: Use the `*` method instead if wrap-around overflow semantics are desired.
+  :: Use the `saturating_multiply` method instead if returning the `max_value`
+  :: on overflow or the `min_value` on underflow is the desired behavior.
   :fun val "*!"(other T) T
+
+  :: Add this value to another value, resulting in a sum value.
+  :: Returns `max_value` if the proper result would be greater than `max_value`.
+  :: Returns `min_value` if the proper result would be less than `min_value`,
+  :: which is possible for signed integer types when adding a negative.
+  ::
+  :: Use the `+!` method instead if raising an error on these cases is desired.
+  :: Use the `+` method instead if wrap-around overflow semantics are desired.
+  :fun val "saturating_add"(other T) T
+
+  :: Subtract another value from this value, resulting in a difference value.
+  :: Returns `min_value` if the proper result would be less than `min_value`.
+  :: Returns `max_value` if the proper result would be greater than `max_value`,
+  :: which is possible for signed integer types when subtracting a negative.
+  ::
+  :: Use the `-!` method instead if raising an error on these cases is desired.
+  :: Use the `-` method instead if wrap-around overflow semantics are desired.
+  :fun val "saturating_subtract"(other T) T
+
+  :: Multiply this value with another value, resulting in a product value.
+  :: Returns `max_value` if the proper result would be greater than `max_value`.
+  :: Returns `min_value` if the proper result would be less than `min_value`,
+  :: which is possible for signed integer types when one factor is negative.
+  ::
+  :: Use the `*!` method instead if raising an error on these cases is desired.
+  :: Use the `*` method instead if wrap-around overflow semantics are desired.
+  :fun val "saturating_multiply"(other T) T
 
 :: A type which can do "wide" arithmetic operations of the given integer type T,
 :: allowing integer arithmetic that is guaranteed to neither lose information
@@ -272,6 +312,19 @@
   :fun val "+!"(other @) @: compiler intrinsic
   :fun val "-!"(other @) @: compiler intrinsic
   :fun val "*!"(other @) @: compiler intrinsic
+  :fun val saturating_add(other @) @: compiler intrinsic
+  :fun val saturating_subtract(other @) @: compiler intrinsic
+  :fun val saturating_multiply(other @) @
+    // There is no LLVM intrinsic for saturating multiplication of integers,
+    // so we implement it using partial multiplication here below.
+    try (
+      @ *! other
+    |
+      left_is_negative = @ < @zero
+      right_is_negative = other < @zero
+      one_is_negative = left_is_negative != right_is_negative
+      if one_is_negative (@min_value | @max_value)
+    )
 
   :is Integer.WideArithmetic(@)
   :fun val wide_multiply(other @) Pair(@, @): compiler intrinsic
