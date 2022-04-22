@@ -5,6 +5,7 @@
       Spec.Run(Savi.BitArray.Spec).new(env)
       Spec.Run(Savi.Bool.Spec).new(env)
       Spec.Run(Savi.Bytes.Spec).new(env)
+      Spec.Run(Savi.Bytes.Format.Spec).new(env)
       Spec.Run(Savi.CPointer.Spec).new(env)
       Spec.Run(Savi.Indexable.Spec).new(env)
       Spec.Run(Savi.Inspect.Spec).new(env)

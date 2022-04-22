@@ -18,25 +18,10 @@
   :fun into(output String'iso, input Any'box) String'iso // TODO: use `box` instead of `Any'box` // TODO: use something like Crystal IO instead of String?
     case input <: (
     | _InspectCustom | input.inspect_into(--output)
+    | Bytes'box | input.format.literal.into_string(--output)
     | String'box |
       output.push_byte('"')
       output << input.clone // TODO: show some characters as escaped.
-      output.push_byte('"')
-      --output
-    | Bytes'box |
-      output.push_byte('b')
-      output.push_byte('"')
-      input.each -> (byte |
-        case (
-        | byte >= 0x7f | output = byte.format.hex.with_prefix("\\x").into_string(--output)
-        | byte == '"'  | output.push_byte('\\').push_byte('"')
-        | byte >= 0x20 | output.push_byte(byte)
-        | byte == '\n' | output.push_byte('\\').push_byte('n')
-        | byte == '\r' | output.push_byte('\\').push_byte('r')
-        | byte == '\t' | output.push_byte('\\').push_byte('t')
-        |                output = byte.format.hex.with_prefix("\\x").into_string(--output)
-        )
-      )
       output.push_byte('"')
       --output
     | _InspectEach |

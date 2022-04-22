@@ -1,0 +1,112 @@
+:: Format the given `Bytes` value using one of the available format types.
+:: Call one of the methods of this struct to choose which format type to use.
+:struct box Bytes.Format
+  :let _value Bytes'box
+  :new box _new(@_value)
+
+  :fun literal: Bytes.Format.Literal._new(@_value)
+  :fun hex_dump: Bytes.Format.HexDump._new(@_value)
+
+  :fun lit: @literal
+  :fun xxd: @hex_dump
+
+:: Format the given `Bytes` as they could appear in Savi source code. That is,
+:: as a string literal with the `b` prefix and non-printable bytes escaped.
+:struct box Bytes.Format.Literal
+  :is IntoString
+
+  :let _value Bytes'box
+  :new box _new(@_value)
+
+  :fun into_string(out String'iso) String'iso
+    out.push_byte('b')
+    out.push_byte('"')
+    @_value.each -> (byte |
+      case (
+      | byte >= 0x7f | out = byte.format.hex.with_prefix("\\x").into_string(--out)
+      | byte == '"'  | out.push_byte('\\').push_byte('"')
+      | byte >= 0x20 | out.push_byte(byte)
+      | byte == '\n' | out.push_byte('\\').push_byte('n')
+      | byte == '\r' | out.push_byte('\\').push_byte('r')
+      | byte == '\t' | out.push_byte('\\').push_byte('t')
+      |                out = byte.format.hex.with_prefix("\\x").into_string(--out)
+      )
+    )
+    out.push_byte('"')
+    --out
+
+  :fun into_string_space USize
+    // Use a conservative estimate, assuming all bytes will be escaped hex.
+    // Each escaped hex byte takes 4 bytes to display, and there are 3 bytes
+    // of overhead involved in displaying the leading `b"` and final `"`.
+    @_value.size * 4 + 3
+
+:: Format the given `Bytes` into a "hex dump", much like the output of the
+:: `xxd` command-line utility found on many UNIX platforms.
+::
+:: This format shows addresses, hex bytes, and corresponding ASCII characters,
+:: in a way that is intended to facilitate debugging of large data sequences.
+:struct val Bytes.Format.HexDump
+  :is IntoString
+
+  :let _value Bytes'box
+  :new box _new(@_value)
+
+  :fun _row_count
+    // Divide by 16 bytes per row, rounding up to the nearest row.
+    (@_value.size + 15) / 16
+
+  :fun into_string_space USize
+    // It takes 68 bytes to show each row of the hex dump.
+    @_row_count * 68
+
+  :fun into_string(out String'iso) String'iso
+    @_row_count.times -> (row_index |
+      row_address = row_index * 16
+
+      // Emit the address shown on the left.
+      out = row_address.u32.format.hex.bare.into_string(--out)
+      out.push_byte(':')
+
+      // Emit the hex view shown in the center.
+      USize[8].times -> (pair_index |
+        out.push_byte(' ')
+        out = @_emit_hex_pair(--out, row_address + pair_index * 2)
+      )
+      out.push_byte(' ')
+
+      // Emit the ASCII view shown on the right.
+      USize[16].times -> (byte_index |
+        out = @_emit_ascii(--out, row_address + byte_index)
+      )
+
+      // Emit a final newline for this row.
+      out.push_byte('\n')
+    )
+    --out
+
+  :fun _emit_hex_pair(out String'iso, pair_address USize)
+    out = @_emit_hex(--out, pair_address)
+    out = @_emit_hex(--out, pair_address + 1)
+    --out
+
+  :fun _emit_hex(out String'iso, byte_address USize)
+    try (
+      out = @_value[byte_address]!.format.hex.bare.into_string(--out)
+    |
+      out.push_byte(' ').push_byte(' ')
+    )
+    --out
+
+  :fun _emit_ascii(out String'iso, byte_address USize)
+    try (
+      byte = @_value[byte_address]!
+      if (byte > 0x20 && byte < 0x7f) (
+        out.push_byte(byte)
+      |
+        out.push_byte('.')
+      )
+    |
+      out.push_byte(' ')
+    )
+    --out
