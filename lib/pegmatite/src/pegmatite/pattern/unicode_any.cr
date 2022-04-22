@@ -68,13 +68,13 @@ module Pegmatite
         # Make sure the encoding is not overlong.
         return err if (c == 0xF0_u32) && (c2 < 0x90_u32)
 
-        # Make sure the result will be <= 0x10FFFF.
+        # Make sure the result will be <= 0x10ffff.
         return err if (c == 0xF4_u32) && (c2 >= 0x90_u32)
 
         # Return the four-byte character.
         {((c << 18) + (c2 << 12) + (c3 << 6) + c4) - 0x3C82080_u32, 4, true}
       else
-        # The result would not be <= 0x10FFFF.
+        # The result would not be <= 0x10ffff.
         err
       end
     end

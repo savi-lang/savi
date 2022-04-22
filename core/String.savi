@@ -159,7 +159,7 @@
 
   :: Return the UTF8-encoded Unicode codepoint starting at the given byte index.
   :: Raises an error if the given index is out of bounds.
-  :: Returns 0xFFFD (Unicode "Replacement Character") if the given byte index
+  :: Returns 0xfffd (Unicode "Replacement Character") if the given byte index
   :: is not pointing to the start of a well-formed UTF-8-encoded codepoint.
   :fun char_at!(index USize) U32
     if (@size <= index) error!
@@ -175,7 +175,7 @@
       state == 0
     )
 
-    if early_stop (codepoint | 0xFFFD)
+    if early_stop (codepoint | 0xfffd)
 
   :fun _offset_to_index(offset ISize) USize
     if (offset < 0) (offset.usize + @size | offset.usize)
@@ -253,7 +253,7 @@
   ::
   :: When invalid UTF8 encoded bytes are observed, (whether because the String
   :: is invalid UTF8, or the starting byte index was pointing to the middle
-  :: of a multibyte codepoint rather than its start), the value 0xFFFD,
+  :: of a multibyte codepoint rather than its start), the value 0xfffd,
   :: known as a Unicode "Replacement character" will be yielded for those bytes.
   ::
   :: If the given byte range is outside of the bounds of the actual byte buffer,
@@ -278,7 +278,7 @@
         yield (codepoint, start_index, index - start_index)
         start_index = index
       | UTF8Decoding.is_error_state(state) |
-        yield (U32[0xFFFD], start_index, index - start_index)
+        yield (U32[0xfffd], start_index, index - start_index)
         start_index = index
         state = 0
       )
@@ -464,36 +464,36 @@
       yield (1, value.u8, 0, 0, 0)
     | 0x800 |
       yield (2
-        value.bit_shr(6).bit_or(0xC0).u8
-        value.bit_and(0x3F).bit_or(0x80).u8
+        value.bit_shr(6).bit_or(0xc0).u8
+        value.bit_and(0x3f).bit_or(0x80).u8
         0
         0
       )
-    | 0xD800 |
+    | 0xd800 |
       yield (3
-        value.bit_shr(12).bit_or(0xE0).u8
-        value.bit_shr(6).bit_and(0x3F).bit_or(0x80).u8
-        value.bit_and(0x3F).bit_or(0x80).u8
+        value.bit_shr(12).bit_or(0xe0).u8
+        value.bit_shr(6).bit_and(0x3f).bit_or(0x80).u8
+        value.bit_and(0x3f).bit_or(0x80).u8
         0
       )
-    | 0xE000 |
+    | 0xe000 |
       // UTF-16 surrogate pairs are not allowed.
-      yield (3, 0xEF, 0xBF, 0xBD, 0)
+      yield (3, 0xef, 0xbf, 0xbd, 0)
     | 0x10000 |
       yield (3
-        value.bit_shr(12).bit_or(0xE0).u8
-        value.bit_shr(6).bit_and(0x3F).bit_or(0x80).u8
-        value.bit_and(0x3F).bit_or(0x80).u8
+        value.bit_shr(12).bit_or(0xe0).u8
+        value.bit_shr(6).bit_and(0x3f).bit_or(0x80).u8
+        value.bit_and(0x3f).bit_or(0x80).u8
         0
       )
     | 0x110000 |
       yield (4
-        value.bit_shr(18).bit_or(0xF0).u8
-        value.bit_shr(12).bit_and(0x3F).bit_or(0x80).u8
-        value.bit_shr(6).bit_and(0x3F).bit_or(0x80).u8
-        value.bit_and(0x3F).bit_or(0x80).u8
+        value.bit_shr(18).bit_or(0xf0).u8
+        value.bit_shr(12).bit_and(0x3f).bit_or(0x80).u8
+        value.bit_shr(6).bit_and(0x3f).bit_or(0x80).u8
+        value.bit_and(0x3f).bit_or(0x80).u8
       )
     |
-      // Code points beyond 0x10FFFF are not allowed.
-      yield (3, 0xEF, 0xBF, 0xBD, 0)
+      // Code points beyond 0x10ffff are not allowed.
+      yield (3, 0xef, 0xbf, 0xbd, 0)
     )

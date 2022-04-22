@@ -62,7 +62,7 @@ class Savi::Compiler::CodeGen
 
         # The first element is always the next yield index to use.
         # This is zero when the function is called the first time,
-        # 0xFFFF when the function is finished, or 0xFFFE if it errored.
+        # 0xffff when the function is finished, or 0xfffe if it errored.
         list << g.llvm.int16
 
         # Then comes the final return value.
@@ -148,7 +148,7 @@ class Savi::Compiler::CodeGen
     end
 
     def set_next_yield_index(cont : LLVM::Value, next_yield_index : Int32)
-      raise "next_yield_index too high" if next_yield_index >= 0xFFFE
+      raise "next_yield_index too high" if next_yield_index >= 0xfffe
 
       builder.store(
         g.llvm.int16.const_int(next_yield_index),
@@ -160,19 +160,19 @@ class Savi::Compiler::CodeGen
       raise "this calling convention can't error" \
         unless gfunc.calling_convention.is_a?(GenFunc::YieldingErrorable)
 
-      # Assign a value of 0xFFFE to the continuation's function pointer,
+      # Assign a value of 0xfffe to the continuation's function pointer,
       # signifying the end of the call, with an error for the caller to raise.
       builder.store(
-        g.llvm.int16.const_int(0xFFFE),
+        g.llvm.int16.const_int(0xfffe),
         struct_gep_for_next_yield_index(cont),
       )
     end
 
     def set_as_finished(cont : LLVM::Value)
-      # Assign a value of 0xFFFF to the continuation's function pointer,
+      # Assign a value of 0xffff to the continuation's function pointer,
       # signifying the final end of the yielding call.
       builder.store(
-        g.llvm.int16.const_int(0xFFFF),
+        g.llvm.int16.const_int(0xffff),
         struct_gep_for_next_yield_index(cont),
       )
     end
@@ -181,7 +181,7 @@ class Savi::Compiler::CodeGen
       # Check if next_yield_index was set to the error value by set_as_error.
       builder.icmp(LLVM::IntPredicate::EQ,
         get_next_yield_index(cont),
-        g.llvm.int16.const_int(0xFFFE),
+        g.llvm.int16.const_int(0xfffe),
       )
     end
 
@@ -191,13 +191,13 @@ class Savi::Compiler::CodeGen
         # Check if next_yield_index was set to finished by set_as_finished.
         builder.icmp(LLVM::IntPredicate::EQ,
           get_next_yield_index(cont),
-          g.llvm.int16.const_int(0xFFFF),
+          g.llvm.int16.const_int(0xffff),
         )
       when GenFunc::YieldingErrorable
         # Check if next_yield_index was set to error or finished.
         builder.icmp(LLVM::IntPredicate::UGE,
           get_next_yield_index(cont),
-          g.llvm.int16.const_int(0xFFFE),
+          g.llvm.int16.const_int(0xfffe),
         )
       else
         raise NotImplementedError.new("#{gfunc.calling_convention}")

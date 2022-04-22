@@ -22,13 +22,13 @@
 
   :fun _ptr_get_at(index USize) Bool
     data_index = index.bit_shr(6)
-    bit_number = index.bit_and(0x3F).u8
+    bit_number = index.bit_and(0x3f).u8
     bit_mask = U64[1].bit_shl(bit_number)
     @_ptr._get_at(data_index).bit_and(bit_mask) != 0
 
   :fun ref _ptr_assign_at(index USize, value Bool)
     data_index = index.bit_shr(6)
-    bit_number = index.bit_and(0x3F).u8
+    bit_number = index.bit_and(0x3f).u8
     bit_mask = U64[1].bit_shl(bit_number)
     bits = @_ptr._get_at(data_index)
     bits = bits
@@ -39,7 +39,7 @@
 
   :fun ref _ptr_displace_at(index USize, value Bool)
     data_index = index.bit_shr(6)
-    bit_number = index.bit_and(0x3F).u8
+    bit_number = index.bit_and(0x3f).u8
     bit_mask = U64[1].bit_shl(bit_number)
     bits = @_ptr._get_at(data_index)
     old_value = bits.bit_and(bit_mask) != 0

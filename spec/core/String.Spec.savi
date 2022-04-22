@@ -120,7 +120,7 @@
     assert: "bar food foo".includes("").is_false
 
   :it "hashes the bytes of the string"
-    assert: ("string".hash == 0x4CF51F4A5B5CF110)
+    assert: ("string".hash == 0x4cf51f4a5b5cf110)
 
   :it "returns the byte at the given byte offset"
     assert: "example"[3]! == 'm'

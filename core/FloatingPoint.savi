@@ -107,11 +107,11 @@
   :is FloatingPoint.Bounded(@)
   :fun non zero @'val:   compiler intrinsic
   :fun non one @'val:    compiler intrinsic
-  :fun non max_value:    @from_bits(0x7F7F_FFFF)
-  :fun non min_value:    @from_bits(0xFF7F_FFFF)
-  :fun non infinity:     @from_bits(0x7F80_0000)
-  :fun non neg_infinity: @from_bits(0xFF80_0000)
-  :fun non nan:          @from_bits(0x7FC0_0000)
+  :fun non max_value:    @from_bits(0x7f7f_ffff)
+  :fun non min_value:    @from_bits(0xff7f_ffff)
+  :fun non infinity:     @from_bits(0x7f80_0000)
+  :fun non neg_infinity: @from_bits(0xff80_0000)
+  :fun non nan:          @from_bits(0x7fc0_0000)
   :fun non epsilon:      @from_bits(0x3400_0000) // 2 ** -23
   :fun non half_epsilon: @from_bits(0x3380_0000) // 2 ** -24
 
@@ -123,13 +123,13 @@
 
   :is FloatingPoint.Comparable(@)
   :fun val is_nan
-    @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
-    @bits.bit_and(0x007F_FFFF) != 0              // mantissa
+    @bits.bit_and(0x7f80_0000) == 0x7f80_0000 && // exponent
+    @bits.bit_and(0x007f_ffff) != 0              // mantissa
   :fun val is_infinite
-    @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
-    @bits.bit_and(0x007F_FFFF) == 0              // mantissa
+    @bits.bit_and(0x7f80_0000) == 0x7f80_0000 && // exponent
+    @bits.bit_and(0x007f_ffff) == 0              // mantissa
   :fun val is_finite
-    @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
+    @bits.bit_and(0x7f80_0000) != 0x7f80_0000 // exponent
 
   :is IntoString
   :fun into_string_space: @f64.into_string_space
@@ -158,13 +158,13 @@
   :is FloatingPoint.Bounded(@)
   :fun non zero @'val:   compiler intrinsic
   :fun non one @'val:    compiler intrinsic
-  :fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
-  :fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
-  :fun non infinity:     @from_bits(0x7FF0_0000_0000_0000)
-  :fun non neg_infinity: @from_bits(0xFFF0_0000_0000_0000)
-  :fun non nan:          @from_bits(0x7FF8_0000_0000_0000)
-  :fun non epsilon:      @from_bits(0x3CB0_0000_0000_0000) // 2 ** -52
-  :fun non half_epsilon: @from_bits(0x3CA0_0000_0000_0000) // 2 ** -53
+  :fun non max_value:    @from_bits(0x7fef_ffff_ffff_ffff)
+  :fun non min_value:    @from_bits(0xffef_ffff_ffff_ffff)
+  :fun non infinity:     @from_bits(0x7ff0_0000_0000_0000)
+  :fun non neg_infinity: @from_bits(0xfff0_0000_0000_0000)
+  :fun non nan:          @from_bits(0x7ff8_0000_0000_0000)
+  :fun non epsilon:      @from_bits(0x3cb0_0000_0000_0000) // 2 ** -52
+  :fun non half_epsilon: @from_bits(0x3ca0_0000_0000_0000) // 2 ** -53
 
   :is FloatingPoint.Arithmetic(@)
   :fun val log @: compiler intrinsic
@@ -174,13 +174,13 @@
 
   :is FloatingPoint.Comparable(@)
   :fun val is_nan
-    @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
-    @bits.bit_and(0x000F_FFFF_FFFF_FFFF) != 0                        // mantissa
+    @bits.bit_and(0x7ff0_0000_0000_0000) == 0x7ff0_0000_0000_0000 && // exponent
+    @bits.bit_and(0x000f_ffff_ffff_ffff) != 0                        // mantissa
   :fun val is_infinite
-    @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
-    @bits.bit_and(0x000F_FFFF_FFFF_FFFF) == 0                        // mantissa
+    @bits.bit_and(0x7ff0_0000_0000_0000) == 0x7ff0_0000_0000_0000 && // exponent
+    @bits.bit_and(0x000f_ffff_ffff_ffff) == 0                        // mantissa
   :fun val is_finite
-    @bits.bit_and(0x7FF0_0000_0000_0000) != 0x7FF0_0000_0000_0000 // exponent
+    @bits.bit_and(0x7ff0_0000_0000_0000) != 0x7ff0_0000_0000_0000 // exponent
 
   :is IntoString
   :fun into_string_space USize: 14 // (max size of the below logic)

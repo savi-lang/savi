@@ -28,7 +28,7 @@
       output.push_byte('"')
       input.each -> (byte |
         case (
-        | byte >= 0x7F | output = byte.format.hex.with_prefix("\\x").into_string(--output)
+        | byte >= 0x7f | output = byte.format.hex.with_prefix("\\x").into_string(--output)
         | byte == '"'  | output.push_byte('\\').push_byte('"')
         | byte >= 0x20 | output.push_byte(byte)
         | byte == '\n' | output.push_byte('\\').push_byte('n')
