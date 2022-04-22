@@ -1434,6 +1434,34 @@ class Savi::Compiler::CodeGen
         gfunc.calling_convention.gen_return(self, gfunc, result_value, nil)
 
         .tap { already_returned = true }
+      when "saturating_add", "saturating_subtract"
+        raise NotImplementedError.new("saturating_add for float") \
+          if gtype.type_def.is_floating_point_numeric?(ctx)
+        basename =
+          case gfunc.func.ident.value
+          when "saturating_add"
+            gtype.type_def.is_signed_numeric?(ctx) ? "sadd" : "uadd"
+          when "saturating_subtract"
+            gtype.type_def.is_signed_numeric?(ctx) ? "ssub" : "usub"
+          else
+            raise NotImplementedError.new(gfunc.func.ident.value)
+          end
+        op_func =
+          case bit_width_of(gtype)
+          when 1
+            use_external_llvm_func("llvm.#{basename}.sat.i1", [@i1, @i1], @i1)
+          when 8
+            use_external_llvm_func("llvm.#{basename}.sat.i8", [@i8, @i8], @i8)
+          when 16
+            use_external_llvm_func("llvm.#{basename}.sat.i16", [@i16, @i16], @i16)
+          when 32
+            use_external_llvm_func("llvm.#{basename}.sat.i32", [@i32, @i32], @i32)
+          when 64
+            use_external_llvm_func("llvm.#{basename}.sat.i64", [@i64, @i64], @i64)
+          else raise NotImplementedError.new(bit_width_of(gtype))
+          end
+
+        @builder.call(op_func, [params[0], params[1]])
       when "bits"
         raise "bits integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
         case bit_width_of(gtype)
