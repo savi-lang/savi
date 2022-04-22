@@ -267,6 +267,10 @@ class Savi::Program
       io << "#<#{self.class} #{@ident.value}>"
     end
 
+    def has_any_fields?
+      @functions.any?(&.has_tag?(:field))
+    end
+
     def find_func?(func_name)
       @functions
         .find { |f| f.ident.value == func_name && !f.has_tag?(:hygienic) }

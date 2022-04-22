@@ -2,9 +2,32 @@
 pass: type_check
 ---
 
+It complains if some params of an asynchronous function are not sendable:
+
+```savi
+:actor BadActor
+  :be bad_behavior(a String'ref, b String'val, c String'box)
+```
+```error
+An asynchronous function must only have sendable parameters:
+  :be bad_behavior(a String'ref, b String'val, c String'box)
+   ^~
+
+- this parameter type (String'ref) is not sendable:
+  :be bad_behavior(a String'ref, b String'val, c String'box)
+                   ^~~~~~~~~~~~
+
+- this parameter type (String'box) is not sendable:
+  :be bad_behavior(a String'ref, b String'val, c String'box)
+                                               ^~~~~~~~~~~~
+```
+
+---
+
 It complains if some params of an elevated constructor are not sendable:
 
 ```savi
+  :let field String'ref: String.new
   :new iso iso_constructor(a String'ref, b String'val, c String'box)
   :new val val_constructor(a String'ref, b String'val, c String'box)
   :new box box_constructor(a String'ref, b String'val, c String'box)
@@ -38,24 +61,11 @@ A constructor with elevated capability must only have sendable parameters:
 
 ---
 
-It complains if some params of an asynchronous function are not sendable:
+It allows non-sendable params to an elevated constructor if there are no fields:
 
 ```savi
-:actor BadActor
-  :be bad_behavior(a String'ref, b String'val, c String'box)
-```
-```error
-An asynchronous function must only have sendable parameters:
-  :be bad_behavior(a String'ref, b String'val, c String'box)
-   ^~
-
-- this parameter type (String'ref) is not sendable:
-  :be bad_behavior(a String'ref, b String'val, c String'box)
-                   ^~~~~~~~~~~~
-
-- this parameter type (String'box) is not sendable:
-  :be bad_behavior(a String'ref, b String'val, c String'box)
-                                               ^~~~~~~~~~~~
+  // (no fields)
+  :new iso iso_constructor(a String'ref, b String'val, c String'box)
 ```
 
 ---
