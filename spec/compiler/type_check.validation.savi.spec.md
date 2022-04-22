@@ -5,19 +5,34 @@ pass: type_check
 It complains if some params of an elevated constructor are not sendable:
 
 ```savi
-  :new val bad_constructor(a String'ref, b String'val, c String'box)
+  :new iso iso_constructor(a String'ref, b String'val, c String'box)
+  :new val val_constructor(a String'ref, b String'val, c String'box)
+  :new box box_constructor(a String'ref, b String'val, c String'box)
 ```
 ```error
 A constructor with elevated capability must only have sendable parameters:
-  :new val bad_constructor(a String'ref, b String'val, c String'box)
+  :new iso iso_constructor(a String'ref, b String'val, c String'box)
        ^~~
 
 - this parameter type (String'ref) is not sendable:
-  :new val bad_constructor(a String'ref, b String'val, c String'box)
+  :new iso iso_constructor(a String'ref, b String'val, c String'box)
                            ^~~~~~~~~~~~
 
 - this parameter type (String'box) is not sendable:
-  :new val bad_constructor(a String'ref, b String'val, c String'box)
+  :new iso iso_constructor(a String'ref, b String'val, c String'box)
+                                                       ^~~~~~~~~~~~
+```
+```error
+A constructor with elevated capability must only have sendable parameters:
+  :new val val_constructor(a String'ref, b String'val, c String'box)
+       ^~~
+
+- this parameter type (String'ref) is not sendable:
+  :new val val_constructor(a String'ref, b String'val, c String'box)
+                           ^~~~~~~~~~~~
+
+- this parameter type (String'box) is not sendable:
+  :new val val_constructor(a String'ref, b String'val, c String'box)
                                                        ^~~~~~~~~~~~
 ```
 
