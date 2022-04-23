@@ -70,6 +70,15 @@ It allows non-sendable params to an elevated constructor if there are no fields:
 
 ---
 
+It allows the sendable param to an elevated constructor to have a default `iso` argument, without treating it as `iso'aliased`:
+
+```savi
+  :var inner String'iso: String.new_iso
+  :new iso new_iso(s String'iso = String.new_iso): @inner = --s
+```
+
+---
+
 It complains when a constant isn't of one of the supported types:
 
 ```savi

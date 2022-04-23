@@ -1031,6 +1031,32 @@ module Savi::Compiler::Infer
     end
   end
 
+  class FromAssignNoAlias < Info
+    getter lhs : NamedInfo
+    getter rhs : Info
+
+    def describe_kind : String; @lhs.describe_kind end
+
+    def initialize(@pos, @layer_index, @lhs, @rhs)
+    end
+
+    def add_downstream(use_pos : Source::Pos, info : Info)
+      @lhs.add_downstream(use_pos, info)
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      Tether.chain(@lhs, querent)
+    end
+
+    def add_peer_hint(peer : Info)
+      @lhs.add_peer_hint(peer)
+    end
+
+    def as_conduit? : Conduit?
+      Conduit.direct(@lhs)
+    end
+  end
+
   class FromYield < Info
     getter yield_in : Info
     getter terms : Array(Info)
@@ -1407,7 +1433,11 @@ module Savi::Compiler::Infer
         param = other_rf.link.resolve(ctx).params.not_nil!.terms.[@index]
         pre_infer = ctx.pre_infer[other_rf.link]
         param_info = pre_infer[param]
-        param_info = param_info.lhs if param_info.is_a?(FromAssign)
+        if param_info.is_a?(FromAssign)
+          param_info = param_info.lhs
+        elsif param_info.is_a?(FromAssignNoAlias)
+          param_info = param_info.lhs
+        end
         param_info = param_info.as(Param)
         results << {param_info.first_viable_constraint_pos, param_mt}
       }

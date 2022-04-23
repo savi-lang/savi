@@ -119,7 +119,8 @@ module Savi::Compiler::PreInfer
         params.terms.each do |param|
           param_info = self[param]
           finish_param(param, param_info) unless param_info.is_a?(Infer::Param) \
-            || (param_info.is_a?(Infer::FromAssign) && param_info.lhs.is_a?(Infer::Param))
+            || (param_info.is_a?(Infer::FromAssign) && param_info.lhs.is_a?(Infer::Param)) \
+            || (param_info.is_a?(Infer::FromAssignNoAlias) && param_info.lhs.is_a?(Infer::Param))
 
           # TODO: special-case this somewhere else?
           if link.type.name == "Main" \
@@ -426,7 +427,7 @@ module Savi::Compiler::PreInfer
         else
           raise NotImplementedError.new(node.to_a)
         end
-      when "=", "<<=", "DEFAULTPARAM"
+      when "="
         lhs = self[node.lhs]
         lhs = lhs.info if lhs.is_a?(Infer::LocalRef)
         case lhs
@@ -436,6 +437,19 @@ module Savi::Compiler::PreInfer
         when Infer::Param
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
           @analysis[node] = Infer::FromAssign.new(node.pos, layer(node), lhs, @analysis[node.rhs])
+        else
+          raise NotImplementedError.new(lhs)
+        end
+      when "<<=", "DEFAULTPARAM"
+        lhs = self[node.lhs]
+        lhs = lhs.info if lhs.is_a?(Infer::LocalRef)
+        case lhs
+        when Infer::Local
+          lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
+          @analysis[node] = Infer::FromAssignNoAlias.new(node.pos, layer(node), lhs, @analysis[node.rhs])
+        when Infer::Param
+          lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
+          @analysis[node] = Infer::FromAssignNoAlias.new(node.pos, layer(node), lhs, @analysis[node.rhs])
         else
           raise NotImplementedError.new(lhs)
         end
