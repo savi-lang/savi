@@ -256,10 +256,11 @@
   :fun ref "<<"(other Bytes'box)
     if (other._size > 0) (
       new_size = @_size + other._size
-      @reserve(new_size)
       if other.is_null_terminated (
+        @reserve(new_size + 1)
         other._ptr._copy_to(@_ptr._offset(@_size), other.size + 1)
       |
+        @reserve(new_size)
         other._ptr._copy_to(@_ptr._offset(@_size), other.size)
       )
       @_size = new_size

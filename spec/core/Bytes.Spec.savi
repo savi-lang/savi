@@ -53,6 +53,20 @@
     assert: data.cpointer.is_not_null
     assert: data.cpointer.usize != orig_pointer_address
 
+  :it "reallocates to a size that includes a null terminator when appending"
+    data = Bytes.new
+    assert: data.space == 0
+    assert: data.size == 0
+
+    // This 8-byte literal has a null terminator and thus 9 bytes to copy in.
+    literal = b"Hi there"
+    // So when we reallocate the buffer for the string, it must be 16 bytes,
+    // instead of only the 8 bytes you might expect if you weren't thinking
+    // about the null terminator or weren't planning to copy it in.
+    data << literal
+    assert: data.space == 16
+    assert: data.size == 8
+
   :it "reserves additional space beyond the current size"
     data = b"0123456789012345678901234567890123456789" // 40 bytes
     assert: data.clone.reserve(32)           .space == 64
