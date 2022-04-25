@@ -982,7 +982,6 @@ class Savi::Compiler::CodeGen
 
   def gen_intrinsic_platform(gtype, gfunc, llvm_func)
     gen_func_start(llvm_func, gtype, gfunc)
-    params = llvm_func.params
 
     target = Target.new(@target_machine.triple)
 
@@ -1015,9 +1014,56 @@ class Savi::Compiler::CodeGen
     gen_func_end
   end
 
+  def gen_intrinsic_inhibit_optimization(gtype, gfunc, llvm_func)
+    gen_func_start(llvm_func, gtype, gfunc)
+    params = llvm_func.params
+
+    @builder.ret \
+      case gfunc.func.ident.value
+      when "[]"
+        param_type = params[0].type
+        asm_fn = LLVM::Function.from_value(
+          LLVM::Type.function([param_type], @void).inline_asm(
+            "", "imr,~{memory}", true, false
+          )
+        )
+        call = @builder.call(asm_fn, [params[0]])
+        call.add_instruction_attribute(
+          LLVM::AttributeIndex::FunctionIndex.to_u32,
+          LLVM::Attribute::NoUnwind, @llvm)
+        call.add_instruction_attribute(
+          LLVM::AttributeIndex::FunctionIndex.to_u32,
+          LLVM::Attribute::InaccessibleMemOrArgMemOnly, @llvm)
+        call.add_instruction_attribute(
+          LLVM::AttributeIndex::FunctionIndex.to_u32,
+          LLVM::Attribute::ReadOnly, @llvm) \
+            if param_type.kind == LLVM::Type::Kind::Pointer
+        gen_none
+      when "observe_side_effects"
+        asm_fn = LLVM::Function.from_value(
+          LLVM::Type.function([] of LLVM::Type, @void).inline_asm(
+            "", "~{memory}", true, false
+          )
+        )
+        call = @builder.call(asm_fn)
+        call.add_instruction_attribute(
+          LLVM::AttributeIndex::FunctionIndex.to_u32,
+          LLVM::Attribute::NoUnwind, @llvm)
+        call.add_instruction_attribute(
+          LLVM::AttributeIndex::FunctionIndex.to_u32,
+          LLVM::Attribute::InaccessibleMemOrArgMemOnly, @llvm)
+        gen_none
+      else
+        raise NotImplementedError.new(gfunc.func.ident.value)
+      end
+
+    gen_func_end
+  end
+
   def gen_intrinsic(gtype, gfunc, llvm_func)
     return gen_intrinsic_cpointer(gtype, gfunc, llvm_func) if gtype.type_def.is_cpointer?(ctx)
     return gen_intrinsic_platform(gtype, gfunc, llvm_func) if gtype.type_def.is_platform?(ctx)
+    return gen_intrinsic_inhibit_optimization(gtype, gfunc, llvm_func) if gtype.type_def.is_inhibit_optimization?(ctx)
 
     raise NotImplementedError.new(gtype.type_def) \
       unless gtype.type_def.is_numeric?(ctx)
