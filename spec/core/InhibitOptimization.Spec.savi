@@ -1,0 +1,15 @@
+:class Savi.InhibitOptimization.Spec
+  :is Spec
+  :const describes: "InhibitOptimization"
+
+  :it "observes a result"
+    // The effects of calling this function on optimizations are not really
+    // testable, but we can at least test that the function can be called
+    // (that code generation of the intrinsic is successful).
+    InhibitOptimization.ObserveResult(U64)[99]
+
+  :it "observes side effects"
+    // The effects of calling this function on optimizations are not really
+    // testable, but we can at least test that the function can be called
+    // (that code generation of the intrinsic is successful).
+    InhibitOptimization.observe_side_effects

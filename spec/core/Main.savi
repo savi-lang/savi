@@ -9,6 +9,7 @@
       Spec.Run(Savi.CPointer.Spec).new(env)
       Spec.Run(Savi.Indexable.Spec).new(env)
       Spec.Run(Savi.Inspect.Spec).new(env)
+      Spec.Run(Savi.InhibitOptimization.Spec).new(env)
       Spec.Run(Savi.None.Spec).new(env)
       Spec.Run(Savi.Numeric.Spec).new(env)
       Spec.Run(Savi.Platform.Spec).new(env)

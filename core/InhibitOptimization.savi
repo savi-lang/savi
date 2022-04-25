@@ -1,0 +1,78 @@
+// TODO: Replace `InhibitOptimization.ObserveResult(A)[a]` with
+// a new generic function `InhibitOptimization.observe_result(a)` when
+// generic functions are ready to be used in the language.
+:module InhibitOptimization.ObserveResult(A)
+  :: Hint that the compiler should avoid optimizing away the given value,
+  :: which is typically the result of some computation that is otherwise unused.
+  ::
+  :: This is typically used in benchmarking, along with the
+  :: `InhibitOptimization.observe_side_effects` function.
+  ::
+  :: Under normal circumstances, if the compiler can detect that a given result
+  :: value is not used by the program, the compiler is free to optimize the
+  :: the program in such a way that it completely removes the computation that
+  :: produced it and doesn't even bother to produce the result value in any way.
+  ::
+  :: If a tree falls in the middle of the forest, and nobody is around to
+  :: collect the fallen wood, the compiler is allowed to simulate a forest
+  :: in which the tree had never even existed in the first place.
+  ::
+  :: That kind of optimization is undesirable when benchmarking, because it
+  :: means that the true computation's duration is not actually being measured.
+  ::
+  :: This function acts like an observation of the result value, indicating that
+  :: the program is still expected to produce the correct result value somehow,
+  :: even if the compiler heavily optimizes the computation used to produce it.
+  ::
+  :: Note that in the extreme case (such as when the computation is statically
+  :: known by the compiler to produce a particular constant value) the
+  :: computation can still be optimized away - but in these cases the fact
+  :: that the computation is optimized away reflects a truth about how fast the
+  :: the optimized computation is, and is thus still a valid benchmark result.
+  ::
+  :: Note that in many cases, this function is not enough by itself to
+  :: completely prevent undesired optimizations. It is often necessary to use
+  :: it in conjunction with the `InhibitOptimization.observe_side_effects`
+  :: function, which can observe effects beyond just the immediate result value,
+  :: and prevent those other effects from being optimized away in the program.
+  ::
+  :: Usually the right approach for benchmarking is to first call the
+  :: `InhibitOptimization.ObserveResult.[]` with any value(s) produced by
+  :: the computation being benchmarked, then follow that with a call
+  :: to the `InhibitOptimization.observe_side_effects` function.
+  :fun "[]"(a A) None: compiler intrinsic
+
+:module InhibitOptimization
+  :: Hint that the compiler should avoid optimizing away side effects
+  :: from operations happening prior to this function call.
+  ::
+  :: This is typically used in benchmarking, along with the
+  :: `InhibitOptimization.ObserveResult.[]` function.
+  ::
+  :: Under normal circumstances, if the compiler can detect that side effects
+  :: (such as writes to various places in memory) are not observed by any reads
+  :: from memory occurring later in the program, the compiler is free to
+  :: optimize the program in such a way that completely removes those writes
+  :: and any computation that was done to produce the values that were written.
+  ::
+  :: If a tree falls in the middle of the forest, and nobody is around to notice
+  :: the smaller trees that were knocked down during its fall, the compiler is
+  :: allowed to simulate a forest in which none of those trees existed.
+  ::
+  :: This function acts like an observation of all accessible program memory,
+  :: indicating that the program is still expected to enact the writes that
+  :: happened in the program prior to this function being called, even if
+  :: the compiler heavily optimizes the operations that did those writes.
+  ::
+  :: Note that in many cases, this function is not enough by itself to
+  :: completely prevent undesired optimizations. It is often necessary to use
+  :: it in conjunction with the `InhibitOptimization.ObserveResult.[]` function,
+  :: which can observe values in the local block scope which may otherwise
+  :: not ever be materialized into program memory at all, and thus would
+  :: not fall under the domain of the side effects observable by this function.
+  ::
+  :: Usually the right approach for benchmarking is to first call the
+  :: `InhibitOptimization.ObserveResult.[]` with any value(s) produced by
+  :: the computation being benchmarked, then follow that with a call
+  :: to the `InhibitOptimization.observe_side_effects` function.
+  :fun observe_side_effects None: compiler intrinsic

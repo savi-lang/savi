@@ -492,6 +492,12 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
       @reified.defn(ctx).ident.value == "Platform"
     end
 
+    def is_inhibit_optimization?(ctx)
+      # TODO: less hacky here
+      name = @reified.defn(ctx).ident.value
+      name == "InhibitOptimization" || name.starts_with?("InhibitOptimization.")
+    end
+
     def cpointer_type_arg(ctx)
       raise "not a cpointer" unless is_cpointer?(ctx)
       Ref.new(@reified.args.first.simplify(ctx))
