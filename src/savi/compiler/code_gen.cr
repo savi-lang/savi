@@ -2160,6 +2160,20 @@ class Savi::Compiler::CodeGen
     rhs = gen_expr(relate.rhs)
     pred = positive_check ? LLVM::IntPredicate::EQ : LLVM::IntPredicate::NE
 
+    # If the values are floating point values, they should be compared by their
+    # bits, so that we can avoid complexities with things like NaN comparison.
+    # We define floating point identity to be defined in terms of its bits.
+    if lhs.type.kind == LLVM::Type::Kind::Double
+      lhs = @builder.bit_cast(lhs, @i64)
+    elsif lhs.type.kind == LLVM::Type::Kind::Float
+      lhs = @builder.bit_cast(lhs, @i32)
+    end
+    if rhs.type.kind == LLVM::Type::Kind::Double
+      rhs = @builder.bit_cast(rhs, @i64)
+    elsif rhs.type.kind == LLVM::Type::Kind::Float
+      rhs = @builder.bit_cast(rhs, @i32)
+    end
+
     if lhs.type.kind == LLVM::Type::Kind::Integer \
     && rhs.type.kind == LLVM::Type::Kind::Integer
       if lhs.type == rhs.type

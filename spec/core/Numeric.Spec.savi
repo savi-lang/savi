@@ -284,6 +284,30 @@
     assert: I32[-30] < 6
     assert: I32[6] > -30
 
+  :it "checks identity equality of integers by value"
+    assert: U32[12] === U32[12]
+    assert: I32[12] === I32[12]
+    assert: (U32[12] === U32[36]).is_false
+    assert: (I32[12] === I32[36]).is_false
+    assert: (U32[12] !== U32[12]).is_false
+    assert: (I32[12] !== I32[12]).is_false
+    assert: U32[12] !== U32[36]
+    assert: I32[12] !== I32[36]
+
+  :it "checks identity equality of floating point values by their bits"
+    assert: F32[12] === F32[12]
+    assert: F64[12] === F64[12]
+    assert: (F32[12] === F32[36]).is_false
+    assert: (F64[12] === F64[36]).is_false
+    assert: (F32[12] !== F32[12]).is_false
+    assert: (F64[12] !== F64[12]).is_false
+    assert: F32[12] !== F32[36]
+    assert: F64[12] !== F64[36]
+    assert: F32.nan === F32.nan // NaN values are comparable by their bits
+    assert: F64.nan === F64.nan // NaN values are comparable by their bits
+    assert: F32.nan !== F32[36]
+    assert: F64.nan !== F64[36]
+
   :it "applies arithmetic operations"
     assert: U32[6]  + 30  == 36
     assert: I32[-6] + 30  == 24
