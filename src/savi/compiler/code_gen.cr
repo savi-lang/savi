@@ -866,15 +866,33 @@ class Savi::Compiler::CodeGen
   def gen_ffi_call(gfunc, args)
     llvm_ffi_func = gen_ffi_decl(gfunc)
 
+    # Sometimes different user libraries may bind to the same
+    # FFI function with different (but ABI-compatible) signatures.
+    # In such a case, the first binding "wins" and the other one
+    # ends up with possible different (but ABI-compatible) LLVM types,
+    # so we must cast the arguments to the appropriate types here.
+    param_types = llvm_ffi_func.type.element_type.params_types
+    cast_args = [] of LLVM::Value
+    args.each_with_index { |arg, index|
+      param_type = param_types[index]?
+      cast_args <<
+        if param_type && arg.type != param_type
+          @builder.bit_cast(arg, param_type, "#{arg.name}.FFICAST")
+        else
+          arg
+        end
+    }
+
+    # Now call the FFI function, according to its convention.
     case gfunc.calling_convention
     when GenFunc::Simple
-      value = @builder.call llvm_ffi_func, args
+      value = @builder.call llvm_ffi_func, cast_args
       value = gen_none if llvm_ffi_func.return_type == @void
       value
     when GenFunc::Errorable
       then_block = gen_block("invoke_then")
       else_block = gen_block("invoke_else")
-      value = @builder.invoke llvm_ffi_func, args, then_block, else_block
+      value = @builder.invoke llvm_ffi_func, cast_args, then_block, else_block
       value = gen_none if llvm_ffi_func.return_type == @void
 
       # In the else block, make a landing pad to catch the Pony-style error,
@@ -893,6 +911,15 @@ class Savi::Compiler::CodeGen
     else
       raise NotImplementedError.new(gfunc.calling_convention)
     end
+
+    # And possibly cast the return type, for the same reasons
+    # that we possibly cast the argument types earlier above.
+    ret_type = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
+    if value.type != ret_type
+      value = @builder.bit_cast(value, ret_type, "#{value.name}.FFICAST")
+    end
+
+    value
   end
 
   def gen_intrinsic_cpointer(gtype, gfunc, llvm_func)
