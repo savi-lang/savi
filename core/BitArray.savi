@@ -13,11 +13,11 @@
     @_ptr = CPointer(U64)._null
 
   :fun ref _ptr_allocate(space USize)
-    @_space = space.next_pow2.max(space).max(64)
+    @_space = space.next_pow2.at_least(space).at_least(64)
     @_ptr = CPointer(U64)._alloc(@_u64_space)
 
   :fun ref _ptr_reallocate(space USize)
-    @_space = space.next_pow2.max(space).max(64)
+    @_space = space.next_pow2.at_least(space).at_least(64)
     @_ptr = @_ptr._realloc(@_u64_space)
 
   :fun _ptr_get_at(index USize) Bool
@@ -65,7 +65,7 @@
   :fun is_not_empty: @_size != 0
   :fun ref clear: @_size = 0, @
 
-  :fun ref truncate(size): @_size = @_size.min(size)
+  :fun ref truncate(size): @_size = @_size.at_most(size)
 
   :: Reserve enough total space for the given number of bits.
   :: The size (number of actual bits present in the array) does not change.
@@ -145,7 +145,7 @@
     to = USize.max_value
     stride USize = 1
   )
-    to = @_size.min(to)
+    to = @_size.at_most(to)
     index = from
     while (index < to) (
       // TODO: it should be possible to do fewer underlying pointer loads
@@ -163,7 +163,7 @@
     stride USize = 1
   )
     try (
-      index USize = @_size.min(from) -! 1
+      index USize = @_size.at_most(from) -! 1
       while (index >= to) (
         // TODO: it should be possible to do fewer underlying pointer loads
         // by batching with an inner loop when the stride is less than 64

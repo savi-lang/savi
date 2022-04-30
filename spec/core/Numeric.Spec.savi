@@ -331,11 +331,14 @@
     assert: I8[-128] / -1 == 0
     assert: I8[-128] / -1 == 0
 
-  :it "finds the minimum or maximum value between the two compared values"
-    assert: U32[6].min(30) == 6
-    assert: U32[30].min(6) == 6
-    assert: U32[30].max(6) == 30
-    assert: U32[6].max(30) == 30
+  :it "limits a value to be at least a given minimum or at most a given maximum"
+    assert: 89.at_least(90) == 90
+    assert: 90.at_least(90) == 90
+    assert: 91.at_least(90) == 91
+
+    assert: 99.at_most(100) == 99
+    assert: 100.at_most(100) == 100
+    assert: 101.at_most(100) == 100
 
   :it "finds the absolute value"
     assert: U32[36]  .abs == 36
