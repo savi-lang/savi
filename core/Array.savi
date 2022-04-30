@@ -13,11 +13,11 @@
     @_ptr = CPointer(A)._null
 
   :fun ref _ptr_allocate(space USize)
-    @_space = space.next_pow2.max(space).max(8)
+    @_space = space.next_pow2.clamp_min(space).clamp_min(8)
     @_ptr = CPointer(A)._alloc(@_space)
 
   :fun ref _ptr_reallocate(space USize)
-    @_space = space.next_pow2.max(space).max(8)
+    @_space = space.next_pow2.clamp_min(space).clamp_min(8)
     @_ptr = @_ptr._realloc(@_space)
 
   :new (space USize = 0)
@@ -36,11 +36,11 @@
   :fun is_not_empty: @_size != 0
   :fun ref clear: @_size = 0, @
 
-  :fun ref truncate(size): @_size = @_size.min(size)
+  :fun ref truncate(size): @_size = @_size.clamp_max(size)
 
   :fun val trim(from USize, to USize = -1)
-    to = to.min(@_size)
-    from = from.min(to)
+    to = to.clamp_max(@_size)
+    from = from.clamp_max(to)
     size = to - from
 
     space = if (to == @_size) (
@@ -65,8 +65,8 @@
     @val_from_cpointer(ptr, size, space)
 
   :fun ref trim_in_place(from USize, to USize = -1)
-    to = to.min(@_size)
-    from = from.min(to)
+    to = to.clamp_max(@_size)
+    from = from.clamp_max(to)
     size = to - from
 
     if (to == @_size) (
@@ -195,7 +195,7 @@
     to = USize.max_value
     stride USize = 1
   )
-    to = @_size.min(to)
+    to = @_size.clamp_max(to)
     index = from
     while (index < to) (
       yield (@_ptr._get_at(index), index)
@@ -209,7 +209,7 @@
     stride USize = 1
   )
     try (
-      index USize = @_size.min(from) -! 1
+      index USize = @_size.clamp_max(from) -! 1
       while (index >= to) (
         yield (@_ptr._get_at(index), index)
         index = index -! stride

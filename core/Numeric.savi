@@ -465,10 +465,43 @@
   :is Comparable(T)
 
   :: Return whichever value is the minimum of this value and the other value.
+  ::
+  :: Use the `clamp_max` alias for readability when the given other value is
+  :: meant to be seen as an upper limit for the range of possible values.
+  :: The behavior is the same, but it is confusing to the reader when the
+  :: `min` method is used to enforce a "maximum" limit on the range of values.
   :fun val min(other T) T
 
   :: Return whichever value is the maximum of this value and the other value.
+  ::
+  :: Use the `clamp_min` alias for readability when the given other value is
+  :: meant to be seen as a lower limit for the range of possible values.
+  :: The behavior is the same, but it is confusing to the reader when the
+  :: `max` method is used to enforce a "minimum" limit on the range of values.
   :fun val max(other T) T
+
+  :: If this value is less than the given maximum value, return it.
+  :: Otherwise return the given maximum value.
+  ::
+  :: This is an alias for the `min` method, which has the same behavior,
+  :: but this alias is provided to reduce reader confusion in cases where the
+  :: intent is to enforce a maximum limit (where the name `min` may confuse).
+  :fun val clamp_max(max T) T: @min(max)
+
+  :: If this value is greater than the given minimum value, return it.
+  :: Otherwise return the given minimum value.
+  ::
+  :: This is an alias for the `max` method, which has the same behavior,
+  :: but this alias is provided to reduce reader confusion in cases where the
+  :: intent is to enforce a minimum limit (where the name `max` may confuse).
+  :fun val clamp_min(min T) T: @max(min)
+
+  :: If this value is between the given minimum and maximum value, return it.
+  :: Otherwise return the given minimum value or maximum value,
+  :: depending on which of the two boundaries the value was beyond.
+  ::
+  :: This is a convenience wrapper for the `clamp_min` and `clamp_max` methods.
+  :fun val clamp(min T, max T) T: @clamp_min(min).clamp_max(max)
 
   :: Return the result of subtracting this value from zero, which will usually
   :: return a negative value of the same magnitude as the original positive,

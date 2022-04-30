@@ -19,11 +19,11 @@
     @_ptr = CPointer(U8)._null
 
   :fun ref _ptr_allocate(space USize)
-    @_space = space.next_pow2.max(space).max(8)
+    @_space = space.next_pow2.clamp_min(space).clamp_min(8)
     @_ptr = CPointer(U8)._alloc(@_space)
 
   :fun ref _ptr_reallocate(space USize)
-    @_space = space.next_pow2.max(space).max(8)
+    @_space = space.next_pow2.clamp_min(space).clamp_min(8)
     @_ptr = @_ptr._realloc(@_space)
 
   :new ref (space USize = 0)
@@ -174,7 +174,7 @@
   :: so this method cannot violate memory safety in terms of address space.
 
   :fun ref resize_possibly_including_uninitialized_memory(size USize)
-    @_size = size.min(@_space)
+    @_size = size.clamp_max(@_space)
     @
 
   :fun "[]!"(index): @byte_at!(index)
@@ -195,7 +195,7 @@
 
   :fun val trim(from ISize = 0, to = ISize.max_value)
     start = @_offset_to_index(from)
-    finish = @_offset_to_index(to).min(@size)
+    finish = @_offset_to_index(to).clamp_max(@size)
 
     if (start < @_size && start < finish) (
       size = finish - start
@@ -210,7 +210,7 @@
 
   :fun ref trim_in_place(from ISize = 0, to = ISize.max_value)
     start = @_offset_to_index(from)
-    finish = @_offset_to_index(to).min(@size)
+    finish = @_offset_to_index(to).clamp_max(@size)
 
     if (start < @_size && start < finish) (
       @_size = finish - start
@@ -231,7 +231,7 @@
     to = USize.max_value
     stride USize = 1
   )
-    to = @_size.min(to)
+    to = @_size.clamp_max(to)
     index = from
     while (index < to) (
       yield (@_ptr._get_at(index), index)
@@ -245,7 +245,7 @@
     stride USize = 1
   )
     try (
-      index USize = @_size.min(from) -! 1
+      index USize = @_size.clamp_max(from) -! 1
       while (index >= to) (
         yield (@_ptr._get_at(index), index)
         index = index -! stride
@@ -277,7 +277,7 @@
     to = ISize.max_value
   )
     start = other._offset_to_index(from)
-    finish = other._offset_to_index(to).min(other.size)
+    finish = other._offset_to_index(to).clamp_max(other.size)
 
     if (start < other._size && start < finish) (
       size = finish - start
@@ -401,13 +401,13 @@
 
   :: Discard all bytes after the given offset.
   :fun ref truncate(offset USize)
-    offset = offset.min(@_size)
+    offset = offset.clamp_max(@_size)
     @_size = offset
     @
 
   :: Discard all bytes to the left of the given offset.
   :fun ref truncate_left(offset USize)
-    offset = offset.min(@_size)
+    offset = offset.clamp_max(@_size)
     @_ptr = @_ptr._offset(offset)
     @_size -= offset
     @_space -= offset
@@ -424,7 +424,7 @@
   :: If the left side later expands its size, it will then reallocate and copy,
   :: because the right side has retained claim over the right-adjacent memory.
   :fun ref chop_left(offset USize) Bytes'iso
-    offset = offset.min(@_size)
+    offset = offset.clamp_max(@_size)
     chopped = Bytes.iso_from_cpointer(@_ptr, offset, offset)
     @_size -= offset
     @_space -= offset
@@ -442,7 +442,7 @@
   :: If the left side later expands its size, it will then reallocate and copy,
   :: because the right side has retained claim over the right-adjacent memory.
   :fun ref chop_right(offset USize) Bytes'iso
-    offset = offset.min(@_size)
+    offset = offset.clamp_max(@_size)
     chopped = Bytes.iso_from_cpointer(
       if (@_space > offset) (@_ptr._offset(offset) | @_ptr._null)
       @_size - offset

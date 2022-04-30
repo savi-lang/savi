@@ -337,6 +337,21 @@
     assert: U32[30].max(6) == 30
     assert: U32[6].max(30) == 30
 
+  :it "clamps the value to be between the given minimum and/or maximum values"
+    assert: 89.clamp_min(90) == 90
+    assert: 90.clamp_min(90) == 90
+    assert: 91.clamp_min(90) == 91
+    assert: 99.clamp_max(100) == 99
+    assert: 100.clamp_max(100) == 100
+    assert: 101.clamp_max(100) == 100
+
+    assert: 89.clamp(90, 100) == 90
+    assert: 90.clamp(90, 100) == 90
+    assert: 91.clamp(90, 100) == 91
+    assert: 99.clamp(90, 100) == 99
+    assert: 100.clamp(90, 100) == 100
+    assert: 101.clamp(90, 100) == 100
+
   :it "finds the absolute value"
     assert: U32[36]  .abs == 36
     assert: U32[-36] .abs == -36 // -36 is an underflow literal when unsigned
