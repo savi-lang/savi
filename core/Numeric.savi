@@ -464,11 +464,19 @@
 :trait Numeric.Comparable(T Numeric(T)'val)
   :is Comparable(T)
 
-  :: Return whichever value is the minimum of this value and the other value.
-  :fun val min(other T) T
+  :: If this value is greater than the given minimum value, return it.
+  :: Otherwise return the given minimum value.
+  :fun val at_least(minimum T) T
 
-  :: Return whichever value is the maximum of this value and the other value.
+  :: DEPRECATED: use the `at_least` method instead.
   :fun val max(other T) T
+
+  :: If this value is less than the given maximum value, return it.
+  :: Otherwise return the given maximum value.
+  :fun val at_most(maximum T) T
+
+  :: DEPRECATED: use the `at_most` method instead.
+  :fun val min(other T) T
 
   :: Return the result of subtracting this value from zero, which will usually
   :: return a negative value of the same magnitude as the original positive,
@@ -549,8 +557,10 @@
   :fun ">"(other @'box) Bool: compiler intrinsic
   :fun ">="(other @'box) Bool: compiler intrinsic
   :fun val negate: @zero - @
-  :fun val min(other @) @: if (@ < other) (@ | other)
-  :fun val max(other @) @: if (@ > other) (@ | other)
+  :fun val at_least(minimum @) @: if (@ > minimum) (@ | minimum)
+  :fun val at_most(maximum @) @: if (@ < maximum) (@ | maximum)
+  :fun val max(other @) @: @at_least(other)
+  :fun val min(other @) @: @at_most(other)
   :fun val abs: if (@is_signed && @ < @zero) (@zero - @ | @)
 
 :: The standard 8-bit unsigned integer numeric type.
