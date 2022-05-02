@@ -60,8 +60,9 @@ module Savi::Compiler::ReferType
 
   class Visitor < Savi::AST::Visitor
     getter analysis : Analysis
+    getter package : Program::Package::Link
     getter namespace : Namespace::Analysis
-    def initialize(@analysis, @namespace)
+    def initialize(@analysis, @package, @namespace)
     end
 
     def find_type?(ctx, node : AST::Identifier)
@@ -70,12 +71,12 @@ module Savi::Compiler::ReferType
       found = @analysis.type_param_for?(node.value)
       return found if found
 
-      if node.pos.source == namespace.source
+      if node.pos.source.package == @package.source_package
         found = namespace[node.value]?
       else
-        # If the identifier comes from a foreign source file, we need to use
-        # the distinct namespace analysis associated with that source file.
-        foreign_namespace = ctx.namespace[node.pos.source]?
+        # If the identifier comes from a foreign source package, we need to use
+        # the distinct namespace analysis associated with that source package.
+        foreign_namespace = ctx.namespace[node.pos.source.package]?
         if foreign_namespace
           found = foreign_namespace[node.value]?
           # If found in a foreign namespace analysis, we need to accure that
@@ -135,12 +136,12 @@ module Savi::Compiler::ReferType
     end
 
     def analyze_type_alias(ctx, t, t_link) : Analysis
-      namespace = ctx.namespace[t.ident.pos.source]
+      namespace = ctx.namespace[t_link.package]
       prev = ctx.prev_ctx.try(&.refer_type)
 
       prev_namespaces = prev.try(&.[]?(t_link)
         .try(&.cache_deps_additional_namespaces
-          .keys.map { |source| ctx.namespace[source] }
+          .keys.map { |source| ctx.namespace[source.package] }
         )
       )
 
@@ -150,7 +151,7 @@ module Savi::Compiler::ReferType
         observe_type_params(ctx, t, t_link, t_analysis)
 
         # Run as a visitor on the ident itself and every type param.
-        visitor = Visitor.new(t_analysis, namespace)
+        visitor = Visitor.new(t_analysis, t_link.package, namespace)
         t.ident.accept(ctx, visitor)
         t.params.try(&.accept(ctx, visitor))
 
@@ -169,12 +170,12 @@ module Savi::Compiler::ReferType
     end
 
     def analyze_type(ctx, t, t_link) : Analysis
-      namespace = ctx.namespace[t.ident.pos.source]
+      namespace = ctx.namespace[t_link.package]
       prev = ctx.prev_ctx.try(&.refer_type)
 
       prev_namespaces = prev.try(&.[]?(t_link)
         .try(&.cache_deps_additional_namespaces
-          .keys.map { |source| ctx.namespace[source] }
+          .keys.map { |source| ctx.namespace[source.package] }
         )
       )
 
@@ -184,7 +185,7 @@ module Savi::Compiler::ReferType
         observe_type_params(ctx, t, t_link, t_analysis)
 
         # Run as a visitor on the ident itself and every type param.
-        visitor = Visitor.new(t_analysis, namespace)
+        visitor = Visitor.new(t_analysis, t_link.package, namespace)
         t.ident.accept(ctx, visitor)
         t.params.try(&.accept(ctx, visitor))
 
@@ -199,19 +200,19 @@ module Savi::Compiler::ReferType
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
-      namespace = ctx.namespace[f.ident.pos.source]
+      namespace = ctx.namespace[f_link.package]
       prev = ctx.prev_ctx.try(&.refer_type)
 
       prev_namespaces = prev.try(&.[]?(f_link)
         .try(&.cache_deps_additional_namespaces
-          .keys.map { |source| ctx.namespace[source] }
+          .keys.map { |source| ctx.namespace[source.package] }
         )
       )
 
       deps = {namespace, prev_namespaces}
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
         f_analysis = Analysis.new(t_analysis)
-        visitor = Visitor.new(f_analysis, namespace)
+        visitor = Visitor.new(f_analysis, f_link.package, namespace)
 
         f.ast.accept(ctx, visitor)
 

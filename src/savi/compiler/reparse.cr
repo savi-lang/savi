@@ -70,7 +70,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
 
   def self.run(ctx, package)
     package = package.types_map_cow do |t|
-      t_namespace = ctx.namespace[t.ident.pos.source]
+      t_namespace = ctx.namespace[t.ident.pos.source.package]
       t_deps = {t_namespace}
 
       t = t_cached_or_run ctx, package, t, t_deps do
@@ -78,7 +78,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
       end
 
       t.functions_map_cow do |f|
-        f_namespace = ctx.namespace[f.ident.pos.source]
+        f_namespace = ctx.namespace[f.ident.pos.source.package]
         f_deps = {f_namespace}
 
         cached_or_run ctx, package, t, f, f_deps do
@@ -88,7 +88,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
     end
 
     package = package.aliases_map_cow do |t|
-      t_namespace = ctx.namespace[t.ident.pos.source]
+      t_namespace = ctx.namespace[t.ident.pos.source.package]
       t_deps = {t_namespace}
 
       ta_cached_or_run ctx, package, t, t_deps do

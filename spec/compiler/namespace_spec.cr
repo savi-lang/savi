@@ -9,7 +9,7 @@ describe Savi::Compiler::Namespace do
     ctx1 = Savi.compiler.test_compile([source], :namespace)
     ctx2 = Savi.compiler.test_compile([source], :namespace)
 
-    ctx1.namespace[source].should eq ctx2.namespace[source]
+    ctx1.namespace[source.package].should eq ctx2.namespace[source.package]
   end
 
   # TODO: Figure out how to test these in our test suite - they need a package.

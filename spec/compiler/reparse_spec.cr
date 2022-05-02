@@ -153,7 +153,7 @@ describe Savi::Compiler::Reparse do
       ]
     ]
 
-    type = ctx.namespace[source]["Example"].resolve(ctx).as(Savi::Program::Type)
+    type = ctx.namespace[source.package]["Example"].resolve(ctx).as(Savi::Program::Type)
     func = ctx.namespace.find_func!(ctx, source, "Example", "example")
     type.params.not_nil!.to_a.should eq [:group, "(", [:relate,
       [:ident, "T"],

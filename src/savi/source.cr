@@ -28,12 +28,12 @@ end
 
 struct Savi::Source::Package
   property path : String
-  property name : String?
+  property name : String
 
-  def initialize(@path, @name = nil)
+  def initialize(@path, @name)
   end
 
-  NONE = new("")
+  NONE = new("", "(none)")
   def self.none; NONE end
 
   def self.for_manifest(manifest : Packaging::Manifest)

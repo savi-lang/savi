@@ -73,9 +73,13 @@ class Savi::Program
       Link.new(source_package.path, source_package.name)
     end
 
+    def self.link(source_package : Source::Package)
+      Link.new(source_package.path, source_package.name)
+    end
+
     struct Link
       getter path : String
-      getter name : String?
+      getter name : String
       def initialize(@path, @name)
       end
       def source_package
@@ -472,6 +476,7 @@ class Savi::Program
       def initialize(@type, @name, @hygienic_id)
       end
       def is_hygienic?; hygienic_id != nil; end
+      def package; type.package; end
       def resolve(ctx : Compiler::Context)
         functions = @type.resolve(ctx).functions
         if hygienic_id

@@ -233,7 +233,7 @@ class Savi::Compiler
     loop {
       sources =
         if options.skip_manifest
-          source_service.get_directory_sources(dirname)
+          source_service.get_directory_sources(dirname, Source::Package::NONE)
         else
           source_service.get_manifest_sources_at_or_above(dirname)
         end
