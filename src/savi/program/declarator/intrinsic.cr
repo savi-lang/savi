@@ -47,7 +47,7 @@ module Savi::Program::Intrinsic
           type_alias.target = body.terms.first
         }
       when "actor", "class", "struct", "trait",
-           "numeric", "enum", "module", "ffimodule"
+           "numeric", "enum", "module"
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
@@ -85,9 +85,6 @@ module Savi::Program::Intrinsic
           type.add_tag(:numeric)
           type.add_tag(:enum)
         when "module"
-          type.add_tag(:singleton)
-          type.add_tag(:ignores_cap)
-        when "ffimodule"
           type.add_tag(:singleton)
           type.add_tag(:ignores_cap)
         else
@@ -199,7 +196,7 @@ module Savi::Program::Intrinsic
       end
 
     # Declarations within a type definition.
-    when "type", "type_singleton", "ffimodule"
+    when "type", "type_singleton"
       case declarator.name.value
       when "it"
         name = terms["name"].as(AST::LiteralString)
@@ -606,19 +603,6 @@ module Savi::Program::Intrinsic
       # A trait's functions should have their body removed.
       scope.current_type.functions.each { |f|
         f.body = nil if f.body.try(&.terms).try(&.empty?)
-      }
-
-      scope.current_package.types << scope.current_type
-      scope.current_type = nil
-    when "ffimodule"
-      # An FFI module's functions should be tagged as "ffi" and body removed.
-      scope.current_type.functions.each { |f|
-        f.add_tag(:ffi)
-        f.add_tag(:inline)
-        ffi_link_name = f.ident.value
-        ffi_link_name = ffi_link_name[0...-1] if ffi_link_name.ends_with?("!")
-        f.metadata[:ffi_link_name] = ffi_link_name
-        f.body = nil
       }
 
       scope.current_package.types << scope.current_type

@@ -283,26 +283,6 @@
     :default non
   :term name_and_params NameMaybeWithParams
 
-:: Declare a static singleton object exposing unsafe foreign functions (C-FFI).
-::
-:: An `:ffimodule` declaration is similar to a `:module` in that it cannot be
-:: instantiated, and it can only have `:fun non` functions.
-::
-:: However, rather than implementing functions with bodies, FFI declarations
-:: are used for binding foreign functions, so they declare no function bodies.
-::
-:: Each function signature in an FFI declaration should directly correspond
-:: to a function exposed by a foreign package which is linked to the program.
-::
-:: DEPRECATED: Use `:ffi` functions on a `:module` instead
-:declarator ffimodule
-  :intrinsic
-  :begins type_singleton
-
-  :term cap enum (iso, val, ref, box, tag, non)
-    :default non
-  :term name_and_params NameMaybeWithParams
-
 // TODO: Document this.
 :declarator alias
   :intrinsic
@@ -376,7 +356,36 @@
     :optional
   :body optional
 
-// TODO: Document this.
+:: Declare a binding to an unsafe foreign functions (FFI), such as a C function.
+::
+:: It is common to define such bindings on a dedicated private module, which is
+:: usually, by convention, named `_FFI` to make it clear at call sites.
+::
+:: Because FFI bindings are inherently unsafe, it becomes the job of FFI-using
+:: library authors to guarantee safety of the packages they publish.
+:: FFI functions should never be exposed directly as a public feature - they
+:: should be carefully wrapped in a library-specific way that can guarantee
+:: memory safety, concurrency safety, and capability security safety,
+:: up to the same high standards as the Savi standard library.
+::
+:: This can be easier said than done. When in doubt, avoid using FFI bindings
+:: and prefer implementing features in pure Savi code where possible, or
+:: ask for an FFI library safety review from experienced community members.
+::
+:: An `:ffi` declaration is similar to a `:fun` in that it declares the name,
+:: parameters, and return type of a function. It accepts no body declaration,
+:: because the implementation of the function is external (such as a C library).
+::
+:: If the `variadic` term is specified, then the function will accept any
+:: number of arbitrary arguments beyond the ones specified in its signature.
+:: This should only be used for truly variadic functions (e.g. `sprintf`) and
+:: should not be used as a lazy shortcut to avoid defining parameters or as
+:: a workaround for allowing different Savi types to fulfill the same C type,
+:: because while that works on certain platform ABIs, it will break on others
+:: (such as on Apple ARM64).
+::
+:: Each function signature in an FFI declaration should directly correspond
+:: to a function exposed by a foreign package which is linked to the program.
 :declarator ffi
   :intrinsic
   :context type
