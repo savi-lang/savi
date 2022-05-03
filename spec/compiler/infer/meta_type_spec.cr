@@ -11,7 +11,7 @@ describe Savi::Compiler::Infer::MetaType do
 
   it "implements logical operators that keep the expression in DNF form" do
     package = Savi::Program::Package.new(
-      Savi::Source::Package.new("(example)")
+      Savi::Source::Package.new("", "(example)")
     )
 
     new_type = ->(s : String, is_abstract : Bool) {

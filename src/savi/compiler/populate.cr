@@ -97,13 +97,13 @@ class Savi::Compiler::Populate
       case ret
       when AST::Identifier
         source_ident = ret
-        source_link = ctx.namespace[source_ident.pos.source][source_ident.value]?
+        source_link = ctx.namespace[source_ident.pos.source.package][source_ident.value]?
         Error.at ret, "This type couldn't be resolved" unless source_link
         source_link = source_link.as(Program::Type::Link) # TODO: handle cases of Program::TypeAlias::Link or type param
         source_defn = source_link.resolve(ctx)
       when AST::Qualify
         source_ident = ret.term.as(AST::Identifier)
-        source_link = ctx.namespace[source_ident.pos.source][source_ident.value]?
+        source_link = ctx.namespace[source_ident.pos.source.package][source_ident.value]?
         Error.at ret, "This type couldn't be resolved" unless source_link
         source_link = source_link.as(Program::Type::Link) # TODO: handle cases of Program::TypeAlias::Link or type param
         source_defn = source_link.resolve(ctx)

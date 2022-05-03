@@ -167,7 +167,7 @@ class Savi::Server
   def handle(req : LSP::Message::Formatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_directory_sources(dirname)
+    sources = Savi.compiler.source_service.get_directory_sources(dirname, Source::Package::NONE)
     options = Savi::Compiler::Options.new
     options.skip_manifest = true
 
@@ -190,7 +190,7 @@ class Savi::Server
   def handle(req : LSP::Message::RangeFormatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_directory_sources(dirname)
+    sources = Savi.compiler.source_service.get_directory_sources(dirname, Source::Package::NONE)
     options = Savi::Compiler::Options.new
     options.skip_manifest = true
 
@@ -214,7 +214,7 @@ class Savi::Server
   def handle(req : LSP::Message::OnTypeFormatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_directory_sources(dirname)
+    sources = Savi.compiler.source_service.get_directory_sources(dirname, Source::Package::NONE)
     options = Savi::Compiler::Options.new
     options.skip_manifest = true
 
@@ -235,7 +235,7 @@ class Savi::Server
   def handle(req : LSP::Message::Completion)
     pos = req.params.position
     path = req.params.text_document.uri.path
-    source = Savi.compiler.source_service.get_source_at(path)
+    source = Savi.compiler.source_service.get_source_at(path, Source::Package::NONE)
     text = source.content
 
     @wire.respond req do |msg|

@@ -15,10 +15,10 @@ describe Savi::Compiler::ReferType do
     ctx1.errors.should be_empty
     ctx2.errors.should be_empty
 
-    t_link_g = ctx1.namespace[source]["Greeting"].as(Savi::Program::Type::Link)
+    t_link_g = ctx1.namespace[source.package]["Greeting"].as(Savi::Program::Type::Link)
     f_link_g = t_link_g.make_func_link_simple("greet")
 
-    t_link_m = ctx1.namespace[source]["Main"].as(Savi::Program::Type::Link)
+    t_link_m = ctx1.namespace[source.package]["Main"].as(Savi::Program::Type::Link)
     f_link_m = t_link_m.make_func_link_simple("new")
 
     # Prove that the output states are the same.

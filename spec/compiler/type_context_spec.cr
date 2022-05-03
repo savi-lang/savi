@@ -16,7 +16,7 @@ describe Savi::Compiler::TypeContext do
     ctx = Savi.compiler.test_compile([source], :type_context)
     ctx.errors.should be_empty
 
-    t_link = ctx.namespace[source]["Container"].as(Savi::Program::Type::Link)
+    t_link = ctx.namespace[source.package]["Container"].as(Savi::Program::Type::Link)
     f_link = t_link.make_func_link_simple("string")
     func = f_link.resolve(ctx)
     type_context = ctx.type_context[f_link]

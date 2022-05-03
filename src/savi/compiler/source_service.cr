@@ -51,14 +51,13 @@ class Savi::Compiler::SourceService
   end
 
   # Get the source object at the given path, either an override or real file.
-  def get_source_at(path)
+  def get_source_at(path, source_package)
     dirname = File.dirname(path)
     name = File.basename(path)
     content = @source_overrides[dirname]?.try(&.[]?(name)) \
       || File.read(to_internal_path(path))
-    package = Source::Package.new(dirname)
 
-    Source.new(dirname, name, content, package)
+    Source.new(dirname, name, content, source_package)
   end
 
   # Write the given content to the source file at the given path.
@@ -227,9 +226,7 @@ class Savi::Compiler::SourceService
   end
 
   # Given a directory name, load source objects for all the source files in it.
-  def get_directory_sources(dirname, package : Source::Package? = nil)
-    package ||= Source::Package.new(dirname)
-
+  def get_directory_sources(dirname : String, package : Source::Package)
     sources = [] of Source
     each_savi_file_in(dirname) { |name, content|
       sources << Source.new(dirname, name, content, package)
@@ -253,7 +250,7 @@ class Savi::Compiler::SourceService
     try_dirname = dirname
     sources = [] of Source
     while sources.empty?
-      package = Source::Package.new(try_dirname)
+      package = Source::Package.new(try_dirname, "(manifests)")
 
       each_manifest_savi_file_in(try_dirname) { |name, content|
         sources << Source.new(try_dirname, name, content, package)
@@ -278,7 +275,7 @@ class Savi::Compiler::SourceService
   # Given a directory name, load source objects for all the source files in it.
   def get_manifest_sources_at(dirname : String)
     sources = [] of Source
-    package = Source::Package.new(dirname)
+    package = Source::Package.new(dirname, "(manifests)")
 
     each_manifest_savi_file_in(dirname) { |name, content|
       sources << Source.new(dirname, name, content, package)
@@ -338,7 +335,7 @@ class Savi::Compiler::SourceService
   def get_recursive_sources(root_dirname, language = :savi)
     sources = {} of Source::Package => Array(Source)
     each_savi_file_in_recursive(root_dirname) { |dirname, name, content|
-      package = Source::Package.new(dirname)
+      package = Source::Package.new(dirname, "(recursive)")
 
       (sources[package] ||= [] of Source) \
         << Source.new(dirname, name, content, package)
