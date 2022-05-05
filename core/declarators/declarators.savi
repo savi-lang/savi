@@ -389,12 +389,19 @@
 :declarator ffi
   :intrinsic
   :context type
+  :begins ffi
 
   :term variadic enum (variadic)
     :optional
   :term name_and_params NameMaybeWithParams
   :term ret Type
     :optional
+
+:declarator foreign_name
+  :intrinsic
+  :context ffi
+
+  :term name Name
 
 // TODO: Document this.
 :declarator inline

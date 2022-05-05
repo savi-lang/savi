@@ -544,6 +544,16 @@ module Savi::Program::Intrinsic
         raise NotImplementedError.new(declarator.pretty_inspect)
       end
 
+    # Declarations within an ffi definition.
+    when "ffi"
+      case declarator.name.value
+      when "foreign_name"
+        name = terms["name"].as(AST::Identifier)
+        scope.current_function.metadata[:ffi_link_name] = name.value
+      else
+        raise NotImplementedError.new(declarator.pretty_inspect)
+      end
+
     # Declarations within a function definition.
     when "function"
       case declarator.name.value
