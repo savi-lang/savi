@@ -1,10 +1,11 @@
 :module _FFI
-  :ffi variadic printf(format CPointer(U8)) I32
+  :ffi variadic libc_printf(format CPointer(U8)) I32
+    :foreign_name printf // (we use this just to test `:foreign_name` here)
 
 :class MicroTest
   :var env Env
   :new (@env)
-  :fun non _printf(f String, t String): _FFI.printf(f.cstring, t.cstring)
+  :fun non _printf(f String, t String): _FFI.libc_printf(f.cstring, t.cstring)
   :fun non print_line_break: @_printf("%s", "\n")
   :fun "[]"(text String) MicroTestInstance
     MicroTestInstance.new(@env, text)
