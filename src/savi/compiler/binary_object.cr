@@ -55,6 +55,10 @@ class Savi::Compiler::BinaryObject
       elsif target.arm64?
         return "arm64-apple-macosx"
       end
+    elsif target.windows?
+      if target.x86_64? && target.msvc?
+        return "x86_64-unknown-windows-msvc"
+      end
     end
 
     raise NotImplementedError.new(target.inspect)

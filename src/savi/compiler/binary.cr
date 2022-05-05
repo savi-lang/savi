@@ -24,6 +24,7 @@ class Savi::Compiler::Binary
   def run(ctx)
     target = Target.new(ctx.code_gen.target_machine.triple)
     bin_path = Binary.path_for(ctx)
+    bin_path += ".exe" if target.windows?
 
     # Compile a temporary binary object file, that we will remove after we
     # use it in the linker invocation to create the final binary.
@@ -36,6 +37,8 @@ class Savi::Compiler::Binary
       link_for_linux_or_bsd(ctx, target, obj_path, bin_path)
     elsif target.macos?
       link_for_macosx(ctx, target, obj_path, bin_path)
+    elsif target.windows?
+      link_for_windows(ctx, target, obj_path, bin_path)
     else
       raise NotImplementedError.new(target.inspect)
     end
@@ -75,7 +78,9 @@ class Savi::Compiler::Binary
 
     # Set up the main library paths.
     # TODO: Support overriding (supplementing?) this via the `SDK_ROOT` env var.
-    each_sysroot_lib_path(target) { |lib_path| link_args << "-L#{lib_path}" }
+    each_sysroot_lib_path(ctx, target) { |lib_path|
+      link_args << "-L#{lib_path}"
+    }
 
     # Link the main system libraries.
     link_args << "-lSystem"
@@ -92,6 +97,29 @@ class Savi::Compiler::Binary
 
     # Invoke the linker, using the MachO flavor.
     invoke_linker("mach_o", link_args)
+  end
+
+  # Link a EXE executable for a Windows target.
+  def link_for_windows(ctx, target, obj_path, bin_path)
+    link_args = %w{lld-link -nologo -defaultlib:libcmt -defaultlib:oldnames}
+
+    # Set up the main library paths.
+    each_sysroot_lib_path(ctx, target) { |lib_path|
+      link_args << "-libpath:#{lib_path}"
+    }
+
+    # Specify the base set of libraries to link to.
+    link_args << "-defaultlib:libcmt"   # always needed
+    link_args << "-defaultlib:oldnames" # always needed
+    link_args << "-defaultlib:dbghelp"  # used by runtime platform/ponyassert.c
+    link_args << "-defaultlib:ws2_32"   # used by runtime lang/socket.c
+
+    # Finally, specify the input object file and the output filename.
+    link_args << obj_path
+    link_args << "-out:#{bin_path}"
+
+    # Invoke the linker, using the COFF flavor.
+    invoke_linker("coff", link_args)
   end
 
   # Link an ELF executable for a Linux or FreeBSD target.
@@ -118,7 +146,7 @@ class Savi::Compiler::Binary
 
     # Get the list of lib search paths within the sysroot.
     lib_paths = [] of String
-    each_sysroot_lib_path(target) { |path| lib_paths << path }
+    each_sysroot_lib_path(ctx, target) { |path| lib_paths << path }
     lib_paths.each { |lib_path| link_args << "-L#{lib_path}" }
 
     # Also find the mandatory ceremony objects that all programs need to link.
@@ -173,11 +201,11 @@ class Savi::Compiler::Binary
   end
 
   # Yield each sysroot-based path in which to search for linkable libs/objs.
-  def each_sysroot_lib_path(target)
+  def each_sysroot_lib_path(ctx, target)
     sysroot = "/" # TODO: Allow user to supply custom sysroot for cross-compile.
 
     yielded_any = false
-    each_sysroot_lib_glob(target) { |lib_glob|
+    each_sysroot_lib_glob(ctx, target) { |lib_glob|
       Dir.glob(lib_glob) { |lib_path|
         next unless Dir.exists?(lib_path)
 
@@ -190,10 +218,26 @@ class Savi::Compiler::Binary
   end
 
   # Yield each sysroot-based glob used to find paths that exist.
-  def each_sysroot_lib_glob(target)
+  def each_sysroot_lib_glob(ctx, target)
     # For MacOS, we have just one valid sysroot path, so we can finish early.
     if target.macos?
       yield "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+      return
+    end
+
+    # For Windows we only allow cross compiling and require this env var.
+    if target.windows?
+      unless ctx.options.cross_compile
+        raise NotImplementedError.new("Windows is only supported by cross-compiling.")
+      end
+
+      sdk_root = ENV["SDK_ROOT"]?
+      unless sdk_root
+        raise NotImplementedError.new("The env var `SDK_ROOT` is required to cross-compile to Windows.")
+      end
+
+      yield "#{sdk_root}/**/x86_64"
+      yield "#{sdk_root}/**/x64"
       return
     end
 

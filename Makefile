@@ -137,7 +137,7 @@ $(eval $(call MAKE_VAR_CACHE_FOR,LLVM_STATIC_RELEASE_URL))
 
 # Specify where to download our pre-built runtime bitcode from.
 # This needs to get bumped explicitly here when we do a new runtime build.
-RUNTIME_BITCODE_RELEASE_URL?=https://github.com/savi-lang/runtime-bitcode/releases/download/20220206
+RUNTIME_BITCODE_RELEASE_URL?=https://github.com/savi-lang/runtime-bitcode/releases/download/v0.20220505.0
 $(eval $(call MAKE_VAR_CACHE_FOR,RUNTIME_BITCODE_RELEASE_URL))
 
 # This is the path where we look for the LLVM pre-built static libraries to be,

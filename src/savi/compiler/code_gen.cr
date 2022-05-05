@@ -92,11 +92,16 @@ class Savi::Compiler::CodeGen
   getter bitwidth
   getter isize
 
-  def initialize(runtime : PonyRT.class | VeronaRT.class = PonyRT)
+  def initialize(
+    runtime : PonyRT.class | VeronaRT.class,
+    options : Compiler::Options
+  )
     LLVM.init_x86
     LLVM.init_aarch64
     LLVM.init_arm
-    @target_triple = LLVM.configured_default_target_triple.as(String)
+    @target_triple = (
+      options.cross_compile || LLVM.configured_default_target_triple
+    ).as(String)
     @target = LLVM::Target.from_triple(@target_triple)
     @target_machine = @target.create_target_machine(@target_triple).as(LLVM::TargetMachine)
     @llvm = LLVM::Context.new
@@ -1021,9 +1026,9 @@ class Savi::Compiler::CodeGen
       when "is_macos"
         gen_bool(target.macos?)
       when "is_posix"
-        gen_bool(true) # TODO: false on windows
+        gen_bool(!target.windows?)
       when "is_windows"
-        gen_bool(false) # TODO: true on windows
+        gen_bool(target.windows?)
       when "is_ilp32"
         gen_bool(abi_size_of(@isize) == 4)
       when "is_lp64"
