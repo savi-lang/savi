@@ -4,8 +4,8 @@ class Savi::Compiler::Context
   getter program = Program.new
 
   getter classify = Classify::Pass.new
-  getter code_gen = CodeGen.new(CodeGen::PonyRT)
-  getter code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
+  getter code_gen : CodeGen
+  getter code_gen_verona : CodeGen
   getter completeness = Completeness::Pass.new
   getter run = Run.new
   getter flow = Flow::Pass.new
@@ -54,6 +54,8 @@ class Savi::Compiler::Context
   getter errors = [] of Error
 
   def initialize(@compiler, @options = Compiler::Options.new, @prev_ctx = nil)
+    @code_gen = CodeGen.new(CodeGen::PonyRT, @options)
+    @code_gen_verona = CodeGen.new(CodeGen::VeronaRT, @options)
   end
 
   def root_package

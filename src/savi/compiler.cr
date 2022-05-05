@@ -11,6 +11,7 @@ class Savi::Compiler
     property llvm_ir = false
     property llvm_keep_fns = false
     property auto_fix = false
+    property cross_compile : String? = nil
     property manifest_name : String?
     property target_pass : Symbol?
 

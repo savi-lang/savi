@@ -21,6 +21,7 @@ module Savi
       option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
       option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+      option "-X", "--cross-compile=TRIPLE", desc: "Cross compile to the given target triple"
       option "-C", "--cd=DIR", desc: "Change the working directory"
       option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
       run do |opts, args|
@@ -33,6 +34,7 @@ module Savi
         options.llvm_keep_fns = true if opts.llvm_keep_fns
         options.auto_fix = true if opts.fix
         options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
+        options.cross_compile = opts.cross_compile.not_nil! if opts.cross_compile
         Dir.cd(opts.cd.not_nil!) if opts.cd
         Cli.compile options, opts.backtrace
       end
@@ -111,6 +113,7 @@ module Savi
         option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
         option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+        option "-X", "--cross-compile=TRIPLE", desc: "Cross compile to the given target triple"
         option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
           options = Savi::Compiler::Options.new(
@@ -122,6 +125,7 @@ module Savi
           options.llvm_keep_fns = true if opts.llvm_keep_fns
           options.auto_fix = true if opts.fix
           options.manifest_name = args.name.not_nil! if args.name
+          options.cross_compile = opts.cross_compile.not_nil! if opts.cross_compile
           Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.compile options, opts.backtrace
         end
