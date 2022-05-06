@@ -217,17 +217,18 @@ module Savi::Compiler::Infer
 
         called_mt.map_each_union_member { |union_member_mt|
           called_rt = union_member_mt.single!
+          is_union = called_mt != union_member_mt
 
           if func_names.is_a?(String)
             func_name = func_names
             called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
             called_rf = ReifiedFunction.new(called_rt, called_link, called_mt)
-            yield({info, called_rf})
+            yield({info, called_rf, is_union})
           else
             func_names.as(Array(String)).each { |func_name|
               called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
               called_rf = ReifiedFunction.new(called_rt, called_link, called_mt)
-              yield({info, called_rf})
+              yield({info, called_rf, is_union})
             }
           end
         }

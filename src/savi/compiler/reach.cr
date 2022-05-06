@@ -585,7 +585,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     @refs = Hash(Infer::MetaType, Ref).new
     @defs = Hash(Infer::ReifiedType, Def).new
     @defs_by_unique_name = Hash(String, Def).new
-    @seen_funcs = Hash(Infer::ReifiedFunction, Array(Func)).new
+    @seen_funcs = Hash({Infer::ReifiedFunction, Bool}, Array(Func)).new
   end
 
   def run(ctx)
@@ -595,7 +595,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
       main_f_link = main_rt.defn(ctx).find_default_constructor?.try(&.make_link(main_rt.link))
       if main_f_link
         main_rf = Infer::ReifiedFunction.new(main_rt, main_f_link, Infer::MetaType.cap(Infer::Cap::REF))
-        handle_func(ctx, main_rf)
+        handle_func(ctx, main_rf, call_is_abstract: true)
       end
     end
 
@@ -604,11 +604,11 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     env_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "Env"))
     env_f_link = env_rt.defn(ctx).find_func!("_create").make_link(env_rt.link)
     env_rf = Infer::ReifiedFunction.new(env_rt, env_f_link, Infer::MetaType.cap(Infer::Cap::VAL))
-    handle_func(ctx, env_rf)
+    handle_func(ctx, env_rf, call_is_abstract: false)
     notify_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "AsioEvent.Actor"))
     notify_f_link = notify_rt.defn(ctx).find_func!("_asio_event").make_link(notify_rt.link)
     notify_rf = Infer::ReifiedFunction.new(notify_rt, notify_f_link, Infer::MetaType.cap(Infer::Cap::REF))
-    handle_func(ctx, notify_rf)
+    handle_func(ctx, notify_rf, call_is_abstract: true)
     string_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "String"))
     handle_type_def(ctx, string_rt)
 
@@ -627,9 +627,9 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     sympathetic_signature_resonance(ctx)
   end
 
-  def handle_func(ctx, rf : Infer::ReifiedFunction)
+  def handle_func(ctx, rf : Infer::ReifiedFunction, call_is_abstract)
     # Skip this function if we've already seen it.
-    return if @seen_funcs.has_key?(rf)
+    return if @seen_funcs.has_key?({rf, call_is_abstract})
 
     # Give handle_type_def a chance to canonicalize the ReifiedType,
     # possibly giving us an altered ReifiedFunction.
@@ -637,7 +637,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     rf = Infer::ReifiedFunction.new(rt, rf.link, rf.receiver_cap)
 
     reach_funcs = Array(Func).new
-    @seen_funcs[rf] = reach_funcs
+    @seen_funcs[{rf, call_is_abstract}] = reach_funcs
 
     infer = ctx.infer[rf.link]
 
@@ -650,9 +650,17 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     reach_def = handle_type_def(ctx, rt)
     reach_funcs << Func.new(reach_def, rf, signature_for(ctx, rf, infer))
 
+    # Skip the rest of this if we've already seen the opposite abstractness.
+    return if @seen_funcs.has_key?({rf, !call_is_abstract})
+
     # Reach all functions called by this function.
-    infer.each_called_func_within(ctx, rf) { |info, called_rf|
-      handle_func(ctx, called_rf)
+    infer.each_called_func_within(ctx, rf) { |info, called_rf, called_is_union|
+      called_is_abstract =
+        called_is_union || \
+        called_rf.type.link.is_abstract? || \
+        called_rf.func(ctx).has_tag?(:async)
+
+      handle_func(ctx, called_rf, called_is_abstract)
     }
 
     # Reach all functions callable via reflection from this function.
@@ -670,11 +678,13 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
         reflect_f_link = f.make_link(reflect_rt.link)
         reflect_rf = Infer::ReifiedFunction.new(reflect_rt, reflect_f_link, reflect_mt.cap_only)
         reflect_infer = ctx.infer[reflect_rf.link]
-        handle_func(ctx, reflect_rf) if reflect_infer.can_reify_with?(
+        if reflect_infer.can_reify_with?(
           reflect_rt.args,
           reflect_mt.cap_only_inner.value.as(Infer::Cap),
           f.has_tag?(:constructor)
         )
+          handle_func(ctx, reflect_rf, call_is_abstract: true)
+        end
       end
     end
 
@@ -689,11 +699,13 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
         reflect_f_link = f.make_link(reflect_rt.link)
         reflect_rf = Infer::ReifiedFunction.new(reflect_rt, reflect_f_link, Infer::MetaType.cap(Infer::Cap::NON))
         reflect_infer = ctx.infer[reflect_rf.link]
-        handle_func(ctx, reflect_rf) if reflect_infer.can_reify_with?(
+        if reflect_infer.can_reify_with?(
           reflect_rt.args,
           Infer::Cap::NON,
           f.has_tag?(:constructor)
         )
+          handle_func(ctx, reflect_rf, call_is_abstract: false)
+        end
       }
     }
   end
@@ -731,7 +743,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     handle_type_ref(ctx, mt)
 
     # Handle the field as if it were a function.
-    handle_func(ctx, rf)
+    handle_func(ctx, rf, call_is_abstract: false)
 
     # Return the name and Ref for this field.
     {f_link.name, Ref.new(mt)}
@@ -807,7 +819,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
   end
 
   def sympathetic_resonance(ctx)
-    @seen_funcs.keys.group_by(&.type).each { |abstract_rt, abstract_rfs|
+    @seen_funcs.keys.map(&.first).group_by(&.type).each { |abstract_rt, abstract_rfs|
       abstract_def = @defs[abstract_rt]
 
       each_reached_subtype_of(ctx, abstract_def) { |subtype_def|
@@ -823,19 +835,19 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
             abstract_rf.receiver_cap
           )
 
-          handle_func(ctx, subtype_rf)
+          handle_func(ctx, subtype_rf, call_is_abstract: true)
         }
       }
     }
   end
 
   def sympathetic_signature_resonance(ctx)
-    @seen_funcs.group_by(&.first.type).each { |abstract_rt, abstract_func_pairs|
+    @seen_funcs.group_by(&.first.first.type).each { |abstract_rt, abstract_func_pairs|
       abstract_def = @defs[abstract_rt]
 
       each_reached_subtype_of(ctx, abstract_def) { |subtype_def|
-        reached_func_sets_for(subtype_def).each { |(subtype_rf, subtype_funcs)|
-          abstract_func_pairs.each { |abstract_rf, abstract_funcs|
+        reached_func_sets_for(subtype_def).each { |(subtype_rf, call_is_abstract), subtype_funcs|
+          abstract_func_pairs.each { |unused_key, abstract_funcs|
             # Skip to the next subtype function if this isn't the right one
             # corresponding to the current function on the abstract type.
             next unless abstract_funcs.any? { |abstract_func|
@@ -918,22 +930,31 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
   end
 
   def reached_func?(rf : Infer::ReifiedFunction)
-    @seen_funcs.has_key?(rf)
+    @seen_funcs.has_key?({rf, false}) || @seen_funcs.has_key?({rf, true})
   end
 
   def reach_func_for(rf : Infer::ReifiedFunction) : Func
-    @seen_funcs[rf].first
+    (@seen_funcs[{rf, false}]? || @seen_funcs[{rf, true}]).first
   end
 
   def reached_funcs_for(reach_def : Def)
     @seen_funcs
-      .select { |rf, _| rf.type == reach_def.reified }
+      .select { |(rf, is_abstract), _|
+        rf.type == reach_def.reified &&
+        (!is_abstract || !@seen_funcs.has_key?({rf, false}))
+      }
+      .flat_map(&.last)
+  end
+
+  def abstractly_reached_funcs_for(reach_def : Def)
+    @seen_funcs
+      .select { |(rf, is_abstract), _| is_abstract && rf.type == reach_def.reified }
       .flat_map(&.last)
   end
 
   def reached_func_sets_for(reach_def : Def)
     @seen_funcs
-      .select { |rf, _| rf.type == reach_def.reified }
+      .select { |(rf, is_abstract), _| rf.type == reach_def.reified }
   end
 
   def each_type_def
