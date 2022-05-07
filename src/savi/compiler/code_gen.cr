@@ -398,28 +398,6 @@ class Savi::Compiler::CodeGen
           "the dumped LLVM IR file located at: #{Binary.path_for(ctx)}.ll"}
       ]
     end
-
-    # Run the LLVM optimizer passes.
-    begin
-      registry = LLVM::PassRegistry.instance
-      registry.initialize_all
-
-      pass_manager_builder = LLVM::PassManagerBuilder.new
-      pass_manager_builder.opt_level = ctx.options.release ? 3 : 0
-      pass_manager_builder.size_level = 0
-      pass_manager_builder.use_inliner_with_threshold = ctx.options.release ? 275 : 0
-
-      fun_pass_manager = @mod.new_function_pass_manager
-      pass_manager_builder.populate fun_pass_manager
-
-      mod_pass_manager = LLVM::ModulePassManager.new
-      pass_manager_builder.populate mod_pass_manager
-
-      fun_pass_manager.run @mod
-      mod_pass_manager.run @mod
-    end
-
-    @mod.print_to_file("#{Binary.path_for(ctx)}.ll") if ctx.options.llvm_ir
   end
 
   def gen_wrapper # TODO: Bring back the JIT or remove this code.

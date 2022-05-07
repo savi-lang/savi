@@ -87,6 +87,9 @@ class Savi::Compiler::BinaryObject
     # Otherwise we will only run a minimal set of passes.
     LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
 
+    # Emit the combined/optimized LLVM IR to a file if requested to do so.
+    mod.print_to_file("#{Binary.path_for(ctx)}.ll") if ctx.options.llvm_ir
+
     # Write the program to disk as a binary object file.
     obj_path = "#{ctx.manifests.root.not_nil!.bin_path}.o"
     FileUtils.mkdir_p(File.dirname(obj_path))
