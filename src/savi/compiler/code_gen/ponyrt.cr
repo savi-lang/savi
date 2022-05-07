@@ -167,19 +167,16 @@ class Savi::Compiler::CodeGen::PonyRT
       ]},
       {"pony_alloc_final", [@ptr, @isize], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_alloc_small_final", [@ptr, @i32], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_alloc_large_final", [@ptr, @isize], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, HEAP_MAX << 1},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},

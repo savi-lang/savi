@@ -33,9 +33,7 @@ void LLVMOptimizeForSavi(LLVMModuleRef ModRef, LLVMBool WantsFullOptimization) {
   // Create the top-level module pass manager using the default LLVM pipeline.
   // Respect the parameter that either requests or declines full optimization.
   ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(
-    WantsFullOptimization
-      ? PassBuilder::OptimizationLevel::O3
-      : PassBuilder::OptimizationLevel::O0
+    WantsFullOptimization ? OptimizationLevel::O3 : OptimizationLevel::O0
   );
   MPM.run(*unwrap(ModRef), MAM);
 }

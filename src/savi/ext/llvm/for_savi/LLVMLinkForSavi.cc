@@ -42,15 +42,15 @@ bool LLVMLinkForSavi(
   // Invoke the linker.
   bool LinkResult = false;
   if (0 == strcmp(Flavor, "elf")) {
-    LinkResult = lld::elf::link(Args, false, Output, Output);
+    LinkResult = lld::elf::link(Args, Output, Output, false, false);
   } else if (0 == strcmp(Flavor, "mach_o")) {
-    LinkResult = lld::macho::link(Args, false, Output, Output);
+    LinkResult = lld::macho::link(Args, Output, Output, false, false);
   } else if (0 == strcmp(Flavor, "mingw")) {
-    LinkResult = lld::mingw::link(Args, false, Output, Output);
+    LinkResult = lld::mingw::link(Args, Output, Output, false, false);
   } else if (0 == strcmp(Flavor, "coff")) {
-    LinkResult = lld::coff::link(Args, false, Output, Output);
+    LinkResult = lld::coff::link(Args, Output, Output, false, false);
   } else if (0 == strcmp(Flavor, "wasm")) {
-    LinkResult = lld::wasm::link(Args, false, Output, Output);
+    LinkResult = lld::wasm::link(Args, Output, Output, false, false);
   } else {
     Output << "Unsupported lld link flavor: " << Flavor;
   }
