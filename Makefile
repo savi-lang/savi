@@ -132,7 +132,7 @@ CLANG_TARGET_PLATFORM?=$(TARGET_PLATFORM)
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
-LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20220112
+LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/v14.0.3-20220506
 $(eval $(call MAKE_VAR_CACHE_FOR,LLVM_STATIC_RELEASE_URL))
 
 # Specify where to download our pre-built runtime bitcode from.

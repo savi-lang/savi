@@ -7,10 +7,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - crystal: "1.2.1"
+          - crystal: "1.4.1"
             os: ubuntu-20.04
             deps: sudo apt-get install -y libgc-dev
-          - crystal: "1.2.1"
+          - crystal: "1.4.1"
             os: macos-11
             deps: echo no system deps to download
     runs-on: ${{matrix.os}}

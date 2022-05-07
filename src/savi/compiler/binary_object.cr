@@ -83,11 +83,12 @@ class Savi::Compiler::BinaryObject
     # Link the runtime bitcode module into the generated application module.
     LibLLVM.link_modules(mod.to_unsafe, runtime.to_unsafe)
 
-    # # Now run LLVM passes, doing full optimization if in release mode.
-    # # Otherwise we will only run a minimal set of passes.
-    # # TODO: Re-enable this once we've troubleshooted the issues it is causing
-    # # on some platforms with preventing program termination/quiescence.
-    # LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
+    # Now run LLVM passes, doing full optimization if in release mode.
+    # Otherwise we will only run a minimal set of passes.
+    LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
+
+    # Emit the combined/optimized LLVM IR to a file if requested to do so.
+    mod.print_to_file("#{Binary.path_for(ctx)}.ll") if ctx.options.llvm_ir
 
     # Write the program to disk as a binary object file.
     obj_path = "#{ctx.manifests.root.not_nil!.bin_path}.o"
