@@ -279,8 +279,10 @@ class Savi::SpecMarkdown
         begin
           file_content = example.expected_ffigen.join("\n\n")
           file = File.tempfile("ffigen_example", ".h", &.print(file_content))
+          options = Savi::FFIGen::Options.new
+          options.header_name = file.path
           expected = example.code_blocks.join("\n\n")
-          actual = String.build { |io| FFIGen.new(file.path).emit(io) }
+          actual = String.build { |io| FFIGen.new(options).emit(io) }
 
           unless expected.strip == actual.strip
             puts "---"

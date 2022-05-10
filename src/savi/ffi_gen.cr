@@ -1,17 +1,26 @@
 require "clang"
 
 class Savi::FFIGen
-  @header_name : String
+  class Options
+    property header_name : String = ""
+    property include_dirs : Array(String) = Array(String).new
+  end
 
-  def initialize(@header_name)
+  @options : Options
+
+  def initialize(@options)
     @savi_name = "_FFI" # TODO: Configurable
     @need_struct_decls = [] of String
 
-    base_name = File.basename(@header_name)
-    dir_name = File.dirname(@header_name)
+    base_name = File.basename(@options.header_name)
+    dir_name = File.dirname(@options.header_name)
     c_file = Clang::UnsavedFile.new("input.c", "#include <#{base_name}>\n")
+
+    cli_opts = ["-I#{dir_name}"]
+    @options.include_dirs.each { |include_dir| cli_opts << "-I#{include_dir}" }
+
     @clang_unit = Clang::TranslationUnit
-      .from_source(Clang::Index.new, [c_file], ["-I#{dir_name}"])
+      .from_source(Clang::Index.new, [c_file], cli_opts)
   end
 
   def emit(io : IO)
@@ -24,7 +33,7 @@ class Savi::FFIGen
     each_top_entity { |cursor|
       # Skip entities that aren't function declarations in the specified header.
       next unless cursor.kind.function_decl? \
-        && cursor.location.file_name.try(&.==(@header_name))
+        && cursor.location.file_name.try(&.==(@options.header_name))
 
       # Each function gets a blank line above it, except the first function.
       io.puts unless is_first_function_decl

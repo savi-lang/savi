@@ -263,9 +263,13 @@ module Savi
         argument "header", type: String, required: true, desc: "header file to parse"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
+        option "-I", "--include-dir=DIR", desc: "Add an include file search path", type: Array(String)
         run do |opts, args|
           Dir.cd(opts.cd.not_nil!) if opts.cd
-          Cli.ffigen(header: args.header, backtrace: opts.backtrace)
+          options = Savi::FFIGen::Options.new
+          options.header_name = args.header
+          options.include_dirs = opts.include_dir
+          Cli.ffigen(options, backtrace: opts.backtrace)
         end
       end
     end
@@ -382,9 +386,9 @@ module Savi
       end
     end
 
-    def self.ffigen(header : String, backtrace : Bool)
+    def self.ffigen(options : Savi::FFIGen::Options, backtrace : Bool)
       _add_backtrace backtrace do
-        gen = Savi::FFIGen.new(header)
+        gen = Savi::FFIGen.new(options)
         puts String.build { |io| gen.emit(io) }
 
         0

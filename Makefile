@@ -77,7 +77,7 @@ format: PHONY $(SAVI)
 
 # Generate FFI code.
 ffigen: PHONY $(SAVI)
-	echo && $(SAVI) ffigen "$(header)" --backtrace
+	echo && $(SAVI) ffigen "$(header)" $(extra_args) --backtrace
 
 # Evaluate a Hello World example.
 example-eval: PHONY $(SAVI)
