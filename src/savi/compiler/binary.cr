@@ -263,6 +263,7 @@ class Savi::Compiler::Binary
       # Try various combinations of leaves of those trees.
       sdk_roots.each { |sdk_root|
         yield "#{sdk_root}/**/x64", "um/x64"             # MSVC style
+        yield "#{sdk_root}/**/x64", "ucrt/x64"           # MSVC style
         yield "#{sdk_root}/**/x64", "lib/x64"            # MSVC style
         yield "#{sdk_root}/**/x86_64", "lib/um/x86_64"   # xwin style
         yield "#{sdk_root}/**/x86_64", "lib/ucrt/x86_64" # xwin style
