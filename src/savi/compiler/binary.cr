@@ -104,15 +104,16 @@ class Savi::Compiler::Binary
     link_args = %w{lld-link -nologo -defaultlib:libcmt -defaultlib:oldnames}
 
     # Set up the main library paths.
+    lib_paths = [] of String
     each_sysroot_lib_path(ctx, target) { |lib_path|
+      lib_paths << lib_path
       link_args << "-libpath:#{lib_path}"
     }
 
     # Specify the base set of libraries to link to.
-    link_args << "-defaultlib:libcmt"   # always needed
-    link_args << "-defaultlib:oldnames" # always needed
-    link_args << "-defaultlib:dbghelp"  # used by runtime platform/ponyassert.c
-    link_args << "-defaultlib:ws2_32"   # used by runtime lang/socket.c
+    add_windows_lib(link_args, lib_paths, "libcmt")  # C runtime startup - always needed
+    add_windows_lib(link_args, lib_paths, "DbgHelp") # used by runtime platform/ponyassert.c
+    add_windows_lib(link_args, lib_paths, "WS2_32")  # used by runtime lang/socket.c
 
     # Finally, specify the input object file and the output filename.
     link_args << obj_path
@@ -120,6 +121,20 @@ class Savi::Compiler::Binary
 
     # Invoke the linker, using the COFF flavor.
     invoke_linker("coff", link_args)
+  end
+
+  private def add_windows_lib(link_args, lib_paths, name)
+    if lib_paths.any? { |lib_path|
+      File.exists?(File.join(lib_path, "#{name}.Lib"))
+    }
+      link_args << "-defaultlib:#{name}.Lib"
+    elsif lib_paths.any? { |lib_path|
+      File.exists?(File.join(lib_path, "#{name}.lib"))
+    }
+      link_args << "-defaultlib:#{name}.lib"
+    else
+      link_args << "-defaultlib:#{name.downcase}.lib"
+    end
   end
 
   # Link an ELF executable for a Linux or FreeBSD target.
@@ -205,8 +220,15 @@ class Savi::Compiler::Binary
     sysroot = "/" # TODO: Allow user to supply custom sysroot for cross-compile.
 
     yielded_any = false
-    each_sysroot_lib_glob(ctx, target) { |lib_glob|
+    each_sysroot_lib_glob(ctx, target) { |lib_glob, check_suffix|
       Dir.glob(lib_glob) { |lib_path|
+        # TODO: Remove this hack when we can go back to using globs for this,
+        # after this Crystal bug with Dir.glob has been fixed and released:
+        # - https://github.com/crystal-lang/crystal/issues/12056
+        if check_suffix
+          next unless lib_path.ends_with?(check_suffix)
+        end
+
         next unless Dir.exists?(lib_path)
 
         yield lib_path
@@ -221,7 +243,7 @@ class Savi::Compiler::Binary
   def each_sysroot_lib_glob(ctx, target)
     # For MacOS, we have just one valid sysroot path, so we can finish early.
     if target.macos?
-      yield "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+      yield "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib", nil
       return
     end
 
@@ -231,13 +253,21 @@ class Savi::Compiler::Binary
         raise NotImplementedError.new("Windows is only supported by cross-compiling.")
       end
 
-      sdk_root = ENV["SDK_ROOT"]?
-      unless sdk_root
-        raise NotImplementedError.new("The env var `SDK_ROOT` is required to cross-compile to Windows.")
-      end
+      # Gather the possible SDK tree roots to search under.
+      sdk_roots = [
+        ENV["SDK_ROOT"]?,
+        "/mnt/c/Program Files/Microsoft Visual Studio",
+        "/mnt/c/Program Files (x86)/Windows Kits",
+      ].compact
 
-      yield "#{sdk_root}/**/x86_64"
-      yield "#{sdk_root}/**/x64"
+      # Try various combinations of leaves of those trees.
+      sdk_roots.each { |sdk_root|
+        yield "#{sdk_root}/**/x64", "lib/um/x64"      # MSVC style
+        yield "#{sdk_root}/**/x64", "lib/x64"         # MSVC style
+        yield "#{sdk_root}/**/x86_64", "lib/um/x86_64"   # xwin style
+        yield "#{sdk_root}/**/x86_64", "lib/ucrt/x86_64" # xwin style
+        yield "#{sdk_root}/**/x86_64", "lib/x86_64"      # xwin style
+      }
       return
     end
 
@@ -245,31 +275,31 @@ class Savi::Compiler::Binary
       if target.musl?
         if target.x86_64?
           # TODO: Support non-alpine musl variants?
-          yield "/usr/lib/gcc/x86_64-alpine-linux-musl/*"
+          yield "/usr/lib/gcc/x86_64-alpine-linux-musl/*", nil
         elsif target.arm64?
           # TODO: Support non-alpine musl variants?
-          yield "/usr/lib/gcc/aarch64-alpine-linux-musl/*"
+          yield "/usr/lib/gcc/aarch64-alpine-linux-musl/*", nil
         else
           raise NotImplementedError.new(target.inspect)
         end
       else
         if target.x86_64?
-          yield "/lib/gcc/x86_64-linux-gnu/*"
-          yield "/lib/x86_64-linux-gnu"
-          yield "/usr/lib/gcc/x86_64-linux-gnu/*"
-          yield "/usr/lib/gcc/x86_64-pc-linux-gnu/*"
-          yield "/usr/lib/x86_64-linux-gnu"
-          yield "/usr/lib/gcc/x86_64-redhat-linux/*"
+          yield "/lib/gcc/x86_64-linux-gnu/*", nil
+          yield "/lib/x86_64-linux-gnu", nil
+          yield "/usr/lib/gcc/x86_64-linux-gnu/*", nil
+          yield "/usr/lib/gcc/x86_64-pc-linux-gnu/*", nil
+          yield "/usr/lib/x86_64-linux-gnu", nil
+          yield "/usr/lib/gcc/x86_64-redhat-linux/*", nil
         else
           raise NotImplementedError.new(target.inspect)
         end
       end
     end
 
-    yield "/lib64"
-    yield "/usr/lib64"
-    yield "/lib"
-    yield "/usr/lib"
+    yield "/lib64", nil
+    yield "/usr/lib64", nil
+    yield "/lib", nil
+    yield "/usr/lib", nil
   end
 
   # Given a prioritized list of search paths and a file name, find the file.
