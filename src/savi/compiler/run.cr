@@ -14,7 +14,9 @@ class Savi::Compiler::Run
   getter! exitcode : Int32
 
   def run(ctx)
-    bin_path = ctx.manifests.root.not_nil!.bin_path
+    target = Target.new(ctx.code_gen.target_machine.triple)
+    bin_path = Binary.path_for(ctx)
+    bin_path += ".exe" if target.windows?
 
     res = Process.run("/usr/bin/env", [bin_path], output: STDOUT, error: STDERR)
     @exitcode = res.exit_code
