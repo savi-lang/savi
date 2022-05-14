@@ -464,6 +464,16 @@
   :body optional
 
 // TODO: Document this.
+// TODO: Make this more general / less boutique.
+:declarator field_order
+  :intrinsic
+  :context type
+
+  :term fields NameList
+  :keyword on
+  :term platform enum (windows) // TODO: more options?
+
+// TODO: Document this.
 :declarator is
   :intrinsic
   :context type

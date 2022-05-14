@@ -14,7 +14,7 @@ class Savi::Compiler::Run
   getter! exitcode : Int32
 
   def run(ctx)
-    target = Target.new(ctx.code_gen.target_machine.triple)
+    target = ctx.code_gen.target_info
     bin_path = Binary.path_for(ctx)
     bin_path += ".exe" if target.windows?
 

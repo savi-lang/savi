@@ -401,6 +401,15 @@ module Savi::Program::Intrinsic
         displace_func = Program::Function.new(displace_cap, displace_ident, displace_params, displace_ret, displace_body)
         displace_func.add_tag(:let) if is_let
         type.functions << displace_func
+      when "field_order"
+        fields = terms["fields"].as(AST::Group).terms.map(&.as(AST::Identifier).value)
+        platform = terms["platform"].as(AST::Identifier).value
+        case platform
+        when "windows"
+          scope.current_type.metadata[:field_order_windows] = fields
+        else
+          raise NotImplementedError.new(platform)
+        end
       when "is"
         scope.current_type.functions << Program::Function.new(
           AST::Identifier.new("non").from(declare.terms.first),

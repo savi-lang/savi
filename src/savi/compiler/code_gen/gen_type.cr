@@ -16,7 +16,7 @@ class Savi::Compiler::CodeGen
       @gfuncs_by_sig_name = Hash(String, GenFunc).new
 
       # Take down info on all fields.
-      @fields = @type_def.fields
+      @fields = @type_def.ordered_fields(g.ctx, g.target_info)
 
       # Take down info on all functions.
       @vtable_size = 0
