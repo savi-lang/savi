@@ -83,6 +83,15 @@ class Savi::Compiler::BinaryObject
     # Link the runtime bitcode module into the generated application module.
     LibLLVM.link_modules(mod.to_unsafe, runtime.to_unsafe)
 
+    # We're not compiling a library, so we want to mark as many functions
+    # as possible with private linkage, so LLVM can optimize them aggressively,
+    # including inlining them, eliminating them if they are not used, and/or
+    # marking them to use the fastest available calling convention.
+    #
+    # Prior to this step, the public runtime functions are all marked as
+    # external, so they would miss out on optimizations if we don't do this.
+    mark_module_functions_as_private(mod)
+
     # Now run LLVM passes, doing full optimization if in release mode.
     # Otherwise we will only run a minimal set of passes.
     LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
@@ -96,5 +105,28 @@ class Savi::Compiler::BinaryObject
     machine.emit_obj_to_file(mod, obj_path)
 
     obj_path
+  end
+
+  def self.mark_module_functions_as_private(mod : LLVM::Module)
+    mod.functions.each { |func|
+      # Only consider functions whose linkage is currently external.
+      next unless func.linkage == LLVM::Linkage::External
+
+      # Only consider functions that are non-empty. In other words,
+      # only consider defined functions rather than merely declared ones.
+      next if func.basic_blocks.empty?
+
+      # We can't make the program entrypoint private - it must be external
+      # so it can be linked to the standard startup code by the linker.
+      next if func.name == "main"
+
+      # Set linkage to private - we don't need this to be externally visible.
+      func.linkage = LLVM::Linkage::Private
+
+      # Also set the DLL Storage Class to default, which is necessary
+      # on Windows targets because if we have functions with `private`
+      # linkage, they must not have `dllexport` or `dllimport` specified.
+      func.dll_storage_class = LLVM::DLLStorageClass::Default
+    }
   end
 end
