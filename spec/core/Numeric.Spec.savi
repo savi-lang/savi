@@ -64,8 +64,3 @@
     // We have significand bits, exponent bits, and 1 sign bit.
     assert: F32.sig_bit_width + F32.exp_bit_width + 1 == F32.bit_width
     assert: F64.sig_bit_width + F64.exp_bit_width + 1 == F64.bit_width
-
-  :it "prints the decimal digits of the floating-point value into a string"
-    assert: "\(0.0)" == "0.0"
-    assert: "\(333333.33333333)" == "333333.333333"
-    assert: "\(-5.5555546e-123)" == "-5.555555e-123"

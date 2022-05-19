@@ -1,0 +1,293 @@
+:: This internal struct can represent any value representable by the F64 type,
+:: but the information is represented in a form that is more convenient for
+:: printing/formatting, with special cases broken out into separate booleans,
+:: and numeric values being represented via powers of 10 instead of powers of 2.
+:struct val _FormattableF64
+  :let significand U64
+  :let power_of_10 I16
+  :let digit_count U8
+  :let is_negative Bool
+  :let is_finite_non_zero Bool
+  :let is_zero Bool
+  :let is_nan Bool
+
+  :fun non from_f64(value F64)
+    case (
+    | value.is_zero |
+      @_zero(value.has_negative_sign_bit)
+
+    | value.is_finite |
+      ryu = _Ryu.F64.to_base_10(value.significand_with_base_2_exponent)
+      @_finite_non_zero(ryu.first, ryu.second, value.has_negative_sign_bit)
+
+    | value.is_nan |
+      @_nan
+
+    |
+      @_infinity(value.has_negative_sign_bit)
+    )
+
+  :new val _finite_non_zero(
+    @significand
+    @power_of_10
+    @is_negative
+  )
+    @digit_count = @_calculate_digit_count(@significand)
+    @is_finite_non_zero = True
+    @is_zero = False
+    @is_nan = False
+
+  :new val _zero(@is_negative)
+    @significand = 0
+    @power_of_10 = 0
+    @digit_count = 1
+    @is_finite_non_zero = False
+    // (@is_negative is assigned via parameter)
+    @is_zero = True
+    @is_nan = False
+
+  :new val _nan
+    @significand = 0
+    @power_of_10 = 0
+    @digit_count = 0
+    @is_negative = False
+    @is_finite_non_zero = False
+    @is_zero = False
+    @is_nan = True
+
+  :new val _infinity(@is_negative)
+    @significand = 0
+    @power_of_10 = 0
+    @digit_count = 0
+    @is_finite_non_zero = False
+    // (@is_negative is assigned via parameter)
+    @is_zero = False
+    @is_nan = False
+
+  :: Emit the represented value into the string, in the event that it is one
+  :: of the "special cases" (i.e. that it is not a finite non-zero value).
+  ::
+  :: If the value `is_finite_non_zero`, it will be yielded back to the caller,
+  :: who has a responsibility to emit as desired into the string and return it.
+  :fun _into_string_unless_finite_non_zero(out String'iso) String'iso
+    :yields String'iso for String'iso
+    case (
+    | @is_finite_non_zero |
+      out = yield --out
+    | @is_zero |
+      if @is_negative out.push_byte('-')
+      out << "0.0"
+    | @is_nan |
+      out << "NaN"
+    |
+      if @is_negative out.push_byte('-')
+      out << "Infinity"
+    )
+    --out
+
+  :: Return the maxmium number of bytes that may be needed to emit the
+  :: stored value into a string buffer, in the event that it is one
+  :: of the "special cases" (i.e. that it is not a finite non-zero value).
+  ::
+  :: If the value `is_finite_non_zero`, an error will be raised.
+  :fun _special_case_as_string! String
+    case (
+    | @is_finite_non_zero | error!
+    | @is_zero            | if @is_negative ("-0.0" | "0.0")
+    | @is_nan             | "NaN"
+    |                       if @is_negative ("-Infinity" | "Infinity")
+    )
+
+  :: Given a significand, determine the number of base-10 digits in it.
+  :fun non _calculate_digit_count(significand U64)
+    // We will use some functions of `Integer.Format.Decimal` as a utility.
+    util = Integer.Format.Decimal(U64)
+
+    // First get a possibly overestimated digit count based on the bit count.
+    digit_count = util._overestimated_digit_count(significand.significant_bits)
+
+    // Check the divisor for that digit count against the significand.
+    // If the divisor is too big, we need to reduce the digit count by one.
+    divisor = try (util._powers_of_10[(digit_count - 1).usize]! | 10)
+    if (significand < divisor) (digit_count -= 1)
+
+    // Return the now-accurate digit count.
+    digit_count
+
+  :: For this value's digit count, get the appropriate starting divisor.
+  :fun initial_divisor U64
+    // We will use the lookup table from `Integer.Format.Decimal` as a utility.
+    util = Integer.Format.Decimal(U64)
+
+    try (util._powers_of_10[(@digit_count - 1).usize]! | 1)
+
+  :: For this value's digit count and power of 10, get the appropriate exponent
+  :: to use when printing with scientific notation.
+  :fun scientific_exponent I16
+    // The final exponent is adjusted based on the digit count, because the
+    // more digits we are printing, the more we need to shift the decimal
+    // point from its initial position at the far right of the significand.
+    @power_of_10 + @digit_count.i16 - 1
+
+:: Format the given floating point using one of the available format types.
+:: Call one of the methods of this struct to choose which format type to use.
+:struct val FloatingPoint.Format(T FloatingPoint(T)'val)
+  :let _value _FormattableF64
+  :new val _new(@_value)
+
+  :fun shortest: FloatingPoint.Format.Shortest(T)._new(@_value)
+  :fun scientific: FloatingPoint.Format.Scientific(T)._new(@_value)
+  :fun without_exponent: FloatingPoint.Format.WithoutExponent(T)._new(@_value)
+
+:: Format the given floating-point using the shortest number of characters,
+:: either with or without an exponent indicator (i.e. scientific notation).
+:struct val FloatingPoint.Format.Shortest(T FloatingPoint(T)'val)
+  :is IntoString
+
+  :let _value _FormattableF64
+  :new val _new(@_value)
+
+  :fun into_string_space USize
+    if (@_value.power_of_10 > 2 || @_value.scientific_exponent < -3) (
+      FloatingPoint.Format.Scientific(T)._new(@_value).into_string_space
+    |
+      FloatingPoint.Format.WithoutExponent(T)._new(@_value).into_string_space
+    )
+
+  :fun into_string(out String'iso) String'iso
+    if (@_value.power_of_10 > 2 || @_value.scientific_exponent < -3) (
+      FloatingPoint.Format.Scientific(T)._new(@_value).into_string(--out)
+    |
+      FloatingPoint.Format.WithoutExponent(T)._new(@_value).into_string(--out)
+    )
+
+:: Format the given floating-point with an exponent (i.e. scientific notation).
+:struct val FloatingPoint.Format.Scientific(T FloatingPoint(T)'val)
+  :is IntoString
+
+  :let _value _FormattableF64
+  :new val _new(@_value)
+
+  // We will use some functions of `Integer.Format.Decimal` as a utility.
+  :fun non _util: Integer.Format.Decimal(U64)
+
+  :fun into_string_space USize
+    // First, deal with any special cases (zero or non-finite numbers).
+    // We count these in a special (hard-coded) way and return early.
+    try (size = @_value._special_case_as_string!.size, return size)
+
+    // Start with the number of significant digits that will be printed.
+    byte_count = @_value.digit_count
+
+    // Account for the decimal point byte, as well as the trailing zero in the
+    // case of no significand digits being to the right of the decimal point.
+    byte_count = (byte_count + 1).at_least(2)
+
+    // Account for the negative symbol if present.
+    if @_value.is_negative (byte_count += 1)
+
+    // Account for the exponent, which will have an 'e' as well as a number.
+    byte_count.usize
+    + 1
+    + @_value.scientific_exponent.format.decimal.into_string_space
+
+  :fun into_string(out String'iso) String'iso
+    // First, deal with any special cases (zero or non-finite numbers).
+    // We print these in a special (hard-coded) way and return early.
+    try (out << @_value._special_case_as_string!, return --out)
+
+    significand = @_value.significand
+    digit_count = @_value.digit_count
+    divisor = @_value.initial_divisor
+    exponent = @_value.scientific_exponent
+
+    // If negative, we need to print a negative symbol.
+    if @_value.is_negative out.push_byte('-')
+
+    // Print the digits of the significand, with the decimal point.
+    digit_count.times -> (digit_index |
+      out.push_byte((significand / divisor % 10).u8 + '0')
+      if digit_index.is_zero out.push_byte('.')
+      divisor = divisor / 10
+    )
+    if (digit_count == 1) out.push_byte('0')
+
+    // Print the base-10 exponent suffix.
+    if exponent.is_nonzero (
+      out.push_byte('e')
+      out = exponent.into_string(--out)
+    )
+
+    --out
+
+:: Format the given floating-point with no exponent (no scientific notation).
+:struct val FloatingPoint.Format.WithoutExponent(T FloatingPoint(T)'val)
+  :is IntoString
+
+  :let _value _FormattableF64
+  :new val _new(@_value)
+
+  // We will use some functions of `Integer.Format.Decimal` as a utility.
+  :fun non _util: Integer.Format.Decimal(U64)
+
+  :fun into_string_space USize
+    // First, deal with any special cases (zero or non-finite numbers).
+    // We count these in a special (hard-coded) way and return early.
+    try (size = @_value._special_case_as_string!.size, return size)
+
+    // Start with the number of significant digits that will be printed.
+    byte_count = @_value.digit_count.usize
+
+    // Account for the decimal point byte and the negative symbol (if present).
+    byte_count += if @_value.is_negative (2 | 1)
+
+    // Account for the leading zeros if present.
+    try (byte_count += (
+      I16.one - @_value.power_of_10 - @_value.digit_count.i16
+    ).usize!)
+
+    // Account for trailing zeros if present.
+    try (byte_count += @_value.power_of_10.usize!.at_least(1))
+
+    byte_count
+
+  :fun into_string(out String'iso) String'iso
+    // First, deal with any special cases (zero or non-finite numbers).
+    // We print these in a special (hard-coded) way and return early.
+    try (out << @_value._special_case_as_string!, return --out)
+
+    significand = @_value.significand
+    digit_count = @_value.digit_count
+    divisor = @_value.initial_divisor
+    exponent = @_value.scientific_exponent
+
+    // If the value is negative, print a negative symbol.
+    if @_value.is_negative out.push_byte('-')
+
+    // If the exponent is negative, print with extra zeros in front,
+    // including the decimal point after the first zero is printed.
+    exponent_is_negative = exponent < 0
+    if exponent_is_negative (
+      exponent.negate.times -> (digit_index |
+        out.push_byte('0')
+        if digit_index.is_zero out.push_byte('.')
+      )
+    )
+
+    // Print the digits of the significand, with decimal point if applicable.
+    digit_count.times -> (digit_index |
+      if (digit_index.i16 - 1 == exponent) out.push_byte('.')
+      out.push_byte((significand / divisor % 10).u8 + '0')
+      divisor = divisor / 10
+    )
+
+    // Print trailing zeros if the exponent raises us beyond the number
+    // of significant digits we already printed.
+    try (
+      trailing_zeros = @_value.power_of_10.u16!
+      trailing_zeros.times -> (out.push_byte('0'))
+      out.push_byte('.')
+      out.push_byte('0')
+    )
+
+    --out
