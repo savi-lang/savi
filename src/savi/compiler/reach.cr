@@ -532,6 +532,45 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     def as_ref(cap = nil) : Ref
       Ref.new(Infer::MetaType.new(@reified))
     end
+
+    def ordered_fields(ctx, target_info : Target)
+      t = @reified.link.resolve(ctx)
+      metadata = t.metadata
+
+      # Check if this type has a platform-specific field order.
+      field_order = (
+        target_info.windows? && metadata[:field_order_windows]?
+        # TODO: specific field order on other platforms?
+      )
+
+      # Otherwise just return the normal declared field order.
+      return @fields unless field_order
+
+      # Construct a new array of the fields in order.
+      # It must contain all of the fields exactly once,
+      # or it will be deemed to be an invalid field order.
+      field_order_invalid = false
+      ordered_fields = [] of {String, Reach::Ref}
+      field_order.as(Array(String)).each { |name|
+        found = @fields.find(&.first.==(name))
+        already = ordered_fields.find(&.first.==(name))
+        if !found || already
+          field_order_invalid = true
+          next
+        end
+        ordered_fields << found
+      }
+      field_order_invalid ||= @fields.size != ordered_fields.size
+
+      # If the field order was invalid, report it as a compilation error.
+      if field_order_invalid
+        ctx.error_at t.ident,
+          "invalid field platform-specific order for this type: #{field_order}"
+        return @fields
+      end
+
+      ordered_fields
+    end
   end
 
   struct Signature

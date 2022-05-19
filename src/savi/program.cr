@@ -224,7 +224,7 @@ class Savi::Program
     def initialize(@cap, @ident, @params = nil)
       @functions = [] of Function
       @tags = Set(Symbol).new
-      @metadata = Hash(Symbol, UInt64 | Bool).new
+      @metadata = Hash(Symbol, UInt64 | Bool | Array(String)).new
     end
 
     def dup_init(new_functions = nil)

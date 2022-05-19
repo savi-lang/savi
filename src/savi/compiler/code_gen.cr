@@ -17,6 +17,7 @@ class Savi::Compiler::CodeGen
   getter llvm : LLVM::Context
   getter target : LLVM::Target
   getter target_machine : LLVM::TargetMachine
+  getter target_info : Target
   getter mod : LLVM::Module
   getter builder : LLVM::Builder
 
@@ -104,6 +105,7 @@ class Savi::Compiler::CodeGen
     ).as(String)
     @target = LLVM::Target.from_triple(@target_triple)
     @target_machine = @target.create_target_machine(@target_triple).as(LLVM::TargetMachine)
+    @target_info = Target.new(@target_machine.triple)
     @llvm = LLVM::Context.new
     @mod = @llvm.new_module("main")
     @builder = @llvm.new_builder
