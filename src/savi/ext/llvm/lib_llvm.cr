@@ -20,6 +20,8 @@ lib LibLLVM
   fun const_shl = LLVMConstShl(lhs : ValueRef, rhs : ValueRef) : ValueRef
   fun build_is_null = LLVMBuildIsNull(builder : BuilderRef, value : ValueRef, name : UInt8*) : ValueRef
   fun build_is_not_null = LLVMBuildIsNotNull(builder : BuilderRef, value : ValueRef, name : UInt8*) : ValueRef
+  fun get_dll_storage_class = LLVMGetDLLStorageClass(global : ValueRef) : LLVM::DLLStorageClass
+  fun set_dll_storage_class = LLVMSetDLLStorageClass(global : ValueRef, cls : LLVM::DLLStorageClass)
 
   enum ByteOrdering
     BigEndian
