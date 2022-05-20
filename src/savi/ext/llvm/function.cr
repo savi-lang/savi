@@ -26,4 +26,13 @@ struct LLVM::Function
       end
     {% end %}
   end
+
+  def remove_attribute(
+    attribute : Attribute,
+    index = AttributeIndex::FunctionIndex
+  )
+    attribute.each_kind do |kind|
+      LibLLVM.remove_enum_attribute_at_index(self, index, kind)
+    end
+  end
 end

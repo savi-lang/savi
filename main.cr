@@ -15,9 +15,10 @@ module Savi
       ].join("\n"), short: "-v"
       help short: "-h"
       option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
-      option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+      option "-r", "--release", desc: "Compile in release mode (i.e. with optimizations)", type: Bool, default: false
       option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
       option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
+      option "--with-runtime-asserts", desc: "Compile with runtime assertions even in release mode", type: Bool, default: false
       option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
       option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
@@ -30,6 +31,7 @@ module Savi
           no_debug: opts.no_debug,
           print_perf: opts.print_perf,
         )
+        options.runtime_asserts = opts.with_runtime_asserts || !opts.release
         options.llvm_ir = true if opts.llvm_ir
         options.llvm_keep_fns = true if opts.llvm_keep_fns
         options.auto_fix = true if opts.fix
@@ -54,9 +56,10 @@ module Savi
         help short: "-h"
         argument "code", type: String, required: true, desc: "code to evaluate"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
-        option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "-r", "--release", desc: "Compile in release mode (i.e. with optimizations)", type: Bool, default: false
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
+        option "--with-runtime-asserts", desc: "Compile with runtime assertions even in release mode", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
@@ -65,6 +68,7 @@ module Savi
             no_debug: opts.no_debug,
             print_perf: opts.print_perf,
           )
+          options.runtime_asserts = opts.with_runtime_asserts || !opts.release
           options.auto_fix = true if opts.fix
           Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.eval args.code, options, opts.backtrace
@@ -77,9 +81,10 @@ module Savi
         help short: "-h"
         argument "name", type: String, required: false, desc: "Name of the manifest to compile"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
-        option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "-r", "--release", desc: "Compile in release mode (i.e. with optimizations)", type: Bool, default: false
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
+        option "--with-runtime-asserts", desc: "Compile with runtime assertions even in release mode", type: Bool, default: false
         option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
         option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
@@ -92,6 +97,7 @@ module Savi
             no_debug: opts.no_debug,
             print_perf: opts.print_perf,
           )
+          options.runtime_asserts = opts.with_runtime_asserts || !opts.release
           options.llvm_ir = true if opts.llvm_ir
           options.llvm_keep_fns = true if opts.llvm_keep_fns
           options.auto_fix = true if opts.fix
@@ -109,9 +115,10 @@ module Savi
         help short: "-h"
         argument "name", type: String, required: false, desc: "Name of the manifest to compile"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
-        option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "-r", "--release", desc: "Compile in release mode (i.e. with optimizations)", type: Bool, default: false
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
+        option "--with-runtime-asserts", desc: "Compile with runtime assertions even in release mode", type: Bool, default: false
         option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
         option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
@@ -123,6 +130,7 @@ module Savi
             no_debug: opts.no_debug,
             print_perf: opts.print_perf,
           )
+          options.runtime_asserts = opts.with_runtime_asserts || !opts.release
           options.llvm_ir = true if opts.llvm_ir
           options.llvm_keep_fns = true if opts.llvm_keep_fns
           options.auto_fix = true if opts.fix
