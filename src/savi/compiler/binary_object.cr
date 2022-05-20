@@ -80,6 +80,17 @@ class Savi::Compiler::BinaryObject
       File.join(BinaryObject::DEFAULT_RUNTIME_PATH, "src")
     )
 
+    # If we're configured to remove assertions in the runtime, remove them now.
+    #
+    # This is the default when compiling in release mode, but can be overridden
+    # if the user wants to keep assertions even in release mode.
+    #
+    # Removing assertions means less overhead, but undefined behavior when the
+    # assert is false, rather than predictably crashing with a helpful message.
+    if !ctx.options.runtime_asserts
+      mark_runtime_asserts_as_unreachable(runtime)
+    end
+
     # Link the runtime bitcode module into the generated application module.
     LibLLVM.link_modules(mod.to_unsafe, runtime.to_unsafe)
 
@@ -107,12 +118,36 @@ class Savi::Compiler::BinaryObject
     obj_path
   end
 
+  def self.mark_runtime_asserts_as_unreachable(mod : LLVM::Module)
+    # Find the function that is called upon assertion failure.
+    func = mod.functions["ponyint_assert_fail"]
+
+    # Remove all the code inside it.
+    basic_blocks = [] of LLVM::BasicBlock
+    func.basic_blocks.each { |b| basic_blocks << b }
+    basic_blocks.each(&.delete)
+
+    # Build a new entry block that simply says the code is unreachable.
+    builder = mod.context.new_builder
+    builder.position_at_end(func.basic_blocks.append("entry"))
+    builder.unreachable
+
+    # Instruct LLVM to always inline this function, effectively replacing
+    # all call sites of it with the `unreachable` instruction (or, more
+    # typically, get rid of the branch altogether and place an `llvm.assume`
+    # intrinsic on the condition, instructing LLVM to optimize it away).
+    func.add_attribute(LLVM::Attribute::AlwaysInline)
+  end
+
   def self.mark_module_functions_as_private(mod : LLVM::Module)
     mod.functions.each { |func|
-      # Only consider functions whose linkage is currently external.
-      next unless func.linkage == LLVM::Linkage::External
+      # Only consider functions whose linkage is currently external or internal,
+      # avoiding functions with the more specific kinds of linkage that
+      # probably shouldn't be meddled with, such as LinkOnceODR on Windows.
+      next unless func.linkage == LLVM::Linkage::External \
+        || func.linkage == LLVM::Linkage::Internal
 
-      # Only consider functions that are non-empty. In other words,
+      # Only consider functions that are non-empty of code. In other words,
       # only consider defined functions rather than merely declared ones.
       next if func.basic_blocks.empty?
 
@@ -127,6 +162,13 @@ class Savi::Compiler::BinaryObject
       # on Windows targets because if we have functions with `private`
       # linkage, they must not have `dllexport` or `dllimport` specified.
       func.dll_storage_class = LLVM::DLLStorageClass::Default
+
+      # Remove "noinline", "optnone", and "uwtable" attributes if present.
+      # These often are assigned by clang alongside external linkage,
+      # so we want to remove them when setting to private linkage.
+      func.remove_attribute(LLVM::Attribute::NoInline)
+      func.remove_attribute(LLVM::Attribute::OptimizeNone)
+      func.remove_attribute(LLVM::Attribute::UWTable)
     }
   end
 end

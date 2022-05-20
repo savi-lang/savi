@@ -8,6 +8,7 @@ class Savi::Compiler
     property no_debug
     property print_perf
     property skip_manifest
+    property runtime_asserts = true
     property llvm_ir = false
     property llvm_keep_fns = false
     property auto_fix = false

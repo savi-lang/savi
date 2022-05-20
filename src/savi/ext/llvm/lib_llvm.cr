@@ -22,6 +22,7 @@ lib LibLLVM
   fun build_is_not_null = LLVMBuildIsNotNull(builder : BuilderRef, value : ValueRef, name : UInt8*) : ValueRef
   fun get_dll_storage_class = LLVMGetDLLStorageClass(global : ValueRef) : LLVM::DLLStorageClass
   fun set_dll_storage_class = LLVMSetDLLStorageClass(global : ValueRef, cls : LLVM::DLLStorageClass)
+  fun remove_enum_attribute_at_index = LLVMRemoveEnumAttributeAtIndex(f : ValueRef, idx : AttributeIndex, kind : UInt32)
 
   enum ByteOrdering
     BigEndian
