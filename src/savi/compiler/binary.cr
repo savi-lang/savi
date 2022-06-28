@@ -91,6 +91,9 @@ class Savi::Compiler::Binary
     sdk_version = (target.arm64? ? "11.0.0" : "10.9.0")
     link_args << "-platform_version" << "macos" << sdk_version << sdk_version
 
+    # Link any additional libraries indicated by user code.
+    ctx.link_libraries.each { |name| link_args << "-l#{name}" }
+
     # Finally, specify the input object file and the output filename.
     link_args << obj_path
     link_args << "-o" << bin_path
@@ -114,6 +117,9 @@ class Savi::Compiler::Binary
     add_windows_lib(link_args, lib_paths, "libcmt")  # C runtime startup - always needed
     add_windows_lib(link_args, lib_paths, "DbgHelp") # used by runtime platform/ponyassert.c
     add_windows_lib(link_args, lib_paths, "WS2_32")  # used by runtime lang/socket.c
+
+    # Link any additional libraries indicated by user code.
+    ctx.link_libraries.each { |name| add_windows_lib(link_args, lib_paths, name) }
 
     # Finally, specify the input object file and the output filename.
     link_args << obj_path
@@ -183,6 +189,9 @@ class Savi::Compiler::Binary
     link_args << "-lc" << "-ldl" << "-lpthread" << "-lm"
     link_args << "-latomic" unless target.freebsd?
     link_args << "-lexecinfo" if target.musl? || target.freebsd?
+
+    # Link any additional libraries indicated by user code.
+    ctx.link_libraries.each { |name| link_args << "-l#{name}" }
 
     # Finally, specify the input object file and the output filename.
     link_args << obj_path
