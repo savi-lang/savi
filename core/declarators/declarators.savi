@@ -356,6 +356,16 @@
     :optional
   :body optional
 
+:: Declare a link-time dependency on a particular dynamic library, by name.
+::
+:: This influences the linker arguments that the Savi compiler will use in the
+:: linker invocation when building the binary executable for the program.
+::
+:: For example, declaring `:ffi_link_lib foo` will pass `-lfoo` to the linker.
+:declarator ffi_link_lib
+  :intrinsic
+  :term name Name
+
 :: Declare a binding to an unsafe foreign functions (FFI), such as a C function.
 ::
 :: It is common to define such bindings on a dedicated private module, which is

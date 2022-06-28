@@ -90,6 +90,9 @@ module Savi::Program::Intrinsic
         else
           raise NotImplementedError.new(declarator.name.value)
         end
+      when "ffi_link_lib"
+        name = terms["name"].as(AST::Identifier)
+        ctx.link_libraries.add(name.value)
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end
