@@ -269,7 +269,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 # This variant of the target compiles in release mode.
 $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANG} -O3 -o $@ -flto=thin \
+	${CLANG} -O3 -o $@ -flto=thin -no-pie \
 		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
@@ -282,7 +282,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llv
 # This variant of the target compiles in debug mode.
 $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANG} -O0 -o $@ -flto=thin \
+	${CLANG} -O0 -o $@ -flto=thin -no-pie \
 		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
@@ -296,7 +296,7 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 # This variant of the target will be used when running tests.
 $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANG} -O0 -o $@ -flto=thin \
+	${CLANG} -O0 -o $@ -flto=thin -no-pie \
 		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
