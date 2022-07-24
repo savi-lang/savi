@@ -1,8 +1,9 @@
 require "./src/savi"
 
-require "clim"
 require "random"
 require "file_utils"
+require "clim"
+require "fswatch"
 
 module Savi
   class Cli < Clim
@@ -83,6 +84,7 @@ module Savi
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
         option "-r", "--release", desc: "Compile in release mode (i.e. with optimizations)", type: Bool, default: false
         option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
+        option "--watch", desc: "Run continuously, watching for file changes (EXPERIMENTAL)", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--with-runtime-asserts", desc: "Compile with runtime assertions even in release mode", type: Bool, default: false
         option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
@@ -105,7 +107,11 @@ module Savi
           options.cross_compile = opts.cross_compile.not_nil! if opts.cross_compile
           options.manifest_name = args.name.not_nil! if args.name
           Dir.cd(opts.cd.not_nil!) if opts.cd
-          Cli.run options, opts.backtrace
+          if opts.watch
+            Cli.run_with_watch(options, opts.backtrace)
+          else
+            Cli.run(options, opts.backtrace)
+          end
         end
       end
       sub "build" do
@@ -317,6 +323,30 @@ module Savi
         ctx = Savi.compiler.compile(Dir.current, options.target_pass || :run, options)
         ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.run.exitcode
       end
+    end
+
+    # This feature is experimental - it's currently not quite working,
+    # due to some issues with inaccurate or incomplete caching of passes.
+    # Also, it doesn't watch precisely the right set of files -
+    # ideally it would watch all of the package globs that are in use,
+    # as well as the manifest files where those packages are defined.
+    # Once we get those issues ironed out, we should mark it as being
+    # no longer experimental, and publicize it as a recommended way of working.
+    def self.run_with_watch(options, backtrace = false)
+      ctx = Savi.compiler.compile(Dir.current, options.target_pass || :run, options)
+      finish_with_errors(ctx.errors, backtrace) if ctx.errors.any?
+      last_compiled_at = Time.utc
+
+      FSWatch.watch(".", latency: 0.25, recursive: true) do |event|
+        next unless event.created? || event.updated? || event.removed? || event.renamed?
+        next if event.timestamp < last_compiled_at
+
+        ctx = Savi.compiler.compile(Dir.current, options.target_pass || :run, options)
+        finish_with_errors(ctx.errors, backtrace) if ctx.errors.any?
+        last_compiled_at = Time.utc
+      end
+
+      sleep
     end
 
     def self.eval(code, options, backtrace = false)

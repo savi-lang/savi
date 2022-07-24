@@ -20,7 +20,7 @@ class Savi::Compiler::Sugar < Savi::AST::CopyOnMutateVisitor
     cached_hash, cached_func = cache_result if cache_result
     return cached_func if cached_func && cached_hash == input_hash
 
-    puts "    RERUN . #{self.class} #{f_link.show}" if cache_result && ctx.options.print_perf
+    puts "    RERUN . #{self} #{f_link.show}" if cache_result && ctx.options.print_perf
 
     yield
 

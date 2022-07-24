@@ -82,7 +82,7 @@ class Savi::Compiler::Context
     return package if package
 
     sources = compiler.source_service.get_directory_sources(path, source_package)
-    docs = sources.map { |source| Parser.parse(source) }
+    docs = sources.map { |source| Parser.parse(self, source) }
     compile_package(source_package, docs)
   end
 
@@ -92,14 +92,14 @@ class Savi::Compiler::Context
 
     # Otherwise go ahead and load the manifests.
     sources = compiler.source_service.get_manifest_sources_at(path)
-    docs = sources.map { |source| Parser.parse(source) }
+    docs = sources.map { |source| Parser.parse(self, source) }
     package = compile_package(sources.first.package, docs)
     self
   end
 
   def compile_package(manifest : Packaging::Manifest)
     sources = compiler.source_service.get_sources_for_manifest(self, manifest)
-    docs = sources.map { |source| Parser.parse(source) }
+    docs = sources.map { |source| Parser.parse(self, source) }
     sources << Source.none if sources.empty?
     compile_package(sources.first.package, docs)
   end
@@ -121,6 +121,8 @@ class Savi::Compiler::Context
     if (cache_result = @@cache[source_package.path]?; cache_result)
       cached_docs, cached_package = cache_result
       return cached_package if cached_docs == docs
+
+      puts "    RERUN . compile_package #{source_package.path}" if self.options.print_perf
     end
 
     compile_package_docs(Program::Package.new(source_package), docs)

@@ -8,6 +8,10 @@ shards:
     git: https://github.com/at-grandpa/clim.git
     version: 0.13.0
 
+  fswatch:
+    git: https://github.com/bcardiff/crystal-fswatch.git
+    version: 0.1.0+git.commit.04aca8703e22fb0ed3d7a39316a49bc0e30eefba
+
   lsp:
     git: https://github.com/jemc/crystal-lsp.git
     version: 0.1.0+git.commit.f7af03eed5b63974c04e92c0854b7c4a5b92c7f9

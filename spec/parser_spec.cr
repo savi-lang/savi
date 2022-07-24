@@ -14,7 +14,7 @@ describe Savi::Parser do
         c * 9 / 5 + 32.0
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ast = Savi::Parser.parse(nil, source)
 
     ast.to_a.pretty_inspect(74).should eq <<-AST
     [:doc,
@@ -65,7 +65,7 @@ describe Savi::Parser do
         ~x
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ast = Savi::Parser.parse(nil, source)
 
     # Can't use array literals here because Crystal is too slow to compile them.
     # See https://github.com/crystal-lang/crystal/issues/5792
@@ -181,7 +181,7 @@ describe Savi::Parser do
     MSG
 
     expect_raises Savi::Error, expected do
-      Savi::Parser.parse(source)
+      Savi::Parser.parse(nil, source)
     end
   end
 
@@ -205,7 +205,7 @@ describe Savi::Parser do
         >>>
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ast = Savi::Parser.parse(nil, source)
 
     ast.to_a.should eq [:doc,
       [:declare, [:ident, "actor"], [:ident, "Main"]],
@@ -226,7 +226,7 @@ describe Savi::Parser do
       :const y U64: -1
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ast = Savi::Parser.parse(nil, source)
 
     # Can't use array literals here because Crystal is too slow to compile them.
     ast.to_a.pretty_inspect(74).should eq <<-AST
@@ -245,8 +245,8 @@ describe Savi::Parser do
       :const greeting String: "Hello, World!"
     SOURCE
 
-    ast1 = Savi::Parser.parse(Savi::Source.new_example(content))
-    ast2 = Savi::Parser.parse(Savi::Source.new_example(content))
+    ast1 = Savi::Parser.parse(nil, Savi::Source.new_example(content))
+    ast2 = Savi::Parser.parse(nil, Savi::Source.new_example(content))
 
     ast1.should be ast2
   end
