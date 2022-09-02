@@ -1003,6 +1003,14 @@ class Savi::Compiler::CodeGen
         gen_bool(target.linux?)
       when "is_bsd"
         gen_bool(target.bsd?)
+      when "is_freebsd"
+        gen_bool(target.freebsd?)
+      when "is_openbsd"
+        gen_bool(target.openbsd?)
+      when "is_netbsd"
+        gen_bool(target.netbsd?)
+      when "is_dragonfly"
+        gen_bool(target.dragonfly?)
       when "is_macos"
         gen_bool(target.macos?)
       when "is_posix"
