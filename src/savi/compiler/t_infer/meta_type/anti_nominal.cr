@@ -1,5 +1,5 @@
 struct Savi::Compiler::TInfer::MetaType::AntiNominal
-  getter defn : ReifiedType
+  getter defn : ReifiedType | ReifiedTypeAlias | TypeParam
 
   def initialize(defn)
     raise NotImplementedError.new(defn) unless defn.is_a?(ReifiedType)
@@ -8,7 +8,7 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
 
   def inspect(io : IO)
     io << "-"
-    io << defn.link.name
+    io << defn.as(ReifiedType).link.name # TODO: support other defn types
   end
 
   def each_reachable_defn(ctx : Context) : Array(ReifiedType)
@@ -37,7 +37,7 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
   end
 
   def is_concrete?
-    defn.link.is_concrete?
+    defn.as(ReifiedType).link.is_concrete? # TODO: support other defn types
   end
 
   def negate : Inner
@@ -124,7 +124,7 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
     case defn
     when TypeParam
       index = type_params.index(defn)
-      index ? type_args[index].strip_cap.inner.negate : self
+      index ? type_args[index].inner.negate : self
     when ReifiedType
       args = defn.args.map do |arg|
         arg.substitute_type_params(type_params, type_args).as(MetaType)

@@ -307,11 +307,11 @@ module Savi::Compiler::TInfer
         end
       end
 
-      def maybe_fallback_based_on_mt_simplify(other_options : Array({Symbol, Inner})) : Inner
+      def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
         Fallback.build(
-          @default.value.maybe_fallback_based_on_mt_simplify(other_options),
+          @default.value.maybe_fallback_based_on_mt_simplify(options),
           @evaluate_mt,
-          @options.map { |(cond, inner)| {cond, inner.maybe_fallback_based_on_mt_simplify(other_options)} }
+          @options.map { |(cond, inner)| {cond, inner.maybe_fallback_based_on_mt_simplify(options)} }
         )
       end
 
