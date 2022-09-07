@@ -37,7 +37,7 @@ task:
         # in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
         MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=x86_64-alpine-linux-musl
       container:
-        image: alpine:edge # TODO: use alpine:3.16 when released
+        image: alpine:3.16
 
     - name: arm64-unknown-linux-musl
       environment:
@@ -52,7 +52,7 @@ task:
         # We also need to use `aarch64` instead of `arm64` here...
         MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=aarch64-alpine-linux-musl
       arm_container:
-        image: alpine:edge # TODO: use alpine:3.16 when released
+        image: alpine:3.16
 
     # # TODO: Enable FreeBSD after getting it working:
     # - name: x86_64-unknown-freebsd

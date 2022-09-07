@@ -1,5 +1,5 @@
 struct Savi::Compiler::Infer::MetaType::AntiNominal
-  getter defn : ReifiedType
+  getter defn : ReifiedType | ReifiedTypeAlias | TypeParam
 
   def initialize(defn)
     raise NotImplementedError.new(defn) unless defn.is_a?(ReifiedType)
@@ -8,7 +8,7 @@ struct Savi::Compiler::Infer::MetaType::AntiNominal
 
   def inspect(io : IO)
     io << "-"
-    io << defn.link.name
+    io << defn.as(ReifiedType).link.name # TODO: support other defn types
     io << "'any"
   end
 
@@ -38,7 +38,7 @@ struct Savi::Compiler::Infer::MetaType::AntiNominal
   end
 
   def is_concrete?
-    defn.link.is_concrete?
+    defn.as(ReifiedType).link.is_concrete? # TODO: support other defn types
   end
 
   def negate : Inner
