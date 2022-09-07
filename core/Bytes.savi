@@ -460,7 +460,8 @@
   :: Raises an error if there aren't enough bytes at that offset to fill a U16.
   :fun read_native_u16!(offset USize) U16
     if ((offset + U16.byte_width.usize) > @_size) error!
-    CPointer(U16).from_address(@_ptr._offset(offset).address)._unsafe._get_at(0)
+    _FFI.Cast(CPointer(U8), CPointer(U16)'box).pointer(@_ptr._offset(offset))
+      ._get_at(0)
 
   :: Write a U16 as bytes starting at the given offset, in native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
@@ -468,7 +469,7 @@
   :: Use push_native_u16 instead if writing past the end is needed.
   :fun ref write_native_u16!(offset USize, number U16)
     if ((offset + U16.byte_width.usize) > @_size) error!
-    CPointer(U16).from_address(@_ptr._offset(offset).address)._unsafe
+    _FFI.Cast(CPointer(U8), CPointer(U16)'ref).pointer(@_ptr._offset(offset))
       ._assign_at(0, number)
     @
 
@@ -476,7 +477,7 @@
   :: This is not suitable for protocols using a platform-independent byte order.
   :fun ref push_native_u16(number U16)
     @reserve(@_size + U16.byte_width.usize)
-    CPointer(U16).from_address(@_ptr._offset(@_size).address)._unsafe
+    _FFI.Cast(CPointer(U8), CPointer(U16)'ref).pointer(@_ptr._offset(@_size))
       ._assign_at(0, number)
     @_size += U16.byte_width.usize
     @
@@ -486,7 +487,8 @@
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.
   :fun read_native_u32!(offset USize) U32
     if ((offset + U32.byte_width.usize) > @_size) error!
-    CPointer(U32).from_address(@_ptr._offset(offset).address)._unsafe._get_at(0)
+    _FFI.Cast(CPointer(U8), CPointer(U32)'box).pointer(@_ptr._offset(offset))
+      ._get_at(0)
 
   :: Write a U32 as bytes starting at the given offset, in native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
@@ -494,7 +496,7 @@
   :: Use push_native_u32 instead if writing past the end is needed.
   :fun ref write_native_u32!(offset USize, number U32)
     if ((offset + U32.byte_width.usize) > @_size) error!
-    CPointer(U32).from_address(@_ptr._offset(offset).address)._unsafe
+    _FFI.Cast(CPointer(U8), CPointer(U32)'ref).pointer(@_ptr._offset(offset))
       ._assign_at(0, number)
     @
 
@@ -502,7 +504,7 @@
   :: This is not suitable for protocols using a platform-independent byte order.
   :fun ref push_native_u32(number U32)
     @reserve(@_size + U32.byte_width.usize)
-    CPointer(U32).from_address(@_ptr._offset(@_size).address)._unsafe
+    _FFI.Cast(CPointer(U8), CPointer(U32)'ref).pointer(@_ptr._offset(@_size))
       ._assign_at(0, number)
     @_size += U32.byte_width.usize
     @
@@ -512,7 +514,8 @@
   :: Raises an error if there aren't enough bytes at that offset to fill a U64.
   :fun read_native_u64!(offset USize) U64
     if ((offset + U64.byte_width.usize) > @_size) error!
-    CPointer(U64).from_address(@_ptr._offset(offset).address)._unsafe._get_at(0)
+    _FFI.Cast(CPointer(U8), CPointer(U64)'box).pointer(@_ptr._offset(offset))
+      ._get_at(0)
 
   :: Write a U64 as bytes starting at the given offset, in native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
@@ -520,7 +523,7 @@
   :: Use push_native_u64 instead if writing past the end is needed.
   :fun ref write_native_u64!(offset USize, number U64)
     if ((offset + U64.byte_width.usize) > @_size) error!
-    CPointer(U64).from_address(@_ptr._offset(offset).address)._unsafe
+    _FFI.Cast(CPointer(U8), CPointer(U64)'ref).pointer(@_ptr._offset(offset))
       ._assign_at(0, number)
     @
 
@@ -528,7 +531,7 @@
   :: This is not suitable for protocols using a platform-independent byte order.
   :fun ref push_native_u64(number U64)
     @reserve(@_size + U64.byte_width.usize)
-    CPointer(U64).from_address(@_ptr._offset(@_size).address)._unsafe
+    _FFI.Cast(CPointer(U8), CPointer(U64)'ref).pointer(@_ptr._offset(@_size))
       ._assign_at(0, number)
     @_size += U64.byte_width.usize
     @

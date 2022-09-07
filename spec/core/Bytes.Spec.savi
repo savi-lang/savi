@@ -26,23 +26,23 @@
 
   :it "won't reallocate when reserving space within the current allocation"
     data = Bytes.new(12)
-    orig_pointer_address = data.cpointer.usize
+    orig_pointer_address = data.cpointer.address
 
     data.reserve(16)
     assert: data.space == 16
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize == orig_pointer_address
+    assert: data.cpointer.address == orig_pointer_address
 
     data.reserve(0)
     assert: data.space == 16
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize == orig_pointer_address
+    assert: data.cpointer.address == orig_pointer_address
 
   :it "will reallocate when reserving space beyond the current allocation"
     data = Bytes.new(12)
-    orig_pointer_address = data.cpointer.usize
+    orig_pointer_address = data.cpointer.address
 
     // Go to a much larger size in a different allocator pool,
     // to ensure that we actually get a new pointer address.
@@ -51,7 +51,7 @@
     assert: data.space == 2048
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize != orig_pointer_address
+    assert: data.cpointer.address != orig_pointer_address
 
   :it "reallocates to a size that includes a null terminator when appending"
     data = Bytes.new
@@ -219,8 +219,8 @@
     assert: right == b"le"
 
     // The three buffers are adjacent in memory.
-    assert: left.cpointer(2).usize == center.cpointer.usize
-    assert: center.cpointer(3).usize == right.cpointer.usize
+    assert: left.cpointer(2).address == center.cpointer.address
+    assert: center.cpointer(3).address == right.cpointer.address
 
     // The first two buffers have a space exactly the same as their size,
     // and the right buffer retains whatever space padding was in the original.
@@ -238,10 +238,10 @@
 
     // After the pushes above, The buffers are no longer adjacent in memory,
     // checking with a pointer offset of both the original size and new size.
-    assert: left.cpointer(2).usize != center.cpointer.usize
-    assert: left.cpointer(3).usize != center.cpointer.usize
-    assert: center.cpointer(3).usize != right.cpointer.usize
-    assert: center.cpointer(4).usize != right.cpointer.usize
+    assert: left.cpointer(2).address != center.cpointer.address
+    assert: left.cpointer(3).address != center.cpointer.address
+    assert: center.cpointer(3).address != right.cpointer.address
+    assert: center.cpointer(4).address != right.cpointer.address
 
     // Also now the first two buffers have some padding in their space,
     // since they reserved more space when they were forced to reallocate.

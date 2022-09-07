@@ -374,6 +374,9 @@ class Savi::Compiler::CodeGen
     # Generate all global values associated with this type.
     @gtypes.each_value(&.gen_singleton(self))
 
+    # Generate all Savi-supplied FFI-accessible functions.
+    gen_savi_supplied_ffi_funcs
+
     # Generate all function implementations.
     @gtypes.each_value(&.gen_func_impls(self))
 
@@ -400,6 +403,14 @@ class Savi::Compiler::CodeGen
           "the dumped LLVM IR file located at: #{Binary.path_for(ctx)}.ll"}
       ]
     end
+  end
+
+  def gen_savi_supplied_ffi_funcs
+    @mod.functions.add("savi_cast_pointer", [@ptr], @ptr) { |f|
+      gen_func_start(f)
+      @builder.ret(f.params[0])
+      gen_func_end
+    }
   end
 
   def gen_wrapper # TODO: Bring back the JIT or remove this code.
@@ -983,8 +994,6 @@ class Savi::Compiler::CodeGen
         @builder.is_not_null(params[0])
       when "address"
         @builder.ptr_to_int(params[0], @isize)
-      when "from_address"
-        @builder.int_to_ptr(params[0], llvm_type)
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
       end

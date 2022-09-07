@@ -26,23 +26,23 @@
 
   :it "won't reallocate when reserving space within the current allocation"
     data = String.new(12)
-    orig_pointer_address = data.cpointer.usize
+    orig_pointer_address = data.cpointer.address
 
     data.reserve(16)
     assert: data.space == 16
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize == orig_pointer_address
+    assert: data.cpointer.address == orig_pointer_address
 
     data.reserve(0)
     assert: data.space == 16
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize == orig_pointer_address
+    assert: data.cpointer.address == orig_pointer_address
 
   :it "will reallocate when reserving space beyond the current allocation"
     data = String.new(12)
-    orig_pointer_address = data.cpointer.usize
+    orig_pointer_address = data.cpointer.address
 
     // Go to a much larger size in a different allocator pool,
     // to ensure that we actually get a new pointer address.
@@ -51,7 +51,7 @@
     assert: data.space == 2048
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize != orig_pointer_address
+    assert: data.cpointer.address != orig_pointer_address
 
   :it "reallocates to a size that includes a null terminator when appending"
     data = String.new

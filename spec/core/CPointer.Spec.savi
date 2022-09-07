@@ -2,10 +2,12 @@
   :is Spec
   :const describes: "CPointer"
 
-  :it "converts to and from USize"
+  :it "returns the address of the pointer as an unsigned integer"
     assert: CPointer(U8).null.address == 0
-    assert: CPointer(U8).from_address(0xdeadbeef).address == 0xdeadbeef
+    assert: (static_address_of_function Bytes.join).address != 0
 
   :it "tests if it is a null pointer or not"
     assert: CPointer(U8).null.is_null
     assert: CPointer(U8).null.is_not_null.is_false
+    assert: (static_address_of_function Bytes.join).is_null.is_false
+    assert: (static_address_of_function Bytes.join).is_not_null

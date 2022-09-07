@@ -31,23 +31,23 @@
 
   :it "won't reallocate when reserving space within the current allocation"
     data = BitArray.new(63)
-    orig_pointer_address = data.cpointer.usize
+    orig_pointer_address = data.cpointer.address
 
     data.reserve(64)
     assert: data.space == 64
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize == orig_pointer_address
+    assert: data.cpointer.address == orig_pointer_address
 
     data.reserve(0)
     assert: data.space == 64
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize == orig_pointer_address
+    assert: data.cpointer.address == orig_pointer_address
 
   :it "will reallocate when reserving space beyond the current allocation"
     data = BitArray.new(12)
-    orig_pointer_address = data.cpointer.usize
+    orig_pointer_address = data.cpointer.address
 
     // Go to a much larger size in a different allocator pool,
     // to ensure that we actually get a new pointer address.
@@ -56,7 +56,7 @@
     assert: data.space == 131072
     assert: data.size == 0
     assert: data.cpointer.is_not_null
-    assert: data.cpointer.usize != orig_pointer_address
+    assert: data.cpointer.address != orig_pointer_address
 
   :it "pushes new bits onto the end of the array and reads them back out"
     // Bool values can be given in numeric form (0/1), or named (True/False).

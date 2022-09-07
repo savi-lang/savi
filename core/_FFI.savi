@@ -12,3 +12,18 @@
   :ffi pony_os_std_write(
     fp CPointer(None)'ref, buffer CPointer(U8), length USize
   ) None
+
+:module _FFI.Cast(A, B)
+  :: An FFI-only utility function for bit-casting type A to B.
+  ::
+  :: This is only meant to be used for pointer types, and will
+  :: fail badly if either A or B is not an ABI pointer type
+  ::
+  :: Obviously this utility function makes it easy to break
+  :: memory safety, so it should be used with great care.
+  ::
+  :: Being private, It is only accessible from within the core library,
+  :: though other libraries can set up similar mechanisms as well,
+  :: provided that they are explicitly allowed by the root manifest to use FFI.
+  :ffi pointer(input A) B
+    :foreign_name savi_cast_pointer
