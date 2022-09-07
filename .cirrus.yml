@@ -6,6 +6,7 @@
 task:
   environment:
     GITHUB_API_TOKEN: ENCRYPTED[5f9b960dd53fb09b34bcb26f7f8a926071f0177e0ec814e7d122db0e2184d3e913ec78d5748e27664c0fef66fde950fe]
+    MAKE: make
     CC: clang
     CXX: clang++
 
@@ -54,18 +55,18 @@ task:
       arm_container:
         image: alpine:3.16
 
-    # # TODO: Enable FreeBSD after getting it working:
-    # - name: x86_64-unknown-freebsd
-    #   environment:
-    #     TRIPLE: x86_64-unknown-freebsd
-    #     DEPS_INSTALL: "
-    #       echo 'FreeBSD:{url:"pkg+http://pkg.FreeBSD.org/${ABI}/latest"}' \
-    #         > /usr/local/etc/pkg/repos/FreeBSD.conf && \
-    #       pkg update && \
-    #       pkg install -y libunwind bash curl llvm-devel crystal shards && \
-    #       ln -s /usr/local/bin/llvm-config-devel /usr/bin/llvm-config"
-    #   freebsd_instance:
-    #     image: freebsd-13-0-release-amd64
+    - name: x86_64-unknown-freebsd
+      environment:
+        TRIPLE: x86_64-unknown-freebsd
+        DEPS_INSTALL: "\
+          pkg update && \
+          pkg install -y gmake libunwind bash curl llvm-devel crystal shards boehm-gc-threaded && \
+          ln -s /usr/local/bin/llvm-config-devel /usr/bin/llvm-config"
+        MAKE: gmake
+        MAKE_EXTRA_ARGS: " \
+          LIB_GC=/usr/local/lib/libgc-threaded.a"
+      freebsd_instance:
+        image: freebsd-13-0-release-amd64
 
     - name: x86_64-apple-macosx
       environment:
@@ -128,7 +129,7 @@ task:
 
   build_script:
     - mkdir -p out/bin
-    - make build/savi-release SAVI_VERSION=${CIRRUS_TAG:-unknown} ${MAKE_EXTRA_ARGS}
+    - ${MAKE} build/savi-release SAVI_VERSION=${CIRRUS_TAG:-unknown} ${MAKE_EXTRA_ARGS}
     - mv build/savi-release out/bin/savi
 
   copy_core_script:
