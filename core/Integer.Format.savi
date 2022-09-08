@@ -8,6 +8,8 @@
   :fun hexadecimal: Integer.Format.Hexadecimal(T)._new(@_value)
   :fun binary: Integer.Format.Binary(T)._new(@_value)
 
+  :fun unicode: Integer.Format.Unicode(T)._new(@_value)
+
   :fun dec: @decimal
   :fun hex: @hexadecimal
   :fun bin: @binary
@@ -220,3 +222,19 @@
     if !show_zeros out.push_byte('0')
 
     --out
+
+:: Format the given integer as Unicode codepoint.
+:struct val Integer.Format.Unicode(T Integer(T)'val)
+  :is IntoString
+
+  :let _value T
+
+  :new val _new(@_value)
+
+  :fun into_string(out String'iso) String'iso
+    out.push_utf8(@_value.u32)
+    --out
+
+  :fun into_string_space USize
+    // This is only a rough guess
+    if (@_value.u32 < 128) (1 | 4)
