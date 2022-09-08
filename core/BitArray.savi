@@ -85,7 +85,7 @@
     other_ptr._unsafe._copy_to(@_ptr, size)
 
   :fun val as_bytes
-    ptr = CPointer(U8).from_address(@_ptr.address)
+    ptr = _FFI.Cast(CPointer(U64), CPointer(U8)).pointer(@_ptr)
     Bytes.val_from_cpointer(ptr._unsafe, @_u8_space, @_u8_space)
 
   :fun val as_native_u64_array
