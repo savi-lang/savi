@@ -8,6 +8,9 @@
     assert: "\(-36)" == "-36"
     assert: "\(9999)" == "9999"
     assert: "\(-9999)" == "-9999"
+    assert: "\(U64.max_value)" == "18446744073709551615"
+    assert: "\(I64.max_value)" == "9223372036854775807"
+    assert: "\(I64.min_value)" == "-9223372036854775808"
 
   :it "never under-estimates the amount of space to emit a U64 into a string"
     value = U64.max_value

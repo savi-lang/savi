@@ -210,6 +210,10 @@
   :: Return true if the value is odd (its least significant bit is set).
   :fun val is_odd Bool
 
+  :: Count significant bits, starting with the most significant nonzero bit,
+  :: until the least significant bit (regardless of whether it is zero).
+  :fun val significant_bits U8
+
   :: Count consecutive zero bits, starting with the most significant bit,
   :: until the first one bit is reached (or until the end of the bit sequence).
   :fun val leading_zero_bits U8
@@ -358,6 +362,7 @@
     )
   :fun val is_even Bool: @bit_and(@one) == @zero
   :fun val is_odd Bool: @bit_and(@one) == @one
+  :fun val significant_bits U8: @bit_width - @leading_zero_bits
   :fun val leading_zero_bits U8: compiler intrinsic
   :fun val trailing_zero_bits U8: compiler intrinsic
   :fun val total_one_bits U8: compiler intrinsic
