@@ -49,3 +49,9 @@
     assert: "\(U8[0].format.bin.without_leading_zeros)" == "0b0"
     assert: "\(I16[36].format.bin.without_leading_zeros)" == "0b100100"
     assert: "\(I16[-36].format.bin.without_leading_zeros)" == "0b1111111111011100"
+
+  :it "can format integers as Unicode codepoints"
+    assert: "\('S'.format.unicode)" == "S"
+    assert: "\(U8[83].format.unicode)" == "S"
+    assert: "\(U32[0x2665].format.unicode)" == "♥"
+    assert: "\(U32[0x2665].format.unicode)" == "\u2665"
