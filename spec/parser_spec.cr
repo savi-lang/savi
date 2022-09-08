@@ -185,6 +185,25 @@ describe Savi::Parser do
     end
   end
 
+  it "complains when a string literal has an unknown escape character" do
+    source = Savi::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        greeting = "Hello, World\\?"
+    SOURCE
+
+    expected = <<-MSG
+    This is an invalid escape character:
+    from (example):3:
+        greeting = "Hello, World\\?"
+                                 ^
+    MSG
+
+    expect_raises Savi::Error, expected do
+      Savi::Parser.parse(source)
+    end
+  end
+
   it "handles nifty heredoc string literals" do
     source = Savi::Source.new_example <<-SOURCE
     :actor Main

@@ -48,6 +48,18 @@ module Savi::Parser::Builder
       )
     end
 
+    def pos_single_with_offset(
+      token : Pegmatite::Token,
+      offset : Int32,
+    ) : Source::Pos
+      kind, start, finish = token
+
+      start = start + offset
+      finish = start + 1
+
+      pos({kind, start, finish})
+    end
+
     def slice(token : Pegmatite::Token)
       kind, start, finish = token
       slice(start...finish)
@@ -58,11 +70,7 @@ module Savi::Parser::Builder
     end
 
     def slice_with_escapes(token : Pegmatite::Token)
-      kind, start, finish = token
-      slice_with_escapes(start...finish)
-    end
-
-    def slice_with_escapes(range : Range)
+      range = token[1]...token[2]
       string = slice(range)
       reader = Char::Reader.new(string)
 
@@ -91,7 +99,8 @@ module Savi::Parser::Builder
                   elsif 'A' <= hex_char <= 'F'
                     10 + (hex_char - 'A')
                   else
-                    raise "invalid escape hex character: #{hex_char}"
+                    Error.at pos_single_with_offset(token, reader.pos),
+                      "This is an invalid escape hex character"
                   end
                 byte_value = 16 * byte_value + hex_value
               end
@@ -108,7 +117,8 @@ module Savi::Parser::Builder
                   elsif 'A' <= hex_char <= 'F'
                     10 + (hex_char - 'A')
                   else
-                    raise "invalid unicode escape hex character: #{hex_char}"
+                    Error.at pos_single_with_offset(token, reader.pos),
+                      "This is an invalid unicode escape hex character"
                   end
                 codepoint = 16 * codepoint + hex_value
               end
@@ -126,10 +136,8 @@ module Savi::Parser::Builder
                 reader.next_char
               end
             else
-              # Not a valid escape character - pass it on as a literal slash
-              # followed by that literal character, as if not an escape.
-              result << '\\'
-              result << reader.current_char
+              Error.at pos_single_with_offset(token, reader.pos),
+                "This is an invalid escape character"
             end
           else
             result << reader.current_char
