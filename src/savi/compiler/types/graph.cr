@@ -505,6 +505,9 @@ module Savi::Compiler::Types::Graph
     end
 
     def run_for_function(ctx : Context, f : Program::Function)
+      # TODO
+      return
+
       @analysis.init_func_self(f.ident.pos)
       if f.has_tag?(:constructor)
         @analysis.init_constructor_return_var(self, f.ident.pos)
