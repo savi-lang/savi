@@ -260,6 +260,18 @@
   :: If the platform is natively big-endian, the byte order will be swapped.
   :fun val le_to_native T
 
+  :: Convert the native-endian representation of a value to network byte order
+  :: (big-endian).
+  :: Alias of `native_to_be`.
+  :fun val native_to_network T
+    @native_to_be
+
+  :: Convert the network byte-order representation (bid-endian) of a value to
+  :: the native-endian.
+  :: Alias of `be_to_native`.
+  :fun val network_to_native T
+    @be_to_native
+
 :: A type which can be counted, using the given type T.
 :trait val Integer.Countable(T Integer(T)'val)
   :is Numeric.Representable
