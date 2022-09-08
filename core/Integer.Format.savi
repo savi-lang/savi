@@ -7,7 +7,6 @@
   :fun decimal: Integer.Format.Decimal(T)._new(@_value)
   :fun hexadecimal: Integer.Format.Hexadecimal(T)._new(@_value)
   :fun binary: Integer.Format.Binary(T)._new(@_value)
-
   :fun unicode: Integer.Format.Unicode(T)._new(@_value)
 
   :fun dec: @decimal
