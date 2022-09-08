@@ -1,0 +1,123 @@
+:class Savi.Integer.BitwiseArithmetic.Spec
+  :is Spec
+  :const describes: "Integer.BitwiseArithmetic"
+
+  :it "implements bitwise analysis and manipulation for integers"
+    assert: U8[18]                    == 0b00010010
+    assert: U8[18].invert             == 0b11101101
+    assert: U8[18].reverse_bits       == 0b01001000
+    assert: U8[18].swap_bytes         == 18
+    assert: U16[0x1234].swap_bytes    == 0x3412
+    assert: U32[66052].swap_bytes     == 67240192
+    assert: U8[18].is_even
+    assert: !U8[18].is_odd
+    assert: !U8[17].is_even
+    assert: U8[17].is_odd
+    assert: U8[0].is_even
+    assert: !U8[0].is_odd
+    assert: U8[18].leading_zero_bits  == 3
+    assert: U8[18].trailing_zero_bits == 1
+    assert: U8[18].total_one_bits     == 2
+    assert: U8[18].total_zero_bits    == 6
+    assert: U8[0].next_pow2           == 1
+    assert: U8[2].next_pow2           == 2
+    assert: U8[17].next_pow2          == 32
+    assert: U8[127].next_pow2         == 128
+    assert: U8[128].next_pow2         == 128
+    assert: U8[129].next_pow2         == 0
+    assert: U16[0b1110010110001010].bit_shl(5)  == 0b1011000101000000
+    assert: U16[0b1110010110001010].bit_rotl(5) == 0b1011000101011100
+    assert: U16[0b1110010110001010].bit_shr(5)  == 0b0000011100101100
+    assert: U16[0b1110010110001010].bit_rotr(5) == 0b0101011100101100
+    assert: True.bit_shl(0) == True
+    assert: True.bit_shl(1) == False
+    assert: True.bit_shr(0) == True
+    assert: True.bit_shr(1) == False
+    assert: False.bit_shl(0) == False
+    assert: False.bit_shl(1) == False
+    assert: False.bit_shr(0) == False
+    assert: False.bit_shr(1) == False
+
+  :it "uses logical bit shift right, even for signed integers"
+    // Some languages/compilers use "arithmetic right shift" for signed integers
+    // in which the sign bit is preserved during shifting, such that shifting
+    // by one can be treated as a proxy for dividing by two, even for
+    // negative numbers (which must keep the sign bit as 1 to remain negative).
+    //
+    // However, in Savi, we use only "logical right shift", wherein for any
+    // non-zero shift amount, the new most significant bits will always be zero.
+    // This makes bit shifting operations work consistently for signed and
+    // unsigned integers, but makes it not a tenable practice to use shifting
+    // as a proxy for dividing by two. Just use division instead, and let LLVM
+    // optimize division by twos into arithmetic bit shifts where appropriate.
+
+    assert: I16[0b1011011100111101].bit_shr(0)  == 0b1011011100111101
+    assert: I16[0b1011011100111101].bit_shr(1)  == 0b0101101110011110
+    assert: I16[0b1011011100111101].bit_shr(5)  == 0b0000010110111001
+    assert: I16[0b1011011100111101].bit_shr(13) == 0b0000000000000101
+    assert: I16[0b1011011100111101].bit_shr(16) == 0b0000000000000000
+
+    assert: U16[0b1011011100111101].bit_shr(0)  == 0b1011011100111101
+    assert: U16[0b1011011100111101].bit_shr(1)  == 0b0101101110011110
+    assert: U16[0b1011011100111101].bit_shr(5)  == 0b0000010110111001
+    assert: U16[0b1011011100111101].bit_shr(13) == 0b0000000000000101
+    assert: U16[0b1011011100111101].bit_shr(16) == 0b0000000000000000
+
+  :it "converts U8 integers from native to big/little endianness and vice versa"
+    u8 = U8[0x12]
+
+    assert: u8.native_to_be == u8
+    assert: u8.be_to_native == u8
+    assert: u8.native_to_le == u8
+    assert: u8.le_to_native == u8
+
+  :it "converts U16 integers from native to big/little endianness and vice versa"
+    u16 = U16[0x1234]
+    u16_swapped = U16[0x3412]
+
+    if Platform.is_little_endian (
+      assert: u16.native_to_be == u16_swapped
+      assert: u16.native_to_le == u16
+      assert: u16.be_to_native == u16_swapped
+      assert: u16.le_to_native == u16
+    )
+    if Platform.is_big_endian (
+      assert: u16.native_to_be == u16
+      assert: u16.native_to_le == u16_swapped
+      assert: u16.be_to_native == u16
+      assert: u16.le_to_native == u16_swapped
+    )
+
+  :it "converts U32 integers from native to big/little endianness and vice versa"
+    u32 = U32[0x1234_5678]
+    u32_swapped = U32[0x7856_3412]
+
+    if Platform.is_little_endian (
+      assert: u32.native_to_be == u32_swapped
+      assert: u32.native_to_le == u32
+      assert: u32.be_to_native == u32_swapped
+      assert: u32.le_to_native == u32
+    )
+    if Platform.is_big_endian (
+      assert: u32.native_to_be == u32
+      assert: u32.native_to_le == u32_swapped
+      assert: u32.be_to_native == u32
+      assert: u32.le_to_native == u32_swapped
+    )
+
+  :it "converts U64 integers from native to big/little endianness and vice versa"
+    u64 = U64[0x1234_5678_9abc_def0]
+    u64_swapped = U64[0xf0de_bc9a_7856_3412]
+
+    if Platform.is_little_endian (
+      assert: u64.native_to_be == u64_swapped
+      assert: u64.native_to_le == u64
+      assert: u64.be_to_native == u64_swapped
+      assert: u64.le_to_native == u64
+    )
+    if Platform.is_big_endian (
+      assert: u64.native_to_be == u64
+      assert: u64.native_to_le == u64_swapped
+      assert: u64.be_to_native == u64
+      assert: u64.le_to_native == u64_swapped
+    )

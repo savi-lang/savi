@@ -1,0 +1,51 @@
+:class Savi.FloatingPoint.Bounded.Spec
+  :is Spec
+  :const describes: "FloatingPoint.Bounded"
+
+  :it "defines zero and one"
+    assert: F32.zero == 0
+    assert: F64.zero == 0
+    assert: F32.one == 1
+    assert: F64.one == 1
+
+  :it "defines minimum and maximum finite representable values"
+    assert: F32.min_value.bits == 0xff7f_ffff
+    assert: F32.max_value.bits == 0x7f7f_ffff
+    assert: F64.min_value.bits == 0xffef_ffff_ffff_ffff
+    assert: F64.max_value.bits == 0x7fef_ffff_ffff_ffff
+
+  :it "defines (one possible value of) NaN"
+    assert: F32.nan.bits == 0x7fc0_0000
+    assert: F64.nan.bits == 0x7ff8_0000_0000_0000
+    assert: F32.nan.is_nan
+    assert: F64.nan.is_nan
+
+  :it "defines (one possible value of) positive infinity"
+    assert: F32.infinity.bits == 0x7f80_0000
+    assert: F64.infinity.bits == 0x7ff0_0000_0000_0000
+    assert: F32.infinity.is_infinite
+    assert: F64.infinity.is_infinite
+    assert: F32.infinity > 0
+    assert: F64.infinity > 0
+    assert: F32.zero < F32.infinity
+    assert: F64.zero < F64.infinity
+    assert: F32.infinity == F32[1] / 0
+    assert: F64.infinity == F64[1] / 0
+
+  :it "defines (one possible value of) negative infinity"
+    assert: F32.neg_infinity.bits == 0xff80_0000
+    assert: F64.neg_infinity.bits == 0xfff0_0000_0000_0000
+    assert: F32.neg_infinity.is_infinite
+    assert: F64.neg_infinity.is_infinite
+    assert: F32.neg_infinity < 0
+    assert: F64.neg_infinity < 0
+    assert: F32.zero > F32.neg_infinity
+    assert: F64.zero > F64.neg_infinity
+    assert: F32.neg_infinity == F32[-1] / 0
+    assert: F64.neg_infinity == F64[-1] / 0
+
+  :it "defines units of least precision just above and below 1.0"
+    assert: F32.epsilon      == F32[2].pow(F32.sig_bit_width.f32.negate)
+    assert: F32.half_epsilon == F32[2].pow(F32.sig_bit_width.f32.negate - 1)
+    assert: F64.epsilon      == F64[2].pow(F64.sig_bit_width.f64.negate)
+    assert: F64.half_epsilon == F64[2].pow(F64.sig_bit_width.f64.negate - 1)

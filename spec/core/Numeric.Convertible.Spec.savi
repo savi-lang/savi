@@ -1,0 +1,133 @@
+:class Savi.Numeric.Convertible.Spec
+  :is Spec
+  :const describes: "Numeric.Convertible"
+
+  :it "converts from integer to other numeric types"
+    assert: U32[36].u8     == 36
+    assert: U32[36].u8!    == 36
+    assert: U32[36].u16    == 36
+    assert: U32[36].u16!   == 36
+    assert: U32[36].u32    == 36
+    assert: U32[36].u32!   == 36
+    assert: U32[36].u64    == 36
+    assert: U32[36].u64!   == 36
+    assert: U32[36].usize  == 36
+    assert: U32[36].usize! == 36
+    assert: U32[36].i8     == 36
+    assert: U32[36].i8!    == 36
+    assert: U32[36].i16    == 36
+    assert: U32[36].i16!   == 36
+    assert: U32[36].i32    == 36
+    assert: U32[36].i32!   == 36
+    assert: U32[36].i64    == 36
+    assert: U32[36].i64!   == 36
+    assert: U32[36].isize  == 36
+    assert: U32[36].isize! == 36
+    assert: U32[36].f32    == 36
+    assert: U32[36].f32!   == 36
+    assert: U32[36].f64    == 36
+    assert: U32[36].f64!   == 36
+
+  :it "handles edge cases for conversions from integer"
+    assert: U64[0x0124].u8                 == 36
+    assert: U64[0x0001_0024].u16           == 36
+    assert: U64[0x0001_0000_0024].u32      == 36
+    assert: U64[0xffff_ffff_ffff_ffff].u64 == 0xffff_ffff_ffff_ffff
+    assert: U64[0x0124].i8                 == 36
+    assert: U64[0x0001_0024].i16           == 36
+    assert: U64[0x0001_0000_0024].i32      == 36
+    assert: U64[0xffff_ffff_ffff_ffff].i64 == 0xffff_ffff_ffff_ffff
+    assert error: U64[0x0124].u8!                 // overflow
+    assert error: U64[0x0001_0024].u16!           // overflow
+    assert error: U64[0x0001_0000_0024].u32!      // overflow
+    assert: U64[0xffff_ffff_ffff_ffff].u64! == 0xffff_ffff_ffff_ffff
+    assert error: U64[0x0124].i8!                 // overflow
+    assert error: U64[0x0001_0024].i16!           // overflow
+    assert error: U64[0x0001_0000_0024].i32!      // overflow
+    assert error: U64[0xffff_ffff_ffff_ffff].i64! // overflow
+    assert: I64[-1].u8  == 0xff
+    assert: I64[-1].u16 == 0xffff
+    assert: I64[-1].u32 == 0xffff_ffff
+    assert: I64[-1].u64 == 0xffff_ffff_ffff_ffff
+    assert: I64[-1].i8  == -1
+    assert: I64[-1].i16 == -1
+    assert: I64[-1].i32 == -1
+    assert: I64[-1].i64 == -1
+    assert: I64[0xff].negate.i8 == 1
+    assert: I64[0xffff].negate.i16 == 1
+    assert: I64[0xffff_ffff].negate.i32 == 1
+    assert error: I64[-1].u8!
+    assert error: I64[-1].u16!
+    assert error: I64[-1].u32!
+    assert error: I64[-1].u64!
+    assert: I64[-1].i8!  == -1
+    assert: I64[-1].i16! == -1
+    assert: I64[-1].i32! == -1
+    assert: I64[-1].i64! == -1
+    assert error: I64[0xff].negate.i8!
+    assert error: I64[0xffff].negate.i16!
+    assert error: I64[0xffff_ffff].negate.i32!
+
+  :it "converts from floating point to other numeric types"
+    assert: F32[36].u32  == 36
+    assert: F32[36].u32! == 36
+    assert: F64[36].u32  == 36
+    assert: F64[36].u32! == 36
+    assert: F32[36].i32  == 36
+    assert: F32[36].i32! == 36
+    assert: F64[36].i32  == 36
+    assert: F64[36].i32! == 36
+    assert: F32[36].f64  == 36
+    assert: F32[36].f64! == 36
+    assert: F64[36].f32  == 36
+    assert: F64[36].f32! == 36
+
+  :it "handles edge cases for conversions from floating point"
+    assert: F32.nan.u8          == 0
+    assert: F32.infinity.u8     == 255
+    assert: F32.neg_infinity.u8 == 0
+    assert: F32[256].u8         == 255
+    assert: F32[-1].u8          == 0
+    assert error: F32.nan.u8!
+    assert error: F32.infinity.u8!
+    assert error: F32.neg_infinity.u8!
+    assert error: F32[256].u8!
+    assert error: F32[-1].u8!
+    assert: F64.nan.u8          == 0
+    assert: F64.infinity.u8     == 255
+    assert: F64.neg_infinity.u8 == 0
+    assert: F64[256].u8         == 255
+    assert: F64[-1].u8          == 0
+    assert error: F64.nan.u8!
+    assert error: F64.infinity.u8!
+    assert error: F64.neg_infinity.u8!
+    assert error: F64[256].u8!
+    assert error: F64[-1].u8!
+    assert: F32.nan.i8          == 0
+    assert: F32.infinity.i8     == 127
+    assert: F32.neg_infinity.i8 == -128
+    assert: F32[128].i8         == 127
+    assert: F32[-129].i8        == -128
+    assert error: F32.nan.i8!
+    assert error: F32.infinity.i8!
+    assert error: F32.neg_infinity.i8!
+    assert error: F32[128].i8!
+    assert error: F32[-129].i8!
+    assert: F64.nan.i8          == 0
+    assert: F64.infinity.i8     == 127
+    assert: F64.neg_infinity.i8 == -128
+    assert: F64[128].i8         == 127
+    assert: F64[-129].i8        == -128
+    assert error: F64.nan.i8!
+    assert error: F64.infinity.i8!
+    assert error: F64.neg_infinity.i8!
+    assert error: F64[128].i8!
+    assert error: F64[-129].i8!
+    assert: F64.nan.f32.is_nan
+    assert: F64.nan.f32!.is_nan
+    assert: F64.max_value.f32   == F32.infinity
+    assert: F64.min_value.f32   == F32.neg_infinity
+    assert error: F64.max_value.f32!
+    assert error: F64.min_value.f32!
+    assert: F64[16777217.0].f32 == 16777216.0
+    assert: F64[16777217.0].f32! == 16777216.0

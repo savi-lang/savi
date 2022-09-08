@@ -1,0 +1,9 @@
+:class Savi.Integer.WideArithmetic.Spec
+  :is Spec
+  :const describes: "Integer.WideArithmetic"
+
+  :it "implements special multiplication without overflow by returning a pair"
+    product = U8[99].wide_multiply(200)
+    assert: product.head == 0x4d
+    assert: product.tail == 0x58
+    assert: product.head.u16.bit_shl(8) + product.tail.u16 == U16[99] * 200

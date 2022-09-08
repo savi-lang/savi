@@ -1,0 +1,25 @@
+:class Savi.FloatingPoint.Arithmetic.Spec
+  :is Spec
+  :const describes: "FloatingPoint.Arithmetic"
+
+  :it "implements logarithms and exponents for floating points"
+    assert: F64[1].log == 0
+    assert: F32[1].log == 0
+    assert: F64[2.718281828459045].log == 1
+    assert: F32[2.718282].log == 1
+    assert: F64[1000000000].log10 == 9
+    assert: F32[1000000000].log10 == 9
+    assert: F64[0.0000000001].log10 == -10
+    assert: F32[0.0000000001].log10 == -10
+    assert: F64[1024].log2 == 10
+    assert: F32[1024].log2 == 10
+    assert: F64[0.0625].log2 == -4
+    assert: F32[0.0625].log2 == -4
+    assert: F64[2].pow(-4) == 0.0625
+    assert: F32[2].pow(-4) == 0.0625
+    assert: F64[2].pow(10) == 1024
+    assert: F32[2].pow(10) == 1024
+    assert: F64[10].pow(-10) == 0.0000000001
+    assert: F32[10].pow(-10) == 0.0000000001
+    assert: F64[10].pow(9) == 1000000000
+    assert: F32[10].pow(9) == 1000000000

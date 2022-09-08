@@ -1,0 +1,50 @@
+:class Savi.Numeric.Comparable.Spec
+  :is Spec
+  :const describes: "Numeric.Comparable"
+
+  :it "compares numbers to one another"
+    assert: U32[12] == 12
+    assert: I32[12] == 12
+    assert: F32[12] == 12
+    assert: U32[12] != 36
+    assert: I32[12] != 36
+    assert: F32[12] != 36
+    assert: U32[12] <  36
+    assert: I32[12] <  36
+    assert: F32[12] <  36
+    assert: U32[12] <= 12
+    assert: I32[12] <= 12
+    assert: F32[12] <= 12
+    assert: U32[36] >  12
+    assert: I32[36] >  12
+    assert: F32[36] >  12
+    assert: U32[36] >= 36
+    assert: I32[36] >= 36
+    assert: F32[36] >= 36
+    assert: I32[-30] < 6
+    assert: I32[6] > -30
+
+  :it "limits a value to be at least a given minimum or at most a given maximum"
+    assert: 89.at_least(90) == 90
+    assert: 90.at_least(90) == 90
+    assert: 91.at_least(90) == 91
+
+    assert: 99.at_most(100) == 99
+    assert: 100.at_most(100) == 100
+    assert: 101.at_most(100) == 100
+
+  :it "finds the absolute value"
+    assert: U32[36]  .abs == 36
+    assert: U32[-36] .abs == -36 // -36 is an underflow literal when unsigned
+    assert: I32[36]  .abs == 36
+    assert: I32[-36] .abs == 36
+    assert: F32[3.6] .abs == 3.6
+    assert: F32[-3.6].abs == 3.6
+
+  :it "negates the value"
+    assert: U32[36]  .negate == -36
+    assert: U32[-36] .negate == 36
+    assert: I32[36]  .negate == -36
+    assert: I32[-36] .negate == 36
+    assert: F32[3.6] .negate == -3.6
+    assert: F32[-3.6].negate == 3.6

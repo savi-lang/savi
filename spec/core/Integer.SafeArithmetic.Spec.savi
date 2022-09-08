@@ -1,0 +1,51 @@
+:class Savi.Integer.SafeArithmetic.Spec
+  :is Spec
+  :const describes: "Integer.SafeArithmetic"
+
+  :it "implements overflow/underflow-checked arithmetic for integers"
+    assert error: U32.max_value - 1 +! 2
+    assert: U32.max_value - 1 +! 1 == U32.max_value
+    assert error: I32.max_value - 1 +! 2
+    assert: I32.max_value - 1 +! 1 == I32.max_value
+    assert error: I32.min_value + 1 +! -2
+    assert: I32.min_value + 1 +! -1 == I32.min_value
+
+    assert error: U32.min_value + 1 -! 2
+    assert: U32.min_value + 1 -! 1 == U32.min_value
+    assert error: I32.min_value + 1 -! 2
+    assert: I32.min_value + 1 -! 1 == I32.min_value
+    assert error: I32.max_value - 1 -! -2
+    assert: I32.max_value - 1 -! -1 == I32.max_value
+
+    assert error: U32[0x4000_0000] *! 4
+    assert: U32[0x4000_0000] *! 3 == U32[0xc000_0000]
+    assert error: I32[0x2000_0000] *! 4
+    assert: I32[0x2000_0000] *! 3 == I32[0x6000_0000]
+    assert error: I32[0x2000_0000] *! -5
+    assert: I32[0x2000_0000] *! -3 == I32[0x6000_0000 * -1]
+
+  :it "implements saturating arithmetic for integers"
+    assert: (U32.max_value - 2).saturating_add(3) == U32.max_value
+    assert: (U32.max_value - 2).saturating_add(1) == U32.max_value - 1
+    assert: (I32.max_value - 2).saturating_add(3) == I32.max_value
+    assert: (I32.max_value - 2).saturating_add(1) == I32.max_value - 1
+    assert: (I32.min_value + 2).saturating_add(-3) == I32.min_value
+    assert: (I32.min_value + 2).saturating_add(-1) == I32.min_value + 1
+
+    assert: (U32.min_value + 2).saturating_subtract(3) == U32.min_value
+    assert: (U32.min_value + 2).saturating_subtract(1) == U32.min_value + 1
+    assert: (I32.min_value + 2).saturating_subtract(3) == I32.min_value
+    assert: (I32.min_value + 2).saturating_subtract(1) == I32.min_value + 1
+    assert: (I32.max_value - 2).saturating_subtract(-3) == I32.max_value
+    assert: (I32.max_value - 2).saturating_subtract(-1) == I32.max_value - 1
+
+    assert: U32[0x4000_0000].saturating_multiply(5) == U32.max_value
+    assert: U32[0x4000_0000].saturating_multiply(3) == U32[0xc000_0000]
+    assert: I32[0x2000_0000].saturating_multiply(5) == I32.max_value
+    assert: I32[0x2000_0000].saturating_multiply(3) == I32[0x6000_0000]
+    assert: I32[0x2000_0000].saturating_multiply(-5) == I32.min_value
+    assert: I32[0x2000_0000].saturating_multiply(-3) == I32[0x6000_0000 * -1]
+    assert: I32[0x2000_0000 * -1].saturating_multiply(5) == I32.min_value
+    assert: I32[0x2000_0000 * -1].saturating_multiply(3) == I32[0x6000_0000 * -1]
+    assert: I32[0x2000_0000 * -1].saturating_multiply(-5) == I32.max_value
+    assert: I32[0x2000_0000 * -1].saturating_multiply(-3) == I32[0x6000_0000]
