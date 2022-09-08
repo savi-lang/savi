@@ -53,3 +53,5 @@
   :it "can format integers as Unicode codepoints"
     assert: "\('S'.format.unicode)" == "S"
     assert: "\(U8[83].format.unicode)" == "S"
+    assert: "\(U32[0x2665].format.unicode)" == "♥"
+    assert: "\(U32[0x2665].format.unicode)" == "\U2665"
