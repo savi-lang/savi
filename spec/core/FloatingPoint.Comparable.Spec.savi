@@ -1,0 +1,54 @@
+
+:class Savi.FloatingPoint.Comparable.Spec
+  :is Spec
+  :const describes: "FloatingPoint.Comparable"
+
+  :it "checks if a value is NaN (Not a Number)"
+    assert: F32.zero.is_nan.is_false
+    assert: F64.zero.is_nan.is_false
+    assert: F32.one.is_nan.is_false
+    assert: F64.one.is_nan.is_false
+    assert: F32.max_value.is_nan.is_false
+    assert: F64.max_value.is_nan.is_false
+    assert: F32.min_value.is_nan.is_false
+    assert: F64.min_value.is_nan.is_false
+    assert: F32.nan.is_nan
+    assert: F64.nan.is_nan
+    assert: (F32[0] / 0).is_nan
+    assert: (F64[0] / 0).is_nan
+    assert: F32.infinity.is_nan.is_false
+    assert: F64.infinity.is_nan.is_false
+    assert: F32.neg_infinity.is_nan.is_false
+    assert: F64.neg_infinity.is_nan.is_false
+
+  :it "checks if a value is infinite (including both positive or negative)"
+    assert: F32.zero.is_infinite.is_false
+    assert: F64.zero.is_infinite.is_false
+    assert: F32.one.is_infinite.is_false
+    assert: F64.one.is_infinite.is_false
+    assert: F32.max_value.is_infinite.is_false
+    assert: F64.max_value.is_infinite.is_false
+    assert: F32.min_value.is_infinite.is_false
+    assert: F64.min_value.is_infinite.is_false
+    assert: F32.nan.is_infinite.is_false
+    assert: F64.nan.is_infinite.is_false
+    assert: F32.infinity.is_infinite
+    assert: F64.infinity.is_infinite
+    assert: F32.neg_infinity.is_infinite
+    assert: F64.neg_infinity.is_infinite
+
+  :it "checks if a value is finite (non-infinite and non-NaN)"
+    assert: F32.zero.is_finite
+    assert: F64.zero.is_finite
+    assert: F32.one.is_finite
+    assert: F64.one.is_finite
+    assert: F32.max_value.is_finite
+    assert: F64.max_value.is_finite
+    assert: F32.min_value.is_finite
+    assert: F64.min_value.is_finite
+    assert: F32.nan.is_finite.is_false
+    assert: F64.nan.is_finite.is_false
+    assert: F32.infinity.is_finite.is_false
+    assert: F64.infinity.is_finite.is_false
+    assert: F32.neg_infinity.is_finite.is_false
+    assert: F64.neg_infinity.is_finite.is_false

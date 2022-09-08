@@ -1,0 +1,15 @@
+:class Savi.Integer.Countable.Spec
+  :is Spec
+  :const describes: "Integer.Countable"
+
+  :it "can count up to the given number, starting with 0, excluding itself"
+    count = 0
+    count_sum = 0
+    count_return = 5.times -> (i |
+      count = count + 1
+      count_sum = count_sum + i
+    )
+
+    assert: count_return == 5
+    assert: count == 5
+    assert: count_sum == 10

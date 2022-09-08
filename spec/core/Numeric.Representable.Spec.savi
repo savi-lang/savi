@@ -1,0 +1,73 @@
+:class Savi.Numeric.Representable.Spec
+  :is Spec
+  :const describes: "Numeric.Representable"
+
+  :it "returns a fixed bit width for most numeric types"
+    assert: U8 .bit_width == 8
+    assert: U16.bit_width == 16
+    assert: U32.bit_width == 32
+    assert: U64.bit_width == 64
+    assert: I8 .bit_width == 8
+    assert: I16.bit_width == 16
+    assert: I32.bit_width == 32
+    assert: I64.bit_width == 64
+    assert: F32.bit_width == 32
+    assert: F64.bit_width == 64
+
+  :it "returns a platform-dependent bit width for USize and ISize"
+    if Platform.has_64bit_size (
+      assert: USize.bit_width == 64
+      assert: ISize.bit_width == 64
+    |
+      assert: USize.bit_width == 32
+      assert: ISize.bit_width == 32
+    )
+
+  :it "returns a fixed byte width for most numeric types"
+    assert: U8 .byte_width == 1
+    assert: U16.byte_width == 2
+    assert: U32.byte_width == 4
+    assert: U64.byte_width == 8
+    assert: I8 .byte_width == 1
+    assert: I16.byte_width == 2
+    assert: I32.byte_width == 4
+    assert: I64.byte_width == 8
+    assert: F32.byte_width == 4
+    assert: F64.byte_width == 8
+
+  :it "returns a platform-dependent byte width for USize and ISize"
+    if Platform.has_64bit_size (
+      assert: USize.byte_width == 8
+      assert: ISize.byte_width == 8
+    |
+      assert: USize.byte_width == 4
+      assert: ISize.byte_width == 4
+    )
+
+  :it "indicates whether the given numeric is signed or unsigned"
+    assert: U8   .is_signed.is_false
+    assert: U16  .is_signed.is_false
+    assert: U32  .is_signed.is_false
+    assert: U64  .is_signed.is_false
+    assert: USize.is_signed.is_false
+    assert: I8   .is_signed
+    assert: I16  .is_signed
+    assert: I32  .is_signed
+    assert: I64  .is_signed
+    assert: ISize.is_signed
+    assert: F32  .is_signed
+    assert: F64  .is_signed
+
+  :it "indicates whether the given numeric is a floating point or an integer"
+    assert: U8   .is_floating_point.is_false
+    assert: U16  .is_floating_point.is_false
+    assert: U32  .is_floating_point.is_false
+    assert: U64  .is_floating_point.is_false
+    assert: USize.is_floating_point.is_false
+    assert: I8   .is_floating_point.is_false
+    assert: I16  .is_floating_point.is_false
+    assert: I32  .is_floating_point.is_false
+    assert: I64  .is_floating_point.is_false
+    assert: ISize.is_floating_point.is_false
+    assert: F32  .is_floating_point
+    assert: F64  .is_floating_point
