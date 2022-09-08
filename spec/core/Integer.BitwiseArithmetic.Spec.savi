@@ -66,26 +66,32 @@
   :it "converts U8 integers from native to big/little endianness and vice versa"
     u8 = U8[0x12]
 
-    assert: u8.native_to_be == u8
-    assert: u8.be_to_native == u8
-    assert: u8.native_to_le == u8
-    assert: u8.le_to_native == u8
+    assert: u8.native_to_network == u8
+    assert: u8.native_to_be      == u8
+    assert: u8.native_to_le      == u8
+    assert: u8.network_to_native == u8
+    assert: u8.be_to_native      == u8
+    assert: u8.le_to_native      == u8
 
   :it "converts U16 integers from native to big/little endianness and vice versa"
     u16 = U16[0x1234]
     u16_swapped = U16[0x3412]
 
     if Platform.is_little_endian (
-      assert: u16.native_to_be == u16_swapped
-      assert: u16.native_to_le == u16
-      assert: u16.be_to_native == u16_swapped
-      assert: u16.le_to_native == u16
+      assert: u16.native_to_network == u16_swapped
+      assert: u16.native_to_be      == u16_swapped
+      assert: u16.native_to_le      == u16
+      assert: u16.network_to_native == u16_swapped
+      assert: u16.be_to_native      == u16_swapped
+      assert: u16.le_to_native      == u16
     )
     if Platform.is_big_endian (
-      assert: u16.native_to_be == u16
-      assert: u16.native_to_le == u16_swapped
-      assert: u16.be_to_native == u16
-      assert: u16.le_to_native == u16_swapped
+      assert: u16.native_to_network == u16
+      assert: u16.native_to_be      == u16
+      assert: u16.native_to_le      == u16_swapped
+      assert: u16.network_to_native == u16
+      assert: u16.be_to_native      == u16
+      assert: u16.le_to_native      == u16_swapped
     )
 
   :it "converts U32 integers from native to big/little endianness and vice versa"
@@ -93,15 +99,19 @@
     u32_swapped = U32[0x7856_3412]
 
     if Platform.is_little_endian (
-      assert: u32.native_to_be == u32_swapped
-      assert: u32.native_to_le == u32
-      assert: u32.be_to_native == u32_swapped
-      assert: u32.le_to_native == u32
+      assert: u32.native_to_network == u32_swapped
+      assert: u32.native_to_be      == u32_swapped
+      assert: u32.native_to_le      == u32
+      assert: u32.network_to_native == u32_swapped
+      assert: u32.be_to_native      == u32_swapped
+      assert: u32.le_to_native      == u32
     )
     if Platform.is_big_endian (
-      assert: u32.native_to_be == u32
-      assert: u32.native_to_le == u32_swapped
-      assert: u32.be_to_native == u32
+      assert: u32.native_to_network == u32
+      assert: u32.native_to_be      == u32
+      assert: u32.native_to_le      == u32_swapped
+      assert: u32.network_to_native == u32
+      assert: u32.be_to_native      == u32
       assert: u32.le_to_native == u32_swapped
     )
 
@@ -110,14 +120,18 @@
     u64_swapped = U64[0xf0de_bc9a_7856_3412]
 
     if Platform.is_little_endian (
-      assert: u64.native_to_be == u64_swapped
-      assert: u64.native_to_le == u64
-      assert: u64.be_to_native == u64_swapped
-      assert: u64.le_to_native == u64
+      assert: u64.native_to_network == u64_swapped
+      assert: u64.native_to_be      == u64_swapped
+      assert: u64.native_to_le      == u64
+      assert: u64.network_to_native == u64_swapped
+      assert: u64.be_to_native      == u64_swapped
+      assert: u64.le_to_native      == u64
     )
     if Platform.is_big_endian (
-      assert: u64.native_to_be == u64
-      assert: u64.native_to_le == u64_swapped
-      assert: u64.be_to_native == u64
-      assert: u64.le_to_native == u64_swapped
+      assert: u64.native_to_network == u64
+      assert: u64.native_to_be      == u64
+      assert: u64.native_to_le      == u64_swapped
+      assert: u64.network_to_native == u64
+      assert: u64.be_to_native      == u64
+      assert: u64.le_to_native      == u64_swapped
     )
