@@ -6,31 +6,37 @@
 
   :: Read a U16 from the bytes at the given offset, with big endian byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U16.
+  :: DEPRECATED: Use `read_native_u16!(offset).native_to_be` instead.
   :fun read_be_u16!(offset USize) U16
     @read_native_u16!(offset).native_to_be
 
   :: Read a U16 from the bytes at the given offset, with little endian byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U16.
+  :: DEPRECATED: Use `read_native_u16!(offset).native_to_le` instead.
   :fun read_le_u16!(offset USize) U16
     @read_native_u16!(offset).native_to_le
 
   :: Read a U32 from the bytes at the given offset, with big endian byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.
+  :: DEPRECATED: Use `read_native_u32!(offset).native_to_be` instead.
   :fun read_be_u32!(offset USize) U32
     @read_native_u32!(offset).native_to_be
 
   :: Read a U32 from the bytes at the given offset, with little endian byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.
+  :: DEPRECATED: Use `read_native_u32!(offset).native_to_le` instead.
   :fun read_le_u32!(offset USize) U32
     @read_native_u32!(offset).native_to_le
 
   :: Read a U64 from the bytes at the given offset, with big endian byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U64.
+  :: DEPRECATED: Use `read_native_u64!(offset).native_to_be` instead.
   :fun read_be_u64!(offset USize) U64
     @read_native_u64!(offset).native_to_be
 
   :: Read a U64 from the bytes at the given offset, with little endian byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U64.
+  :: DEPRECATED: Use `read_native_u64!(offset).native_to_le` instead.
   :fun read_le_u64!(offset USize) U64
     @read_native_u64!(offset).native_to_le
 
