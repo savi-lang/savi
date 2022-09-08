@@ -122,7 +122,7 @@ module Savi::Parser::Builder
                   end
                 codepoint = 16 * codepoint + hex_value
               end
-              result << codepoint
+              result << codepoint.chr
             when '\r', '\n' then
               while (
                 case reader.peek_next_char
