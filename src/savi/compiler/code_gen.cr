@@ -2902,7 +2902,7 @@ class Savi::Compiler::CodeGen
         if from_width > to_width
           @builder.sext(to_min, value.type)
         elsif from_width < to_width
-          raise "this should never happen"
+          @builder.trunc(to_min, value.type)
         else
           to_min
         end

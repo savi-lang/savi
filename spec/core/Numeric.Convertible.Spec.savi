@@ -2,7 +2,7 @@
   :is Spec
   :const describes: "Numeric.Convertible"
 
-  :it "converts from integer to other numeric types"
+  :it "converts from unsigned integer to other numeric types"
     assert: U32[36].u8     == 36
     assert: U32[36].u8!    == 36
     assert: U32[36].u16    == 36
@@ -27,6 +27,32 @@
     assert: U32[36].f32!   == 36
     assert: U32[36].f64    == 36
     assert: U32[36].f64!   == 36
+
+  :it "converts from signed integer to other numeric types"
+    assert: I32[36].u8     == 36
+    assert: I32[36].u8!    == 36
+    assert: I32[36].u16    == 36
+    assert: I32[36].u16!   == 36
+    assert: I32[36].u32    == 36
+    assert: I32[36].u32!   == 36
+    assert: I32[36].u64    == 36
+    assert: I32[36].u64!   == 36
+    assert: I32[36].usize  == 36
+    assert: I32[36].usize! == 36
+    assert: I32[36].i8     == 36
+    assert: I32[36].i8!    == 36
+    assert: I32[36].i16    == 36
+    assert: I32[36].i16!   == 36
+    assert: I32[36].i32    == 36
+    assert: I32[36].i32!   == 36
+    assert: I32[36].i64    == 36
+    assert: I32[36].i64!   == 36
+    assert: I32[36].isize  == 36
+    assert: I32[36].isize! == 36
+    assert: I32[36].f32    == 36
+    assert: I32[36].f32!   == 36
+    assert: I32[36].f64    == 36
+    assert: I32[36].f64!   == 36
 
   :it "handles edge cases for conversions from integer"
     assert: U64[0x0124].u8                 == 36
