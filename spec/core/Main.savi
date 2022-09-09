@@ -27,4 +27,5 @@
       Spec.Run(Savi.Numeric.Spec).new(env)
       Spec.Run(Savi.Platform.Spec).new(env)
       Spec.Run(Savi.String.Spec).new(env)
+      Spec.Run(Savi.BCD.U64.Spec).new(env)
     ])
