@@ -13,3 +13,9 @@
   // Convenience aliases for when this is used as a head/tail pair.
   :fun head: @first
   :fun tail: @second
+
+  // Convenience aliases for when this is used as a high/low pair.
+  :fun high: @first
+  :fun low: @second
+  :fun hi: @high
+  :fun lo: @low
