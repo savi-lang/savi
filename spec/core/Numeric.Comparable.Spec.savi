@@ -24,6 +24,12 @@
     assert: I32[-30] < 6
     assert: I32[6] > -30
 
+  :it "checks if a number is zero or nonzero"
+    assert: U32.zero.is_zero
+    assert: U32.max_value.is_zero.is_false
+    assert: U32.zero.is_nonzero.is_false
+    assert: U32.max_value.is_nonzero
+
   :it "limits a value to be at least a given minimum or at most a given maximum"
     assert: 89.at_least(90) == 90
     assert: 90.at_least(90) == 90

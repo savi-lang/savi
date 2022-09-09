@@ -464,6 +464,12 @@
 :trait Numeric.Comparable(T Numeric(T)'val)
   :is Comparable(T)
 
+  :: Return `True` if the value is equal to zero.
+  :fun val is_zero Bool
+
+  :: Return `True` if the value is not equal to zero.
+  :fun val is_nonzero Bool: @is_zero.not
+
   :: If this value is greater than the given minimum value, return it.
   :: Otherwise return the given minimum value.
   :fun val at_least(minimum T) T
@@ -557,6 +563,7 @@
   :fun ">"(other @'box) Bool: compiler intrinsic
   :fun ">="(other @'box) Bool: compiler intrinsic
   :fun val negate: @zero - @
+  :fun val is_zero Bool: @ == @zero
   :fun val at_least(minimum @) @: if (@ > minimum) (@ | minimum)
   :fun val at_most(maximum @) @: if (@ < maximum) (@ | maximum)
   :fun val max(other @) @: @at_least(other)
