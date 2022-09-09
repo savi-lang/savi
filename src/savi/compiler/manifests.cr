@@ -23,9 +23,11 @@ class Savi::Compiler::Manifests
     @root = manifest = select_root_manifest(ctx)
     return unless manifest
 
-    # If this manifest copies from other manifests, bring the data from those
-    # copied manifests into the root manifest now, to fully extrapolate it.
-    execute_copies_for_manifest(ctx, ctx.program.manifests, manifest)
+    # If some manifests copy from other manifests, bring the data from those
+    # copied manifests into the destination manifests, to fully extrapolate.
+    ctx.program.manifests.each { |m|
+      execute_copies_for_manifest(ctx, ctx.program.manifests, m)
+    }
 
     # For each name provided by the root manifest, track it.
     manifest.provides_names.each { |provides_name|
@@ -306,37 +308,44 @@ class Savi::Compiler::Manifests
       [{manifest.append_pos, fix_lines.join("\n")}]
   end
 
-  private def maybe_deps_update(ctx, manifest)
+  private def maybe_deps_update(ctx, root_manifest)
     deps_update = ctx.options.deps_update
     return unless deps_update
 
+    # If the user named a specific manifest, we'll only update for that one.
+    # Otherwise we'll update deps for all manifests.
+    selected_manifests =
+      ctx.options.manifest_name ? [root_manifest] : ctx.program.manifests
+
     # Determine which dependencies should be updated.
-    fetchable_deps = manifest.dependencies.select(&.location_nodes.any?)
     deps_to_update = Set(Packaging::Dependency).new
-    if deps_update.empty?
-      # If no explicit dependency was specified, then we'll update everything
-      # that is fetchable (that has a known location to fetch from).
-      fetchable_deps.each { |dep| deps_to_update.add(dep) }
-    else
-      # If an explicit dependency was specified to update, then we'll only
-      # update it and anything that it (directly or transitively) depends on.
-      fetchable_deps.each { |dep|
-        deps_to_update.add(dep) if dep.name.value == deps_update
-      }
-      previous_size = 0
-      while deps_to_update.size > previous_size
-        previous_size = deps_to_update.size
-        deps_to_update.to_a.each { |dep|
-          fetchable_deps.each { |dep_dep|
-            deps_to_update.add(dep_dep) \
-              if dep.depends_on_nodes.any?(&.value.==(dep_dep.name.value))
-          }
+    selected_manifests.each { |manifest|
+      fetchable_deps = manifest.dependencies.select(&.location_nodes.any?)
+      if deps_update.empty?
+        # If no explicit dependency was specified, then we'll update everything
+        # that is fetchable (that has a known location to fetch from).
+        fetchable_deps.each { |dep| deps_to_update.add(dep) }
+      else
+        # If an explicit dependency was specified to update, then we'll only
+        # update it and anything that it (directly or transitively) depends on.
+        fetchable_deps.each { |dep|
+          deps_to_update.add(dep) if dep.name.value == deps_update
         }
+        previous_size = 0
+        while deps_to_update.size > previous_size
+          previous_size = deps_to_update.size
+          deps_to_update.to_a.each { |dep|
+            fetchable_deps.each { |dep_dep|
+              deps_to_update.add(dep_dep) \
+                if dep.depends_on_nodes.any?(&.value.==(dep_dep.name.value))
+            }
+          }
+        end
       end
-    end
+    }
 
     # Update the specified dependencies.
-    Packaging::RemoteService.update_all(ctx, deps_to_update.to_a, manifest.deps_path)
+    Packaging::RemoteService.update_all(ctx, deps_to_update.to_a, root_manifest.deps_path)
   end
 
   private def check_transitive_deps(ctx, manifest, dep, dep_manifest)
