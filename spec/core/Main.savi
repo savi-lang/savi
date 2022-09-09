@@ -25,6 +25,7 @@
       Spec.Run(Savi.Numeric.Convertible.Spec).new(env)
       Spec.Run(Savi.Numeric.Representable.Spec).new(env)
       Spec.Run(Savi.Numeric.Spec).new(env)
+      Spec.Run(Savi.Pair.Spec).new(env)
       Spec.Run(Savi.Platform.Spec).new(env)
       Spec.Run(Savi.String.Spec).new(env)
     ])

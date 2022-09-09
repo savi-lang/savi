@@ -1,0 +1,30 @@
+:class Savi.Pair.Spec
+  :is Spec
+  :const describes: "Pair"
+
+  :it "has two elements"
+    pair = Pair(String, U64).new("example", 99)
+    assert: pair.first  == "example"
+    assert: pair.second == 99
+    assert: pair.last   == 99
+
+  :it "calls its elements a key and a value"
+    pair = Pair(String).new("color", "red")
+    assert: pair.key == "color"
+    assert: pair.value == "red"
+
+  :it "calls its elements a head and a tail"
+    pair = Pair(String, Pair(String, String)).new(
+      "one"
+      Pair(String, String).new("two", "three")
+    )
+    assert: pair.head == "one"
+    assert: pair.tail.head == "two"
+    assert: pair.tail.tail == "three"
+
+  :it "calls its elements a high and a low"
+    pair = Pair(U32).new(0xFEDCBA98, 0x7654321)
+    assert: pair.high == 0xFEDCBA98
+    assert: pair.low  == 0x7654321
+    assert: pair.hi == 0xFEDCBA98
+    assert: pair.lo == 0x7654321
