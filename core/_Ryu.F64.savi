@@ -1,0 +1,964 @@
+// This file implements the Ryū algorithm for representing floating-point values
+// in an optimal decimal base, so that they can be easily printed.
+//
+// Credit for this algorithm goes to Ulf Adams, the author of the Ryū paper.
+// The PDF link and the formal citation for the paper appear below.
+//
+// https://dl.acm.org/doi/pdf/10.1145/3296979.3192369
+//
+// Adams, Ulf. (2018). Ryū: fast float-to-string conversion.
+// ACM SIGPLAN Notices. 53. 270-282. 10.1145/3296979.3192369.
+//
+// Small excerpts and names from the paper are quoted in some code comments,
+// citing "fair use" for the purpose of helping the reader of this code
+// be able to easily compare concepts from paper with concepts in this code.
+//
+// Note to the reader: the actual algorithm in use and the lookup tables we
+// generated here do differ in some ways. For example, we're able to use
+// smaller-bit-width lookup tables than the paper said was possible, and
+// the accuracy of these smaller tables has been validated. Perhaps the paper
+// was too focused on proofs for the general case to notice some of the
+// opportunities we noticed when we were implementing it step by step here.
+
+// TODO: Remove this empty namespace module when its absence no longer
+// breaks Sugar compiler pass specs. Currently if this is missing it will cause
+// those tests to fail because the PopulateTypes pass doesn't yet cache ASTs.
+:module _Ryu
+
+:struct val _Ryu.F64
+  :: Use the Ryū algorithm to transform the given input significand and
+  :: base-2 exponent into a new signficand with base-10 exponent, signifying
+  :: a value that is guaranteed to the shortest possible representation
+  :: that is within the same semantic interval represented by the input value,
+  :: respecting IEEE754 rounding semantics.
+  ::
+  :: TODO: Accept a configurable rounding mode as an additional parameter.
+  :: TODO: Some rounding modes depend on sign of the original floating point.
+  :fun non to_base_10(input_pair Pair(U64, I16)) Pair(U64, I16)
+    ///
+    // Step 1: "Decode the floating point number [from its IEEE 754 encoding]".
+    //
+    //    "We convert `f` into the intermediate form `f = (−1)**s * mf * 2**ef`
+    //    such that `mf` is an unsigned integer"
+
+    original_significand = input_pair.first // (`mf` in the paper)
+    original_exponent = input_pair.second // (`ef` in the paper)
+
+    ///
+    // Step 2: "Determine the interval of information-preserving outputs".
+    //
+    //     "We compute the halfway points to the next smaller and
+    //     larger floating point values `f−` and `f+` of the same float-
+    //     ing point type, and represent these as `u * 2**e2` and `w * 2**e2`,
+    //     respectively. We also convert `f` into the same form `v * 2**e2`
+    //     intentionally using the same exponent `e2`, which is required
+    //     for step 4. Using `e2 = ef − 2` guarantees that all of `u`, `v`,
+    //     and `w` are integers."
+
+    exponent_base2 = original_exponent - 2 // ("e2" in the paper)
+    significand_base2 = original_significand * 4 // ("v" in the paper)
+    upper_bound_base2 = significand_base2 + 2 // ("w" in the paper)
+    lower_bound_base2 = significand_base2 - (
+      if (original_significand == U64.one.bit_shl(F64.sig_bit_width)) (1 | 2)
+    ) // ("u" in the paper)
+
+    ///
+    // Step 3: "Convert `(u, v, w) * 2**e2` to a decimal power base".
+    //
+    //    "We determine values for `(a, b, c)` and `e10` such that
+    //    `(a, b, c) * 10**e10` equals `(u, v, w) * 2**e2`; there are many
+    //    possible choices for `e10`, and we choose specific values"
+
+    if (exponent_base2 >= 0) (
+      // "For each possible value of `e2` that is greater than or equal to
+      // zero, we determine `q` as `max(0, ⌊e2 * log10(2)⌋ − 1)` (Lemma 3.2)"
+      q = try (@_approx_floor_multiply_log10of2(exponent_base2.u16) -! 1 | 0)
+      table_index = q
+
+      // "... and then use `B0` to determine a legal value for `k` as
+      // `(B0 + ⌊q * log2(5)⌋)` (Lemma 3.3)"
+      k = @_table_for_positive_exponent_base2_bit_width.u16
+        + @_approx_floor_multiply_log2of5(q)
+
+      // Determine how many bits by which to shift the products.
+      //
+      // Note that this is never less than 64 bits, so we can take a faster
+      // path when wide-multiplying than we would if it had a smaller bit shift.
+      //
+      // See: https://www.wolframalpha.com/input?i=plot+max%280%2C+floor%28x+log10%282%29%29+-+1%29+%2B+%28B+%2B+floor%28max%280%2C+floor%28x+log10%282%29%29+-+1%29+*+log2%285%29%29%29+-+x+from+x%3D0+to+1024+where+B+%3D+124
+      shr_bits = (q + k - exponent_base2.u16).u8
+
+      // Lookup the correct factor from the table and then create three products
+      // representing the lower bound, upper bound, and the significand betwixt,
+      // all now represented in base-10 after transforming the base-2 values.
+      factor = @_factor_from_table(@_table_for_positive_exponent_base2, table_index)
+      lower_bound_base10 = @_multiply_and_shr(lower_bound_base2, factor, shr_bits) // (`a` in the paper)
+      significand_base10 = @_multiply_and_shr(significand_base2, factor, shr_bits) // (`b` in the paper)
+      upper_bound_base10 = @_multiply_and_shr(upper_bound_base2, factor, shr_bits) // (`c` in the paper)
+      exponent_base10 = q.i16
+    |
+      negative_exponent_base2 = exponent_base2.negate.u16
+
+      // "For each possible value of `e2` that is less than zero, we
+      // determine `q` as `max(0, ⌊−e2 * log5(2)⌋ − 1)` (Lemma 3.2)"
+      // CORRECTION TO THE PAPER: This actually needs log10(5) instead.
+      q = try (@_approx_floor_multiply_log10of5(negative_exponent_base2) -! 1 | 0)
+
+      table_index_plus_1 = negative_exponent_base2 - q
+      table_index = table_index_plus_1 - 1
+
+      // "... and then use `B1` to determine a legal value for `k` as
+      // `(⌈q * log2(5)⌉ − B1)` (Lemma 3.4)"
+      k_prime = @_approx_ceil_multiply_log2of5(table_index_plus_1).i16
+        - @_table_for_negative_exponent_base2_bit_width.i16
+
+      shr_bits = (q.i16 - k_prime).u8
+
+      // Lookup the correct factor from the table and then create three products
+      // representing the lower bound, upper bound, and the significand betwixt,
+      // all now represented in base-10 after transforming the base-2 values.
+      factor = @_factor_from_table(@_table_for_negative_exponent_base2, table_index)
+      lower_bound_base10 = @_multiply_and_shr(lower_bound_base2, factor, shr_bits) // (`a` in the paper)
+      significand_base10 = @_multiply_and_shr(significand_base2, factor, shr_bits) // (`b` in the paper)
+      upper_bound_base10 = @_multiply_and_shr(upper_bound_base2, factor, shr_bits) // (`c` in the paper)
+      exponent_base10 = q.i16 + exponent_base2
+    )
+
+    ///
+    // Step 4:
+    //
+    //     "Let `a` and `c` be the boundaries of an interval within which we
+    //     want to find the shortest decimal representation. As we will
+    //     see, the algorithm requires `0 < a < c − 1` as a precondition,
+    //     which holds when `a` and `c` are computed as described in step 3.
+    //
+    //     "Using the given rounding mode and the sign of `f` , we introduce
+    //     two boolean flags `accept_smaller` and `accept_larger`, which
+    //     indicate whether the smaller or larger boundary may be returned
+    //     exactly, respectively. Then we determine `do` and `eo`, such that
+    //     [information is preserved] and `eo` is maximal (minimum-length
+    //     output), i.e., there is no valid solution `(dt, et)` with `et > eo`."
+
+    // We assume here a rounding mode of "to nearest, ties going toward even".
+    // TODO: Configurable rounding mode (or `llvm.flt.rounds` to get current?)
+    accept_larger = original_significand.is_even
+    accept_smaller = accept_larger
+    should_break_tie_down = True // not dependent on rounding mode, but could be separately configurable
+
+    i I16 = 0
+    digit_i U8 = 0
+    all_a_zero = True
+    all_b_zero = True
+    a_i = lower_bound_base10
+    b_i = significand_base10
+    c_i = upper_bound_base10, if !accept_larger (c_i -= 1)
+
+    // Divide our three numbers by 10 until we see that the next divide would
+    // make our lower bound (`a_i`) to no longer be less than our upper (`c_i`).
+    // This is effectively about discarding insignificant digits that don't
+    // make any difference within the space between the two bounds.
+    // Our counter `i` keeps track of the number of digits we discarded,
+    // and the other variables we track (apart from `a_i`, `b_i`, and `c_i`)
+    // will be used later for rounding logic.
+    while (a_i / 10 < c_i / 10) (
+      digit_i = (b_i % 10).u8
+      all_a_zero = all_a_zero && (a_i % 10 == 0)
+      all_b_zero = all_b_zero && (digit_i == 0)
+      a_i = a_i / 10
+      b_i = b_i / 10
+      c_i = c_i / 10
+      i += 1
+    )
+
+    if (accept_smaller && all_a_zero) (
+      while (a_i % 10 == 0) (
+        a_i = a_i / 10
+        b_i = b_i / 10
+        c_i = c_i / 10
+        i += 1
+      )
+    )
+    is_tie = digit_i == 5 && all_b_zero
+    want_round_down = digit_i < 5 || (is_tie && should_break_tie_down)
+    round_down = (
+      want_round_down && (a_i != b_i || all_a_zero)
+      || (b_i + 1 > c_i)
+    )
+
+    Pair(U64, I16).new(
+      if round_down (b_i | b_i + 1)
+      exponent_base10 + i
+    )
+
+  :: Multiply the given value by the given factor using wide arithmetic,
+  :: then shifting the result to the right by the given number of bits,
+  :: so that truncating to the original bit width doesn't lose significant bits.
+  :fun non _multiply_and_shr(value U64, factor U64, shr_bits U8) U64
+    pair = value.wide_multiply(factor)
+    pair.hi.bit_shl(U64.bit_width - shr_bits).bit_or(
+      pair.lo.bit_shr(shr_bits)
+    )
+
+  :: Returns `⌊x * log10(2)⌋` for all integers `0 <= x <= 1650`
+  :fun non _approx_floor_multiply_log10of2(x U16) U16
+    // `78913 / 2**18 =~ 0.3010292`, which approximates `log10(2)`
+    (x.u32 * 78913).bit_shr(18).u16
+
+  :: Returns `⌊x * log10(5)⌋` for all integers `0 <= x <= 2620`
+  :fun non _approx_floor_multiply_log10of5(x U16) U16
+    // `732923 / 2**20 =~ 0.6989698`, which approximates `log10(5)`
+    (x.u32 * 732923).bit_shr(20).u16
+
+  :: Returns `⌊x * log2(5)⌋` for all integers `0 <= x <= 3528`
+  :fun non _approx_floor_multiply_log2of5(x U16) U16
+    // `1217359 / 2**19 =~ 2.3219280`, which approximates `log2(5)`
+    (x.u32 * 1217359).bit_shr(19).u16
+
+  :: Returns `⌈x * log2(5)⌉` for all integers `1 <= x <= 3528`
+  :: Returns `1` for `x == 0`
+  :fun non _approx_ceil_multiply_log2of5(x U16) U16
+    @_approx_floor_multiply_log2of5(x) + 1
+
+  :fun non _factor_from_table(table Array(U64)'val, index_u16 U16)
+    try (
+      table[index_u16.usize]!
+    |
+      0 // TODO: impossible "the index range is known and the table is sized appropriately"
+    )
+
+  :const _table_for_negative_exponent_base2_bit_width U8: 63 // (`B1` in the paper)
+  :const _table_for_negative_exponent_base2 Array(U64)'val: [ // (`TABLE_LT` in the paper)
+    // This table (and the comments about variable ranges preceding it) were
+    // produced using the following Ruby script (with Ruby being a convenient
+    // language here because it gives very easy access to Bignum semantics):
+    //
+    // Care should be taken to ensure that the calculations inside the loop
+    // of this Ruby script continue to match the calculations surrounding
+    // the calculation of the table index and bit shift amount in the Savi code.
+    //
+    // ruby -e '
+    //   B1 = 63
+    //   F64_SIG_BIT_WIDTH = 52
+    //   F64_EXP_MIN = -1022 - F64_SIG_BIT_WIDTH
+    //   F64_EXP_MAX = 1023 - F64_SIG_BIT_WIDTH
+    //
+    //   q_min = Float::INFINITY
+    //   q_max = -Float::INFINITY
+    //   k_min = Float::INFINITY
+    //   k_max = -Float::INFINITY
+    //   shr_bits_min = Float::INFINITY
+    //   shr_bits_max = -Float::INFINITY
+    //   table_index_min = Float::INFINITY
+    //   table_index_max = -Float::INFINITY
+    //   table_results = []
+    //
+    //   (F64_EXP_MIN..F64_EXP_MAX).each { |e|
+    //     e2 = e - 2
+    //     next unless e2 < 0
+    //
+    //     q = [(-e2 * Math.log(5) / Math.log(10)).floor - 1, 0].max
+    //     table_index_plus_1 = -e2 - q
+    //     table_index = table_index_plus_1 - 1
+    //     k = (table_index_plus_1 * Math.log(5) / Math.log(2)).ceil - B1
+    //     shr_bits = q - k
+    //
+    //     table_results[table_index] = ((5 ** table_index_plus_1) >> k).to_i
+    //
+    //     q_max           = q           if q           > q_max
+    //     q_min           = q           if q           < q_min
+    //     k_max           = k           if k           > k_max
+    //     k_min           = k           if k           < k_min
+    //     shr_bits_max    = shr_bits    if shr_bits    > shr_bits_max
+    //     shr_bits_min    = shr_bits    if shr_bits    < shr_bits_min
+    //     table_index_max = table_index if table_index > table_index_max
+    //     table_index_min = table_index if table_index < table_index_min
+    //   }
+    //
+    //   puts "// #{q_min} <= q <= #{q_max}"
+    //   puts "// #{k_min} <= k <= #{k_max}"
+    //   puts "// #{shr_bits_min} <= shr_bits <= #{shr_bits_max}"
+    //   puts "// #{table_index_min} <= table_index <= #{table_index_max}"
+    //   table_results.each { |result| puts "0x%016x" % result }
+    // '
+
+    // 0 <= q <= 751
+    // -60 <= k <= 692
+    // 56 <= shr_bits <= 60
+    // 0 <= table_index <= 324
+    0x5000000000000000
+    0x6400000000000000
+    0x7d00000000000000
+    0x4e20000000000000
+    0x61a8000000000000
+    0x7a12000000000000
+    0x4c4b400000000000
+    0x5f5e100000000000
+    0x7735940000000000
+    0x4a817c8000000000
+    0x5d21dba000000000
+    0x746a528800000000
+    0x48c2739500000000
+    0x5af3107a40000000
+    0x71afd498d0000000
+    0x470de4df82000000
+    0x58d15e1762800000
+    0x6f05b59d3b200000
+    0x4563918244f40000
+    0x56bc75e2d6310000
+    0x6c6b935b8bbd4000
+    0x43c33c1937564800
+    0x54b40b1f852bda00
+    0x69e10de76676d080
+    0x422ca8b0a00a4250
+    0x52b7d2dcc80cd2e4
+    0x6765c793fa10079d
+    0x409f9cbc7c4a04c2
+    0x50c783eb9b5c85f2
+    0x64f964e68233a76f
+    0x7e37be2022c0914b
+    0x4ee2d6d415b85ace
+    0x629b8c891b267182
+    0x7b426fab61f00de3
+    0x4d0985cb1d3608ae
+    0x604be73de4838ad9
+    0x785ee10d5da46d90
+    0x4b3b4ca85a86c47a
+    0x5e0a1fd271287598
+    0x758ca7c70d7292fe
+    0x4977e8dc68679bdf
+    0x5bd5e313828182d6
+    0x72cb5bd86321e38c
+    0x47bf19673df52e37
+    0x59aedfc10d7279c5
+    0x701a97b150cf1837
+    0x46109eced2816f22
+    0x5794c6828721caeb
+    0x6d79f82328ea3da6
+    0x446c3b15f9926687
+    0x558749db77f70029
+    0x6ae91c5255f4c034
+    0x42d1b1b375b8f820
+    0x53861e2053273628
+    0x6867a5a867f103b2
+    0x4140c78940f6a24f
+    0x5190f96b91344ae3
+    0x65f537c675815d9c
+    0x7f7285b812e1b504
+    0x4fa793930bcd1122
+    0x63917877cec0556b
+    0x7c75d695c2706ac5
+    0x4dc9a61d998642bb
+    0x613c0fa4ffe7d36a
+    0x798b138e3fe1c845
+    0x4bf6ec38e7ed1d2b
+    0x5ef4a74721e86476
+    0x76b1d118ea627d93
+    0x4a2f22af927d8e7c
+    0x5cbaeb5b771cf21b
+    0x73e9a63254e42ea2
+    0x487207df750e9d25
+    0x5a8e89d75252446e
+    0x71322c4d26e6d58a
+    0x46bf5bb038504576
+    0x586f329c466456d4
+    0x6e8aff4357fd6c89
+    0x4516df8a16fe63d5
+    0x565c976c9cbdfccb
+    0x6bf3bd47c3ed7bfd
+    0x4378564cda746d7e
+    0x54566be0111188de
+    0x696c06d81555eb15
+    0x41e384470d55b2ed
+    0x525c6558d0ab1fa9
+    0x66f37eaf04d5e793
+    0x40582f2d6305b0bc
+    0x506e3af8bbc71ceb
+    0x6489c9b6eab8e426
+    0x7dac3c24a5671d2f
+    0x4e8ba596e760723d
+    0x622e8efca1388ecd
+    0x7aba32bbc986b280
+    0x4cb45fb55df42f90
+    0x5fe177a2b5713b74
+    0x77d9d58b62cd8a51
+    0x4ae825771dc07672
+    0x5da22ed4e530940f
+    0x750aba8a1e7cb913
+    0x4926b496530df3ac
+    0x5b7061bbe7d17097
+    0x724c7a2ae1c5ccbd
+    0x476fcc5acd1b9ff6
+    0x594bbf71806287f3
+    0x6f9eaf4de07b29f0
+    0x45c32d90ac4cfa36
+    0x5733f8f4d76038c3
+    0x6d00f7320d3846f4
+    0x44209a7f48432c59
+    0x5528c11f1a53f76f
+    0x6a72f166e0e8f54b
+    0x4287d6e04c91994f
+    0x5329cc985fb5ffa2
+    0x67f43fbe77a37f8b
+    0x40f8a7d70ac62fb7
+    0x5136d1cccd77bba4
+    0x6584864000d5aa8e
+    0x7ee5a7d0010b1531
+    0x4f4f88e200a6ed3f
+    0x63236b1a80d0a88e
+    0x7bec45e12104d2b2
+    0x4d73abacb4a303af
+    0x60d09697e1cbc49b
+    0x7904bc3dda3eb5c2
+    0x4ba2f5a6a8673199
+    0x5e8bb3105280fdff
+    0x762e9fd467213d7f
+    0x49dd23e4c074c66f
+    0x5c546cddf091f80b
+    0x736988156cb6760e
+    0x4821f50d63f209c9
+    0x5a2a7250bcee8c3b
+    0x70b50ee4ec2a2f4a
+    0x4671294f139a5d8e
+    0x580d73a2d880f4f2
+    0x6e10d08b8ea1322e
+    0x44ca82573924bf5d
+    0x55fd22ed076def34
+    0x6b7c6ba849496b01
+    0x432dc3492dcde2e1
+    0x53f9341b79415b99
+    0x68f781225791b27f
+    0x419ab0b576bb0f8f
+    0x52015ce2d469d373
+    0x6681b41b89844850
+    0x4011109135f2ad32
+    0x501554b5836f587e
+    0x641aa9e2e44b2e9e
+    0x7d21545b9d5dfa46
+    0x4e34d4b9425abc6b
+    0x61c209e792f16b86
+    0x7a328c6177adc668
+    0x4c5f97bceacc9c01
+    0x5f777dac257fc301
+    0x77555d172edfb3c2
+    0x4a955a2e7d4bd059
+    0x5d3ab0ba1c9ec46f
+    0x74895ce8a3c6758b
+    0x48d5da11665c0977
+    0x5b0b5095bff30bd5
+    0x71ce24bb2fefceca
+    0x4720d6f4fdf5e13e
+    0x58e90cb23d73598e
+    0x6f234fdeccd02ff1
+    0x457611eb40021df7
+    0x56d396661002a574
+    0x6c887bff94034ed2
+    0x43d54d7fbc821143
+    0x54caa0dfaba29594
+    0x69fd4917968b3af9
+    0x423e4daebe1704db
+    0x52cde11a6d9cc612
+    0x678159610903f797
+    0x40b0d7dca5a27abe
+    0x50dd0dd3cf0b196e
+    0x65145148c2cddfc9
+    0x7e59659af38157bc
+    0x4ef7df80d830d6d5
+    0x62b5d7610e3d0c8b
+    0x7b634d3951cc4fad
+    0x4d1e1043d31fb1cc
+    0x60659454c7e79e3f
+    0x787ef969f9e185cf
+    0x4b4f5be23c2cf3a1
+    0x5e2332dacb38308a
+    0x75abff917e063cac
+    0x498b7fbaeec3e5ec
+    0x5bee5fa9aa74df67
+    0x72e9f79415121740
+    0x47d23abc8d2b4e88
+    0x59c6c96bb076222a
+    0x70387bc69c93aab5
+    0x46234d5c21dc4ab1
+    0x57ac20b32a535d5d
+    0x6d9728dff4e834b5
+    0x447e798bf91120f1
+    0x559e17eef755692d
+    0x6b059deab52ac378
+    0x42e382b2b13aba2b
+    0x539c635f5d8968b6
+    0x68837c3734ebc2e3
+    0x41522da2811359ce
+    0x51a6b90b21583042
+    0x6610674de9ae3c52
+    0x7f9481216419cb67
+    0x4fbcd0b4de901f20
+    0x63ac04e2163426e8
+    0x7c97061a9bc130a2
+    0x4dde63d0a158be65
+    0x6155fcc4c9aeedff
+    0x79ab7bf5fc1aa97f
+    0x4c0b2d79bd90a9ef
+    0x5f0df8d82cf4d46b
+    0x76d1770e38320986
+    0x4a42ea68e31f45f3
+    0x5cd3a5031be71770
+    0x74088e43e2e0dd4c
+    0x488558ea6dcc8a50
+    0x5aa6af25093face4
+    0x71505aee4b8f981d
+    0x46d238d4ef39bf12
+    0x5886c70a2b082ed6
+    0x6ea878ccb5ca3a8c
+    0x45294b7ff19e6497
+    0x56739e5fee05fdbd
+    0x6c1085f7e9877d2d
+    0x438a53baf1f4ae3c
+    0x546ce8a9ae71d9cb
+    0x698822d41a0e503e
+    0x41f515c49048f226
+    0x52725b35b45b2eb0
+    0x670ef2032171fa5c
+    0x40695741f4e73c79
+    0x5083ad1272210b98
+    0x64a498570ea94e7e
+    0x7dcdbe6cd253a21e
+    0x4ea0970403744552
+    0x6248bcc5045156a7
+    0x7adaebf64565ac51
+    0x4cc8d379eb5f8bb2
+    0x5ffb085866376e9f
+    0x77f9ca6e7fc54a47
+    0x4afc1e850fdb4e6c
+    0x5dbb262653d22207
+    0x7529efafe8c6aa89
+    0x493a35cdf17c2a96
+    0x5b88c3416ddb353b
+    0x726af411c952028a
+    0x4782d88b1dd34196
+    0x59638eade54811fc
+    0x6fbc72595e9a167b
+    0x45d5c777db204e0d
+    0x574b3955d1e86190
+    0x6d1e07ab466279f4
+    0x4432c4cb0bfd8c38
+    0x553f75fdcefcef46
+    0x6a8f537d42bc2b18
+    0x4299942e49b59aef
+    0x533ff939dc2301ab
+    0x680ff788532bc216
+    0x4109fab533fb594d
+    0x514c796280fa2fa1
+    0x659f97bb2138bb89
+    0x7f077da9e986ea6b
+    0x4f64ae8a31f45283
+    0x633dda2cbe716724
+    0x7c0d50b7ee0dc0ed
+    0x4d885272f4c89894
+    0x60ea670fb1fabeb9
+    0x792500d39e796e67
+    0x4bb72084430be500
+    0x5ea4e8a553cede41
+    0x764e22cea8c295d1
+    0x49f0d5c129799da2
+    0x5c6d0b3173d8050b
+    0x73884dfdd0ce064e
+    0x483530bea280c3f1
+    0x5a427cee4b20f4ed
+    0x70d31c29dde93228
+    0x4683f19a2ab1bf59
+    0x5824ee00b55e2f2f
+    0x6e2e2980e2b5bafb
+    0x44dcd9f08db194dd
+    0x5614106cb11dfa14
+    0x6b991487dd657899
+    0x433facd4ea5f6b60
+    0x540f980a24f74638
+    0x69137e0cae3517c6
+    0x41ac2ec7ece12edb
+    0x52173a79e8197a92
+    0x669d0918621fd937
+    0x402225af3d53e7c2
+    0x502aaf1b0ca8e1b3
+    0x64355ae1cfd31a20
+    0x7d42b19a43c7e0a8
+    0x4e49af006a5cec69
+    0x61dc1ac084f42783
+    0x7a532170a6313164
+    0x4c73f4e667debede
+    0x5f90f22001d66e96
+    0x77752ea8024c0a3c
+    0x4aa93d29016f8665
+    0x5d538c7341cb67fe
+    0x74a86f90123e41fe
+    0x48e945ba0b66e93f
+    0x5b2397288e40a38e
+    0x71ec7cf2b1d0cc72
+    0x4733ce17af227fc7
+    0x5900c19d9aeb1fb9
+    0x6f40f20501a5e7a7
+    0x458897432107b0c8
+    0x56eabd13e9499cfb
+    0x6ca56c58e39c043a
+    0x43e763b78e4182a4
+    0x54e13ca571d1e34d
+    0x6a198bcece465c20
+    0x424ff76140ebf994
+    0x52e3f5399126f7f9
+    0x679cf287f570b5f7
+    0x40c21794f96671ba
+    0x50f29d7a37c00e29
+    0x652f44d8c5b011b4
+    0x7e7b160ef71c1621
+    0x4f0cedc95a718dd4
+    0x62d0293bb10df149
+  ]
+
+  :const _table_for_positive_exponent_base2_bit_width U8: 63 // (`B0` in the paper)
+  :const _table_for_positive_exponent_base2 Array(U64)'val: [ // (`TABLE_GTE` in the paper)
+    // This table (and the comments about variable ranges preceding it) were
+    // produced using the following Ruby script (with Ruby being a convenient
+    // language here because it gives very easy access to Bignum semantics):
+    //
+    // Care should be taken to ensure that the calculations inside the loop
+    // of this Ruby script continue to match the calculations surrounding
+    // the calculation of the table index and bit shift amount in the Savi code.
+    //
+    // ruby -e '
+    //   B0 = 63
+    //   F64_SIG_BIT_WIDTH = 52
+    //   F64_EXP_MIN = -1022 - F64_SIG_BIT_WIDTH
+    //   F64_EXP_MAX = 1023 - F64_SIG_BIT_WIDTH
+    //
+    //   q_min = Float::INFINITY
+    //   q_max = -Float::INFINITY
+    //   k_min = Float::INFINITY
+    //   k_max = -Float::INFINITY
+    //   shr_bits_min = Float::INFINITY
+    //   shr_bits_max = -Float::INFINITY
+    //   table_index_min = Float::INFINITY
+    //   table_index_max = -Float::INFINITY
+    //   table_results = []
+    //
+    //   (F64_EXP_MIN..F64_EXP_MAX).each { |e|
+    //     e2 = e - 2
+    //     next unless e2 >= 0
+    //
+    //     q = [(e2 * Math.log(2) / Math.log(10)).floor - 1, 0].max
+    //     k = (q * Math.log(5) / Math.log(2)).floor + B0
+    //     shr_bits = q + k - e2
+    //     table_index = q
+    //
+    //     table_results[table_index] = ((1 << k) / (5 ** table_index)).ceil
+    //
+    //     q_max           = q           if q           > q_max
+    //     q_min           = q           if q           < q_min
+    //     k_max           = k           if k           > k_max
+    //     k_min           = k           if k           < k_min
+    //     shr_bits_max    = shr_bits    if shr_bits    > shr_bits_max
+    //     shr_bits_min    = shr_bits    if shr_bits    < shr_bits_min
+    //     table_index_max = table_index if table_index > table_index_max
+    //     table_index_min = table_index if table_index < table_index_min
+    //   }
+    //
+    //   puts "// #{q_min} <= q <= #{q_max}"
+    //   puts "// #{k_min} <= k <= #{k_max}"
+    //   puts "// #{shr_bits_min} <= shr_bits <= #{shr_bits_max}"
+    //   puts "// #{table_index_min} <= table_index <= #{table_index_max}"
+    //   table_results.each { |result| puts "0x%016x" % result }
+    // '
+
+    // 0 <= q <= 290
+    // 63 <= k <= 736
+    // 56 <= shr_bits <= 63
+    // 0 <= table_index <= 290
+    0x8000000000000000
+    0x6666666666666666
+    0x51eb851eb851eb85
+    0x4189374bc6a7ef9d
+    0x68db8bac710cb295
+    0x53e2d6238da3c211
+    0x431bde82d7b634da
+    0x6b5fca6af2bd215e
+    0x55e63b88c230e77e
+    0x44b82fa09b5a52cb
+    0x6df37f675ef6eadf
+    0x57f5ff85e592557f
+    0x465e6604b7a84465
+    0x709709a125da0709
+    0x5a126e1a84ae6c07
+    0x480ebe7b9d58566c
+    0x734aca5f6226f0ad
+    0x5c3bd5191b525a24
+    0x49c97747490eae83
+    0x760f253edb4ab0d2
+    0x5e72843249088d75
+    0x4b8ed0283a6d3df7
+    0x78e480405d7b9658
+    0x60b6cd004ac94513
+    0x4d5f0a66a23a9da9
+    0x7bcb43d769f762a8
+    0x63090312bb2c4eed
+    0x4f3a68dbc8f03f24
+    0x7ec3daf941806506
+    0x65697bfa9acd1d9f
+    0x51212ffbaf0a7e18
+    0x40e7599625a1fe7a
+    0x67d88f56a29cca5d
+    0x5313a5dee87d6eb0
+    0x42761e4bed31255a
+    0x6a5696dfe1e83bc3
+    0x5512124cb4b9c969
+    0x440e750a2a2e3aba
+    0x6ce3ee76a9e3912a
+    0x571cbec554b60dbb
+    0x45b0989ddd5e7163
+    0x6f80f42fc8971bd1
+    0x5933f68ca078e30e
+    0x475cc53d4d2d8271
+    0x722e086215159d82
+    0x5b5806b4ddaae468
+    0x49133890b1558386
+    0x74eb8db44eef38d7
+    0x5d893e29d8bf60ac
+    0x4ad431bb13cc4d56
+    0x77b9e92b52e07bbe
+    0x5fc7edbc424d2fcb
+    0x4c9ff163683dbfd5
+    0x7a998238a6c932ef
+    0x6214682d523a8f26
+    0x4e76b9bddb620c1e
+    0x7d8ac2c95f034697
+    0x646f023ab2690545
+    0x5058ce955b87376b
+    0x40470baaaf9f5f88
+    0x66d812aab29898db
+    0x524675555bad4715
+    0x41d1f7777c8a9f44
+    0x694ff258c7443207
+    0x543ff513d29cf4d2
+    0x43665da9754a5d75
+    0x6bd6fc425543c8bb
+    0x5645969b77696d62
+    0x4504787c5f878ab5
+    0x6e6d8d93cc0c1122
+    0x5857a4763cd6741b
+    0x46ac8391ca4529af
+    0x711405b6106ea919
+    0x5a766af80d255414
+    0x485ebbf9a41ddcdc
+    0x73cac65c39c96161
+    0x5ca23849c7d44de7
+    0x4a1b603b06437185
+    0x76923391a39f1c09
+    0x5edb5c7482e5b007
+    0x4be2b05d35848cd2
+    0x796ab3c855a0e151
+    0x6122296d114d810d
+    0x4db4edf0daa4673e
+    0x7c54afe7c43a3eca
+    0x6376f31fd02e98a1
+    0x4f925c1973587a1b
+    0x7f50935bebc0c35e
+    0x65da0f7cbc9a35e5
+    0x517b3f96fd482b1d
+    0x412f66126439bc17
+    0x684bd683d38f9359
+    0x536fdecfdc72dc47
+    0x42bfe57316c249d2
+    0x6acca251be03a951
+    0x557081dafe695440
+    0x445a017bfebaa9cd
+    0x6d5ccf2ccac442e2
+    0x577d728a3bd03581
+    0x45fdf53b630cf79b
+    0x6ffcbb923814bf5e
+    0x5996fc74f9aa32b2
+    0x47abfd2a6154f55b
+    0x72acc843ceee555e
+    0x5bbd6d030bf1dde5
+    0x49645735a327e4b7
+    0x756d5855d1d96df2
+    0x5df11377db1457f5
+    0x4b2742c648dd132a
+    0x783ed13d4161b844
+    0x603240fdcde7c69c
+    0x4cf500cb0b1fd217
+    0x7b219ade7832e9be
+    0x628148b1f9c25498
+    0x4ecdd3c1949b76e0
+    0x7e161f9c20f8be33
+    0x64de7fb01a609829
+    0x50b1ffc0151a1354
+    0x408e66334414dc43
+    0x674a3d1ed354939f
+    0x52a1ca7f0f76dc7f
+    0x421b0865a5f8b065
+    0x69c4da3c3cc11a3c
+    0x549d7b6363cdae96
+    0x43b12f82b63e2545
+    0x6c4eb26abd303ba2
+    0x56a55b889759c94e
+    0x45511606df7b0772
+    0x6ee8233e325e7250
+    0x58b9b5cb5b7ec1d9
+    0x46faf7d5e2cbce47
+    0x71918c896adfb073
+    0x5adad6d4557fc05c
+    0x48af1243779966b0
+    0x744b506bf28f0ab3
+    0x5d090d2328726ef5
+    0x4a6da41c205b8bf7
+    0x7715d36033c5acbf
+    0x5f44a919c3048a32
+    0x4c36edae359d3b5b
+    0x79f17c49ef61f893
+    0x618dfd07f2b4c6dc
+    0x4e0b30d328909f16
+    0x7cdeb4850db431bd
+    0x63e55d373e29c164
+    0x4feab0f8fe87cde9
+    0x7fdde7f4ca72e30f
+    0x664b1ff7085be8d9
+    0x51d5b32c06afed7a
+    0x4177c2899ef32462
+    0x68bf9da8fe51d3d0
+    0x53cc7e20cb74a973
+    0x4309fe80a2c3bac2
+    0x6b4330cdd1392ad1
+    0x55cf5a3e40fa88a7
+    0x44a5e1cb672ed3b9
+    0x6dd636123eb152c1
+    0x57de91a832277567
+    0x464ba7b9c1b92ab9
+    0x70790c5c6928445c
+    0x59fa7049edb9d049
+    0x47fb8d07f161736e
+    0x732c14d98235857d
+    0x5c2343e134f79dfd
+    0x49b5cfe75d92e4ca
+    0x75efb30bc8eb07ab
+    0x5e595c096d88d2ef
+    0x4b7ab0078ad3dbf2
+    0x78c44cd8de1fc650
+    0x609d0a4718196b73
+    0x4d4a6e9f467abc5c
+    0x7baa4a9870c46094
+    0x62eea2138d69e6dd
+    0x4f254e760abb1f17
+    0x7ea21723445e9825
+    0x654e78e9037ee01d
+    0x510b93ed9c658017
+    0x40d60ff149eaccdf
+    0x67bce64edcaae166
+    0x52fd850be3bbe784
+    0x42646a6fe9631f9d
+    0x6a3a43e642383295
+    0x54fb698501c68ede
+    0x43fc546a67d20be4
+    0x6cc6ed770c83463b
+    0x57058ac5a39c382f
+    0x459e089e1c7cf9bf
+    0x6f6340fcfa618f98
+    0x591c33fd951ad946
+    0x4749c33144157a9f
+    0x720f9eb539bbf765
+    0x5b3fb22a94965f84
+    0x48ffc1bbaa11e603
+    0x74cc692c434fd66b
+    0x5d705423690cab89
+    0x4ac0434f873d5607
+    0x779a054c0b955672
+    0x5fae6aa33c77785b
+    0x4c8b888296c5f9e2
+    0x7a78da6a8ad65c9d
+    0x61fa48553bdeb07e
+    0x4e61d37763188d31
+    0x7d6952589e8daeb6
+    0x645441e07ed7bef8
+    0x504367e6cbdfcbf9
+    0x4035ecb8a3196ffb
+    0x66bcadf43828b32b
+    0x52308b29c686f5bc
+    0x41c06f549ed25e30
+    0x6933e554315096b3
+    0x542984435aa6def5
+    0x435469cf7bb8b25e
+    0x6bba42e592c11d63
+    0x562e9beadbcdb11c
+    0x44f216557ca48db0
+    0x6e5023bbfaa0e2b3
+    0x58401c96621a4ef6
+    0x4699b0784e7b725e
+    0x70f5e726e3f8b6fd
+    0x5a5e5285832d5f31
+    0x484b75379c244c27
+    0x73abeebf603a1372
+    0x5c898bcc4cfb42c2
+    0x4a07a309d72f689b
+    0x76729e762518a75e
+    0x5ec2185e8413b918
+    0x4bce79e536762dad
+    0x794a5ca1f0bd15e2
+    0x61084a1b26fdab1b
+    0x4da03b48ebfe227c
+    0x7c33920e46636a60
+    0x635c74d8384f884d
+    0x4f7d2a469372d370
+    0x7f2eaa0a85848581
+    0x65beee6ed136d134
+    0x51658b8bda9240f6
+    0x411e093caedb672b
+    0x68300ec77e2bd845
+    0x5359a56c64efe037
+    0x42ae1df050bfe693
+    0x6ab02fe6e79970eb
+    0x5559bfebec7ac0bc
+    0x4447ccbcbd2f0096
+    0x6d3fadfac84b3424
+    0x576624c8a03c29b6
+    0x45eb50a08030215e
+    0x6fdee76733803564
+    0x597f1f85c2ccf783
+    0x4798e6049bd72c69
+    0x728e3cd42c8b7a42
+    0x5ba4fd768a092e9b
+    0x4950cac53b3a8baf
+    0x754e113b91f745e5
+    0x5dd80dc941929e51
+    0x4b133e3a9adbb1da
+    0x781ec9f75e2c4fc4
+    0x6018a192b1bd0c9c
+    0x4ce0814227ca707d
+    0x7b00ced03faa4d95
+    0x62670bd9cc883e11
+    0x4eb8d647d6d364da
+    0x7df48a0c8aebd491
+    0x64c3a1a3a25643a7
+    0x509c814fb511cfb9
+    0x407d343fc40e3fc7
+    0x672eb9ffa016cc71
+    0x528bc7ffb345705b
+    0x42096ccc8f6ac048
+    0x69a8ae1418aacd41
+    0x5486f1a9ad557101
+    0x439f27baf1112734
+    0x6c31d92b1b4ea520
+    0x568e4755af721db3
+    0x453e9f77bf8e7e29
+    0x6eca98bf98e3fd0e
+    0x58a213cc7a4ffda5
+    0x46e80fd6c83ffe1d
+    0x71734c8ad9fffcfc
+    0x5ac2a3a247fffd96
+    0x489bb61b6ccccadf
+    0x742c569247ae1164
+    0x5cf04541d2f1a783
+    0x4a59d101758e1f9c
+    0x76f61b3588e365c7
+    0x5f2b48f7a0b5eb06
+    0x4c22a0c61a2b226b
+    0x79d1013cf6ab6a45
+    0x617400fd9222bb6a
+    0x4df6673141b562bb
+    0x7cbd71e869223792
+    0x63cac186ba81c60e
+  ]

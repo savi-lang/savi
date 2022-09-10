@@ -1,0 +1,67 @@
+:class Savi.FloatingPoint.Format.Spec
+  :is Spec
+  :const describes: "FloatingPoint.Format"
+
+  :it "prints the decimal digits of the floating-point value into a string"
+    assert: "\(0.0)" == "0.0"
+    assert: "\(1.0)" == "1.0"
+    assert: "\(9.543)" == "9.543"
+    assert: "\(1.2345678)" == "1.2345678"
+    assert: "\(9.543e20)" == "9.543e20"
+    assert: "\(9.543e80)" == "9.543e80"
+    assert: "\(-5.5555546e-123)" == "-5.5555546e-123"
+    assert: "\(333333333333333.3333)" == "333333333333333.3"
+    assert: "\(3333333333333333.333)" == "3333333333333333.5"
+
+    assert: "\(F64.from_bits(0x0010000000000000))" == "2.2250738585072014e-308"
+    assert: "\(F64.from_bits(0x00000000000f4240))" == "4.940656e-318"
+    assert: "\(F64.from_bits(0x00000000016e3600))" == "1.18575755e-316"
+    assert: "\(F64.from_bits(0x0000008cdcdea440))" == "2.989102097996e-312"
+    assert: "\(F64.from_bits(0x434018601510c000))" == "9060801153433600.0"
+    assert: "\(F64.from_bits(0x43d055dc36f24000))" == "4.708356024711512e18"
+    assert: "\(F64.from_bits(0x43e052961c6f8000))" == "9.409340012568248e18"
+
+    // This exercises the `accept_smaller` path in the "shortest digits" code:
+    assert: "\(F64.from_bits(0xc352bd2668e077c4))" == "-21098088986959630.0"
+
+  :it "approximates `⌊x * log10(2)⌋` for all `0 <= x <= 1650`"
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(0) == 0
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(1) == 0
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(3) == 0
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(4) == 1
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(1647) == 495
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(1648) == 496
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(1649) == 496
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(1650) == 496
+    assert: _Ryu.F64._approx_floor_multiply_log10of2(1651) != 497 // wrong
+
+  :it "approximates `⌊x * log10(5)⌋` for all `0 <= x <= 2620`"
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(0) == 0
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(1) == 0
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(2) == 1
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(3) == 2
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(4) == 2
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(5) == 3
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(2619) == 1830
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(2620) == 1831
+    assert: _Ryu.F64._approx_floor_multiply_log10of5(2621) != 1832 // wrong
+
+  :it "approximates `⌊x * log2(5)⌋` for all `0 <= x <= 3528`"
+    assert: _Ryu.F64._approx_floor_multiply_log2of5(0) == 0
+    assert: _Ryu.F64._approx_floor_multiply_log2of5(1) == 2
+    assert: _Ryu.F64._approx_floor_multiply_log2of5(2) == 4
+    assert: _Ryu.F64._approx_floor_multiply_log2of5(3) == 6
+    assert: _Ryu.F64._approx_floor_multiply_log2of5(4) == 9
+    assert: _Ryu.F64._approx_floor_multiply_log2of5(3527) == 8189
+    assert: _Ryu.F64._approx_floor_multiply_log2of5(3528) == 8191 // wrong
+    assert: _Ryu.F64._approx_floor_multiply_log2of5(3529) != 8194 // wrong
+
+  :it "approximates `⌈x * log2(5)⌉` for all `1 <= x <= 3528`"
+    assert: _Ryu.F64._approx_ceil_multiply_log2of5(0) == 1
+    assert: _Ryu.F64._approx_ceil_multiply_log2of5(1) == 3
+    assert: _Ryu.F64._approx_ceil_multiply_log2of5(2) == 5
+    assert: _Ryu.F64._approx_ceil_multiply_log2of5(3) == 7
+    assert: _Ryu.F64._approx_ceil_multiply_log2of5(4) == 10
+    assert: _Ryu.F64._approx_ceil_multiply_log2of5(3527) == 8190
+    assert: _Ryu.F64._approx_ceil_multiply_log2of5(3528) == 8192 // wrong
+    assert: _Ryu.F64._approx_ceil_multiply_log2of5(3529) != 8195 // wrong

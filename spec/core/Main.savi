@@ -10,6 +10,7 @@
       Spec.Run(Savi.FloatingPoint.Arithmetic.Spec).new(env)
       Spec.Run(Savi.FloatingPoint.Bounded.Spec).new(env)
       Spec.Run(Savi.FloatingPoint.Comparable.Spec).new(env)
+      Spec.Run(Savi.FloatingPoint.Format.Spec).new(env)
       Spec.Run(Savi.Indexable.Spec).new(env)
       Spec.Run(Savi.InhibitOptimization.Spec).new(env)
       Spec.Run(Savi.Inspect.Spec).new(env)

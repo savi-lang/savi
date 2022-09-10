@@ -26,6 +26,74 @@
   :: because that implicit bit is not actually in the memory representation.
   :fun non sig_bit_width U8
 
+:: A type that can decode the low-level details of a floating-point number
+:: whose internal representation follows the IEEE754 standard.
+::
+:: The first type argument is expected to be an unsigned integer type and will
+:: be used to represent the raw bits of the entire value, as well as the
+:: bits of the significand (which is almost as wide as the entire value).
+::
+:: The second type argument is expected to be a signed integer type and will
+:: be used to represent the base-2 exponent of the value.
+:trait val FloatingPoint.IEEE754(B Integer(B)'val, E Integer(E)'val)
+  :is FloatingPoint.Representable
+
+  :: Create a new floating-point value from the raw bits representation.
+  :fun non from_bits(bits B) @'val
+
+  :: Get the raw bits representation of the value, as an integer.
+  :fun val bits B
+
+  :: A bit mask highlighting only the bits encoding the significand.
+  ::
+  :: Note that if you use this bit mask to obtain the value's significand bits,
+  :: this is not necessarily the same as the actual signficand value,
+  :: which may include an implicit leading bit depending on the value.
+  ::
+  :: Use `significand_with_base_2_exponent` instead if you wish to decode
+  :: the value to obtain the actual significand and base-2 exponent values.
+  :fun non sig_bit_mask B
+
+  :: A bit mask highlighting only the bits encoding the exponent.
+  ::
+  :: Note that if you use this bit mask to obtain the value's exponent bits,
+  :: this is not necessarily the same as the actual exponent value,
+  :: because the exponent is encoded with implicit bias and normalization.
+  ::
+  :: Use `significand_with_base_2_exponent` instead if you wish to decode
+  :: the value to obtain the actual significand and base-2 exponent values.
+  :fun non exp_bit_mask B
+
+  :: A bit mask highlighting only the bit encoding the sign.
+  ::
+  :: If you use this bit mask to obtain the value's sign bits,
+  :: then a zero check can test for negative or positive sign of the value,
+  :: though this bit check isn't relevant for NaN values.
+  ::
+  :: Use `has_negative_sign_bit` or `has_positive_sign_bit` for a convenient
+  :: way to access the result of this bit check.
+  :fun non sign_bit_mask B
+
+  :: Return `True` if the sign bit is set (indicating negative).
+  :: Note that this bit check isn't relevant for NaN values.
+  :fun val has_negative_sign_bit Bool: @bits.bit_and(@sign_bit_mask).is_nonzero
+
+  :: Return `True` if the sign bit is unset (indicating positive).
+  :: Note that this bit check isn't relevant for NaN values.
+  :fun val has_positive_sign_bit Bool: @bits.bit_and(@sign_bit_mask).is_zero
+
+  :: Decode the significand and exponent from the IEEE-754-encoded bits.
+  ::
+  :: The actual value represented (ignoring the sign bit) can be understood
+  :: to be the significand multiplied by the given exponent's power of 2.
+  :: The value would then be understood to be negated if the sign bit is set.
+  ::
+  :: If the value is not a finite number (i.e. if it `is_infinite` or `is_nan`),
+  :: then the numbers returned by this function have no semantic meaning,
+  :: so those special cases should be accounted for in some other way
+  :: by the caller (likely, by avoiding calling this method in that case).
+  :fun val significand_with_base_2_exponent Pair(B, E)
+
 :: A type that can return certain special edge-case floating-point values.
 :trait val FloatingPoint.Bounded(T FloatingPoint(T)'val)
   :is Numeric.Bounded(T)
@@ -84,6 +152,18 @@
   :: Return true if the value is neither NaN nor positive or negative infinity.
   :fun val is_finite Bool
 
+:: A type which can be formatted as the given integer type T.
+:trait val FloatingPoint.Formattable(T FloatingPoint(T)'val)
+  :fun as_val T
+
+  :fun format
+    // TODO: Specialized 32-bit implementation.
+    FloatingPoint.Format(F64)._new(_FormattableF64.from_f64(@as_val.f64))
+
+  :is IntoString
+  :fun into_string(out String'iso): @format.shortest.into_string(--out)
+  :fun into_string_space: @format.shortest.into_string_space
+
 :: This trait isn't meant to be used externally. It's just a base implementation
 :: of methods to be copied into every new floating-point 32-bit `:numeric` type.
 :trait val FloatingPoint.BaseImplementation32 // TODO: don't use :trait for this... `common`?
@@ -95,8 +175,53 @@
   :: allowing them to treat any `box` reference as a `val` reference.
   :fun as_val @'val: compiler intrinsic
 
+  :is FloatingPoint.IEEE754(U32, I8)
   :fun non from_bits(bits U32) @'val: compiler intrinsic
   :fun val bits U32: compiler intrinsic
+  :fun non sig_bit_mask U32:  0b00000000011111111111111111111111
+  :fun non exp_bit_mask U32:  0b01111111100000000000000000000000
+  :fun non sign_bit_mask U32: 0b10000000000000000000000000000000
+
+  :: Decode the significand and exponent from the IEEE-754-encoded bits.
+  ::
+  :: The actual value represented (ignoring the sign bit) can be understood
+  :: to be the significand multiplied by the given exponent's power of 2.
+  :: The value would then be understood to be negated if the sign bit is set.
+  ::
+  :: If the value is not a finite number (i.e. if it `is_infinite` or `is_nan`),
+  :: then the numbers returned by this function have no semantic meaning,
+  :: so those special cases should be accounted for in some other way.
+  :fun val significand_with_base_2_exponent Pair(U32, I8)
+    sig_bits = @bits.bit_and(@sig_bit_mask)
+    exp_bits = @bits.bit_and(@exp_bit_mask).bit_shr(@sig_bit_width)
+
+    // Exponents are encoded with a bias value added that raises all negative
+    // exponents into positive integers, and positive exponents raised further.
+    // In other words, the bias is what value a zero exponent is encoded as.
+    exp_bias = I8.one.bit_shl(@exp_bit_width - 1) - 1
+
+    if exp_bits.is_zero (
+      // When the exponent bits are zero, it is treated as if it was "one"
+      // (i.e. the most negative representable exponent when bias is applied),
+      // and the significand bits are passed through directly without the
+      // implicit leading bit being applied as it is for "normalized" numbers.
+      //
+      // This space of numbers are known as "subnormal" numbers, and they are
+      // used to represent numbers which are otherwise too small to represent.
+      Pair(U32, I8).new(
+        sig_bits
+        I8.one - exp_bias - @sig_bit_width.i8
+      )
+    |
+      // Otherwise, we are in the space of "normalized" numbers, where the
+      // exponent bits are used as normal (with bias-correction) and the
+      // significand bits have the implicit leading bit applied to raise them,
+      // which is skipped during encoding to allow for the "subnormal" space.
+      Pair(U32, I8).new(
+        sig_bits.bit_or(U32.one.bit_shl(@sig_bit_width))
+        exp_bits.i8 - exp_bias - @sig_bit_width.i8
+      )
+    )
 
   :is Numeric.Convertible
 
@@ -131,9 +256,7 @@
   :fun val is_finite
     @bits.bit_and(0x7f80_0000) != 0x7f80_0000 // exponent
 
-  :is IntoString
-  :fun into_string_space: @f64.into_string_space
-  :fun into_string(out String'iso): @f64.into_string(--out) // TODO: 32-bit impl
+  :is FloatingPoint.Formattable(@)
 
 :: This trait isn't meant to be used externally. It's just a base implementation
 :: of methods to be copied into every new floating-point 64-bit `:numeric` type.
@@ -146,8 +269,56 @@
   :: allowing them to treat any `box` reference as a `val` reference.
   :fun as_val @'val: compiler intrinsic
 
+  :is FloatingPoint.IEEE754(U64, I16)
   :fun non from_bits(bits U64) @'val: compiler intrinsic
   :fun val bits U64: compiler intrinsic
+  :fun non sig_bit_mask U64
+    0b0000000000001111111111111111111111111111111111111111111111111111
+  :fun non exp_bit_mask U64
+    0b0111111111110000000000000000000000000000000000000000000000000000
+  :fun non sign_bit_mask U64
+    0b1000000000000000000000000000000000000000000000000000000000000000
+
+  :: Decode the significand and exponent from the IEEE-754-encoded bits.
+  ::
+  :: The actual value represented (ignoring the sign bit) can be understood
+  :: to be the significand multiplied by the given exponent's power of 2.
+  :: The value would then be understood to be negated if the sign bit is set.
+  ::
+  :: If the value is not a finite number (i.e. if it `is_infinite` or `is_nan`),
+  :: then the numbers returned by this function have no semantic meaning,
+  :: so those special cases should be accounted for in some other way.
+  :fun val significand_with_base_2_exponent Pair(U64, I16)
+    sig_bits = @bits.bit_and(@sig_bit_mask)
+    exp_bits = @bits.bit_and(@exp_bit_mask).bit_shr(@sig_bit_width)
+
+    // Exponents are encoded with a bias value added that raises all negative
+    // exponents into positive integers, and positive exponents raised further.
+    // In other words, the bias is what value a zero exponent is encoded as.
+    exp_bias = I16.one.bit_shl(@exp_bit_width - 1) - 1
+
+    if exp_bits.is_zero (
+      // When the exponent bits are zero, it is treated as if it was "one"
+      // (i.e. the most negative representable exponent when bias is applied),
+      // and the significand bits are passed through directly without the
+      // implicit leading bit being applied as it is for "normalized" numbers.
+      //
+      // This space of numbers are known as "subnormal" numbers, and they are
+      // used to represent numbers which are otherwise too small to represent.
+      Pair(U64, I16).new(
+        sig_bits
+        I16.one - exp_bias - @sig_bit_width.i16
+      )
+    |
+      // Otherwise, we are in the space of "normalized" numbers, where the
+      // exponent bits are used as normal (with bias-correction) and the
+      // significand bits have the implicit leading bit applied to raise them,
+      // which is skipped during encoding to allow for the "subnormal" space.
+      Pair(U64, I16).new(
+        sig_bits.bit_or(U64.one.bit_shl(@sig_bit_width))
+        exp_bits.i16 - exp_bias - @sig_bit_width.i16
+      )
+    )
 
   :is Numeric.Convertible
 
@@ -182,45 +353,4 @@
   :fun val is_finite
     @bits.bit_and(0x7ff0_0000_0000_0000) != 0x7ff0_0000_0000_0000 // exponent
 
-  :is IntoString
-  :fun into_string_space USize: 14 // (max size of the below logic)
-  :fun into_string(out String'iso) String'iso
-    value = @as_val
-    case (
-    | value == @zero |
-      out << "0.0"
-    | value.is_finite |
-      // If the value is negative, begin with a negative symbol character.
-      // Then from here on we will work only with the absolute value.
-      if (value < @zero) out.push_byte('-')
-      value = value.abs
-
-      // TODO: Avoid this hacky workaround for lack of numeric literals here.
-      ten = @one + @one + @one + @one + @one + @one + @one + @one + @one + @one
-      million = ten * ten * ten * ten * ten * ten
-      hundredth = @one / ten / ten
-
-      // Decide which representation to use based on the magnitude of the
-      // value, limiting the left side of the decimal point so that it will
-      // have no more than 6 digits, and keeping the right side of the decimal
-      // (which is limited to 6 digits) having at least 5 significant digits.
-      use_scientific = value >= million || value < hundredth
-
-      // Cheat and use `snprintf` to print the value into the output string.
-      // TODO: use grisu3 algorithm like Crystal does, for better performance
-      // for those numbers that the algorithm handles, using this as a fallback:
-      out.reserve(out.size + @into_string_space)
-      out_offset_cpointer = out.cpointer._unsafe._offset(out.size)
-      buffer = _FFI.snprintf(
-        out_offset_cpointer
-        @into_string_space.i32
-        if use_scientific ("%.6e".cstring | "%.12g".cstring)
-        value
-      )
-      out._size += _FFI.strlen(out_offset_cpointer).usize
-    | value.is_infinite |
-      out << if (value > @zero) ("Infinity" | "-Infinity")
-    |
-      out << "NaN"
-    )
-    --out
+  :is FloatingPoint.Formattable(@)
