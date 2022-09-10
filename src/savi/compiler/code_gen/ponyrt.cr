@@ -8,7 +8,8 @@ class Savi::Compiler::CodeGen::PonyRT
   # 52/104 bytes: heap
   # 48/88 bytes: gc
   # 28/0 bytes: padding to 64 bytes, ignored
-  ACTOR_PAD_SIZE = 248
+  # XXX: USE_RUNTIMESTATS -> 392
+  ACTOR_PAD_SIZE = 264
   # TODO: adjust based on intptr size to account for 32-bit platforms:
   # if INTPTR_MAX == INT64_MAX
   #  define ACTOR_PAD_SIZE 248
