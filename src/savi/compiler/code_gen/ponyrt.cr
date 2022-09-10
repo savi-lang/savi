@@ -218,7 +218,7 @@ class Savi::Compiler::CodeGen::PonyRT
       {"pony_init", [@i32, @pptr], @i32, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
-      {"pony_become", [@ptr, @obj_ptr], @void, [
+      {"ponyint_become", [@ptr, @obj_ptr], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
       {"pony_start", [@i1, @i32_ptr, @ptr], @i1, [
@@ -593,7 +593,7 @@ class Savi::Compiler::CodeGen::PonyRT
     # TODO: Run module finalizers.
 
     # Become nothing (stop being the main actor).
-    g.builder.call(g.mod.functions["pony_become"], [
+    g.builder.call(g.mod.functions["ponyint_become"], [
       g.func_frame.alloc_ctx,
       @obj_ptr.null,
     ])
@@ -680,7 +680,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
     if become_now
       g.builder.call(
-        g.mod.functions["pony_become"],
+        g.mod.functions["ponyint_become"],
         [g.gen_frame.alloc_ctx, allocated],
       )
     end
