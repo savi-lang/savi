@@ -26,17 +26,15 @@
     while True (
       ndigits = ndigits + 1
       digit = u64 % 10
-      high = high.bit_shl(4).bit_or(low.bit_shr(60).bit_and(0xF))
-      low = low.bit_shl(4).bit_or(u64 % 10)
       u64 = u64 / 10
+      high = high.bit_shl(4).bit_or(low.bit_shr(60).bit_and(0xF))
+      low = low.bit_shl(4).bit_or(digit)
       if (u64 == 0) (
         break
       )
     )
     @_high = high.bit_or(ndigits.bit_shl(58))
     @_low = low
-
-  :new _from_high_low(@_high, @_low)
 
   :fun box is_zero Bool
     @_low.bit_and(0xFF) == 0xF0
@@ -54,28 +52,6 @@
   :fun box ndigits USize
     @_high.bit_shr(58).bit_and(0b11111).usize
 
-  :: Given a BCD representing `321`, pushing digit 4
-  :: to the left will return a new BCD representing `4321`.
-  :fun val push_digit_left!(digit U8) @'val
-    if (digit > 9) (
-      error!
-    )
-    ndigits = @ndigits
-    if (ndigits >= 20) (
-      error!
-    )
-
-    low = @_low
-    // only the lower 20 bits of high are used for digits (including sentinel 0xF)
-    high = @_high.bit_and(0xF_FFFF)
-    ndigits = ndigits + 1
-
-    high = high.bit_shl(4).bit_or(low.bit_shr(60).bit_and(0xF))
-    low = low.bit_shl(4).bit_or(digit.u64)
-    high = high.bit_or(ndigits.u64.bit_shl(58))
-
-    BCD.U64._from_high_low(high, low)
-
   :: Returns digit at position `pos`.
   :fun box digit!(pos USize) U8
     // 1234  -> 0xF_4321
@@ -91,7 +67,6 @@
       // digits 16..19 in the higher word
       @_high.bit_shr(((index - 16) * 4).u8).u8.bit_and(U8[0xF])
     )
-
 
   :fun box each_digit
     :yields U8 for None 
@@ -112,5 +87,4 @@
     )
 
     --out
-
 
