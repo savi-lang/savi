@@ -34,7 +34,7 @@
     if @_is_negative (
       out.push_byte('-')
     )
-    --@_bcd.into_string(--out)
+    @_bcd.into_string(--out)
 
   :fun into_string_space USize
     @_bcd.into_string_space + if @_is_negative (1 | 0)
