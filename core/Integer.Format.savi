@@ -17,110 +17,27 @@
 :struct val Integer.Format.Decimal(T Integer(T)'val)
   :is IntoString
 
-  :let _value T
-  :new val _new(@_value)
+  :let _bcd U64.BCD
+  :let _is_negative Bool
 
-  :fun into_string(out String'iso) String'iso
-    value = @_value
-
-    // TODO: Avoid this hacky workaround for lack of numeric literals here.
+  :new val _new(value T)
     zero = value.zero
-    one = value.one
-    ten = one + one + one + one + one + one + one + one + one + one
-
-    // Fast path for zero - it always has exactly one digit.
-    if (value == zero) (
-      out.push_byte('0')
-      return --out
-    )
-
-    // If the value is less than zero, we need to negate it to make it positive
-    // before we try to append its representation into the given string,
-    // and we'll append a negative sign byte first.
     if (value < zero) (
       value = zero - value
+      @_is_negative = True
+    |
+      @_is_negative = False
+    )
+    @_bcd = U64.BCD.new(value.u64)
+
+  :fun into_string(out String'iso) String'iso
+    if @_is_negative (
       out.push_byte('-')
     )
-
-    // Convert the value to a U64 so we don't have to specialize code by size.
-    // TODO: It would likely be slightly faster to specialize by size here.
-    u64 = value.u64
-
-    // Get the number of digits to print and the initial divisor to use.
-    digit_count = @_overestimated_digit_count(value.significant_bits)
-    divisor = try (@_powers_of_10[(digit_count - 1).usize]! | 10)
-
-    // For some numbers, our initial estimate is one higher than the correct
-    // digit count, so in such cases we adjust our values down by one digit.
-    if (u64 < divisor) (
-      digit_count -= 1
-      divisor = divisor / 10
-    )
-
-    // Print the digits from left to right (most to least significant).
-    // This works because the divisor is decreasing by a factor of 10 each time.
-    digit_count.times -> (
-      out.push_byte((u64 / divisor % 10).u8 + '0')
-      divisor = divisor / 10
-    )
-
-    --out
+    --@_bcd.into_string(--out)
 
   :fun into_string_space USize
-    orig_value = value = @_value
-
-    // TODO: Avoid this hacky workaround for lack of numeric literals here.
-    zero = value.zero
-
-    // Fast path for zero - it always has exactly one digit.
-    return 1 if (value == zero)
-
-    // If the value is less than zero, we need to negate it to make it positive
-    // before we try to count the number of its significant bits.
-    if (value < zero) (value = zero - value)
-
-    // The number of bytes we need available to print the number is the
-    // same as the number of digits, with an added byte for the negative sign
-    // in the case that the number is a negative one.
-    digit_count = @_overestimated_digit_count(value.significant_bits)
-    byte_count = if (orig_value < zero) (digit_count + 1 | digit_count)
-    byte_count.usize
-
-  :: Return a number which is greater than or equal to the number of base-10
-  :: digits needed to represent the given value (which must be positive).
-  :: This approximation will always be either exactly correct (as it is for the
-  :: majority of possible numbers), or one higher than the correct digit count.
-  :fun non _overestimated_digit_count(bit_count U8) U8
-    // Take the number of significant bits, multiply by (77 / 256), then add 1.
-    // This approximation is valid for up to 128 significant bits, and will not
-    // overflow 16-bit intermediate computation, because 128 * 77 uses 14 bits.
-    // Note that shifting by 8 bits is equivalent to floored division by 256.
-    (bit_count.u16 * 77).bit_shr(8).u8 + 1
-
-  :: All of the powers of 10 that are representable by the `U64` type,
-  :: where the index of this table is used as the exponent of 10.
-  :const _powers_of_10 Array(U64)'val: [
-    1
-    10
-    100
-    1000
-    10000
-    100000
-    1000000
-    10000000
-    100000000
-    1000000000
-    10000000000
-    100000000000
-    1000000000000
-    10000000000000
-    100000000000000
-    1000000000000000
-    10000000000000000
-    100000000000000000
-    1000000000000000000
-    10000000000000000000
-  ]
+    @_bcd.into_string_space + if @_is_negative (1 | 0)
 
 :: Format the given integer into a fixed width hexadecimal representation.
 ::
