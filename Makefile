@@ -171,6 +171,10 @@ ifneq (,$(findstring macos,$(TARGET_PLATFORM)))
 	CRYSTAL_RT_LIBS+=-liconv
 endif
 
+ifneq (,$(findstring freebsd,$(TARGET_PLATFORM)))
+	CRYSTAL_RT_LIBS+=-L/usr/local/lib
+endif
+
 # This is the path to the Crystal standard library source code,
 # including the LLVM extensions C++ file we need to build and link.
 CRYSTAL_PATH?=$(shell env $(shell crystal env) printenv CRYSTAL_PATH | rev | cut -d ':' -f 1 | rev)
