@@ -20,6 +20,11 @@
 // was too focused on proofs for the general case to notice some of the
 // opportunities we noticed when we were implementing it step by step here.
 
+// TODO: Remove this empty namespace module when its absence no longer
+// breaks Sugar compiler pass specs. Currently if this is missing it will cause
+// those tests to fail because the PopulateTypes pass doesn't yet cache ASTs.
+:module _Ryu
+
 :struct val _Ryu.F64
   :: Use the Ryū algorithm to transform the given input significand and
   :: base-2 exponent into a new signficand with base-10 exponent, signifying
