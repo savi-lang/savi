@@ -13,7 +13,7 @@
 :: TODO: The code would become trivial if we had a `U128` type or a
 :: bit-shift connected pair of two U64.
 ::
-:struct val BCD.U64
+:struct val U64.BCD
   :is IntoString
 
   :let _high U64
@@ -23,7 +23,7 @@
     high U64 = 0 
     low U64 = 0xF
     ndigits U64 = 0
-    while (True) (
+    while True (
       ndigits = ndigits + 1
       digit = u64 % 10
       high = high.bit_shl(4).bit_or(low.bit_shr(60).bit_and(0xF))
@@ -44,7 +44,7 @@
   :: Converts the BCD back to an U64
   :fun box u64 U64
     n U64 = 0
-    @each_digit -> (digit|
+    @each_digit -> (digit |
       n = (n * 10) + digit.u64
     )
     n
@@ -64,7 +64,7 @@
     if (ndigits >= 20) (
       error!
     )
-    
+
     low = @_low
     // only the lower 20 bits of high are used for digits (including sentinel 0xF)
     high = @_high.bit_and(0xF_FFFF)
@@ -91,7 +91,7 @@
       // digits 16..19 in the higher word
       @_high.bit_shr(((index - 16) * 4).u8).u8.bit_and(U8[0xF])
     )
-      
+
 
   :fun box each_digit
     :yields U8 for None 
@@ -107,7 +107,7 @@
     @ndigits
 
   :fun box into_string(out String'iso) String'iso
-    @each_digit -> (digit|
+    @each_digit -> (digit |
       out.push_byte('0'.u8 + digit)
     )
 

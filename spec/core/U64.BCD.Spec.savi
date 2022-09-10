@@ -1,0 +1,43 @@
+:class Savi.U64.BCD.Spec
+  :is Spec
+  :const describes: "U64.BCD"
+
+  :it "can be converted back into an U64"
+    assert: U64.BCD.new(0).u64 == U64[0]
+    assert: U64.BCD.new(12345).u64 == U64[12345]
+
+  :it "can access digits by position"
+    bcd = U64.BCD.new(123)
+    assert: bcd.digit!(0) == 3
+    assert: bcd.digit!(1) == 2
+    assert: bcd.digit!(2) == 1
+    assert error: bcd.digit!(3)
+
+  :it "can test for zero"
+    assert: U64.BCD.new(0).is_zero
+    assert: U64.BCD.new(1).is_zero.is_false
+
+  :it "can retrieve number of digits"
+    assert: U64.BCD.new(0).ndigits == 1
+    assert: U64.BCD.new(9).ndigits == 1
+    assert: U64.BCD.new(10).ndigits == 2
+    assert: U64.BCD.new(12345).ndigits == 5
+
+  :it "can push digits to the left"
+    assert no_error: (
+      bcd = U64.BCD.new(0).push_digit_left!(9)
+      assert: "\(bcd)" == "90"
+    )
+    assert no_error: (
+      bcd = U64.BCD.new(1).push_digit_left!(9)
+      assert: "\(bcd)" == "91"
+    )
+    assert no_error: (
+      bcd = U64.BCD.new(1).push_digit_left!(9).push_digit_left!(0).push_digit_left!(0).push_digit_left!(5)
+      assert: bcd.ndigits == 5
+      assert: "\(bcd)" == "50091"
+    )
+
+  :it "displays as decimal string representation"
+    bcd = U64.BCD.new(123)
+    assert: "\(bcd)" == "123"
