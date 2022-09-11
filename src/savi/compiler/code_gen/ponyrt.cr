@@ -8,7 +8,8 @@ class Savi::Compiler::CodeGen::PonyRT
   # 52/104 bytes: heap
   # 48/88 bytes: gc
   # 28/0 bytes: padding to 64 bytes, ignored
-  ACTOR_PAD_SIZE = 248
+  # XXX: USE_RUNTIMESTATS -> 392
+  ACTOR_PAD_SIZE = 264
   # TODO: adjust based on intptr size to account for 32-bit platforms:
   # if INTPTR_MAX == INT64_MAX
   #  define ACTOR_PAD_SIZE 248
@@ -218,7 +219,7 @@ class Savi::Compiler::CodeGen::PonyRT
       {"pony_init", [@i32, @pptr], @i32, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
-      {"pony_become", [@ptr, @obj_ptr], @void, [
+      {"ponyint_become", [@ptr, @obj_ptr], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
       {"pony_start", [@i1, @i32_ptr, @ptr], @i1, [
@@ -593,7 +594,7 @@ class Savi::Compiler::CodeGen::PonyRT
     # TODO: Run module finalizers.
 
     # Become nothing (stop being the main actor).
-    g.builder.call(g.mod.functions["pony_become"], [
+    g.builder.call(g.mod.functions["ponyint_become"], [
       g.func_frame.alloc_ctx,
       @obj_ptr.null,
     ])
@@ -680,7 +681,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
     if become_now
       g.builder.call(
-        g.mod.functions["pony_become"],
+        g.mod.functions["ponyint_become"],
         [g.gen_frame.alloc_ctx, allocated],
       )
     end
