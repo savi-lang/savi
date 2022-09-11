@@ -396,6 +396,7 @@ class Savi::Compiler::CodeGen
     begin
       @mod.verify
     rescue ex
+      FileUtils.mkdir_p(File.dirname(Binary.path_for(ctx)))
       @mod.print_to_file("#{Binary.path_for(ctx)}.ll")
       Error.at Source::Pos.none, "LLVM #{ex.message}", [
         {Source::Pos.none,
