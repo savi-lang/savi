@@ -408,7 +408,12 @@ class Savi::Compiler::CodeGen::VeronaRT
   end
 
   # When an assignment cast may need to happen, classify the kind of type.
-  def cast_kind_of(g : CodeGen, type_ref : Reach::Ref, pos : Source::Pos) : Symbol
+  def cast_kind_of(
+    g : CodeGen,
+    type_ref : Reach::Ref,
+    llvm_type : LLVM::Type?,
+    pos : Source::Pos
+  ) : Symbol
     # For now we only have supported this logic for singular types.
     raise NotImplementedError.new(type_ref.show_type) unless type_ref.singular?
     type_def = type_ref.single_def!(g.ctx)
@@ -487,7 +492,7 @@ class Savi::Compiler::CodeGen::VeronaRT
     infos.each do |info|
       case info
       when Lifetime::PassAsArgument
-        kind = cast_kind_of(g, g.type_of(expr), expr.pos)
+        kind = cast_kind_of(g, g.type_of(expr), nil, expr.pos)
         case kind
         when :simple_value, :no_allocation
           # Do nothing - we don't track lifetime of bare values.
@@ -505,7 +510,7 @@ class Savi::Compiler::CodeGen::VeronaRT
         end
       when Lifetime::ReleaseFromScope
         local_defn = g.func_frame.any_defn_for_local(info.local)
-        kind = cast_kind_of(g, g.type_of(local_defn), local_defn.pos)
+        kind = cast_kind_of(g, g.type_of(local_defn), nil, local_defn.pos)
         case kind
         when :simple_value, :no_allocation
           # Do nothing - we don't track lifetime of bare values.

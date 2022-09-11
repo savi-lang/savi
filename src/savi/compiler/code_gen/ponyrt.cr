@@ -258,8 +258,13 @@ class Savi::Compiler::CodeGen::PonyRT
     g.builder.call(g.mod.functions["pony_ctx"], "ALLOC_CTX")
   end
 
-  def cast_kind_of(g : CodeGen, type_ref : Reach::Ref, pos : Source::Pos) : Symbol
-    if type_ref.singular?
+  def cast_kind_of(
+    g : CodeGen,
+    type_ref : Reach::Ref,
+    llvm_type : LLVM::Type,
+    pos : Source::Pos
+  ) : Symbol
+    if type_ref.singular? && llvm_type.kind != LLVM::Type::Kind::Pointer
       type_def = type_ref.single_def!(g.ctx)
       if type_def.is_simple_value?(g.ctx)
         :simple_value

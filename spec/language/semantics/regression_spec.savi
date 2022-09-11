@@ -1,0 +1,10 @@
+:module RegressionSpec
+  :fun run(test MicroTest)
+    // In a past version of the compiler, this would generate invalid LLVM IR,
+    // failing to deal properly with the fact that we were calling `into_string`
+    // on a receiver that was either a struct or a class.
+    test["struct or class into string"].pass = "example: \(
+      try (@maybe_int_format! | "???")
+    )" == "example: 33"
+
+  :fun maybe_int_format!: 33.format.decimal
