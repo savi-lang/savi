@@ -20,12 +20,12 @@ module Savi::Packaging::RemoteService
           if scheme.empty?
             ctx.error_at dep.name, "This dependency couldn't be resolved", [
               {Source::Pos.none, "please use a `:from` declaration such as" +
-                " `:from \"github:username/example\"`"}
+                                 " `:from \"github:username/example\"`"},
             ]
           else
             ctx.error_at dep.name, "This dependency couldn't be resolved", [
               {dep.location_nodes.first.pos,
-                "the #{scheme.inspect} scheme is not recognized"},
+               "the #{scheme.inspect} scheme is not recognized"},
             ]
           end
         }
@@ -39,75 +39,82 @@ module Savi::Packaging::RemoteService
       fetch_specified_versions_of_each(ctx, deps, versions, into_dirname)
     end
 
+    PROCESS_CONCURRENCY            = 2
     COMMAND_GIT_REMOTE_SORTED_TAGS =
       %w{git -c versionsort.suffix=- ls-remote --tags --sort=-v:refname}
 
-    def self.latest_version_of_each(ctx, deps : Array(Dependency))
-      # Start a parallel sub-process for each repo we want to list versions of.
-      list = deps.map { |dep|
-        repo_name = dep.location_without_scheme
-        output = IO::Memory.new
-        args = COMMAND_GIT_REMOTE_SORTED_TAGS.dup
-        args << "https://github.com/#{repo_name}.git"
-        process = Process.new("/usr/bin/env", args, output: output)
-        {dep, process, output}
-      }
+    def self.latest_version_of_each(ctx, deps : Array(Dependency)) : Array(String)
+      versions = [] of String
 
-      # Wait for each of the parallel sub-processes to finish, and determine
-      # the latest tag that is acceptable from the list of available tags.
-      list.map { |dep, process, output|
-        # Wait for the process to finish and check its status code for success.
-        status = process.wait
-        if !status.success?
-          ctx.error_at dep.name,
-            "Failed to list remote versions for this dependency", [
+      # Start a parallel sub-process for each repo we want to list versions of,
+      # but no more than `PROCESS_CONCURRENCY` processes concurrently.
+      deps.each_slice(PROCESS_CONCURRENCY) { |group|
+        list = group.map { |dep|
+          repo_name = dep.location_without_scheme
+          output = IO::Memory.new
+          args = COMMAND_GIT_REMOTE_SORTED_TAGS.dup
+          args << "https://github.com/#{repo_name}.git"
+          process = Process.new("/usr/bin/env", args, output: output)
+          {dep, process, output}
+        }
+
+        # Wait for each of the parallel sub-processes to finish, and determine
+        # the latest tag that is acceptable from the list of available tags.
+        list.each { |dep, process, output|
+          # Wait for the process to finish and check its status code for success.
+          status = process.wait
+          if !status.success?
+            ctx.error_at dep.name,
+              "Failed to list remote versions for this dependency", [
               {dep.location_nodes.first.pos,
-                "please ensure this location is correct, or try again later"}
+               "please ensure this location is correct, or try again later"},
             ]
-          next
-        end
+            next
+          end
 
-        # Get tag names from the sorted output of the process.
-        sorted_tags = output.to_s.each_line.map(&.split("refs/tags/", 2).last).to_a
-        if sorted_tags.empty?
-          hints = [
-            {dep.location_nodes.first.pos,
-              "this repository had no commits tagged in it"},
-          ]
-          dep.version.try { |version_node|
-            hints << {version_node.pos,
-              "please tag a commit with a version tag starting with " +
-                  version_node.value.inspect}
-          }
+          # Get tag names from the sorted output of the process.
+          sorted_tags = output.to_s.each_line.map(&.split("refs/tags/", 2).last).to_a
+          if sorted_tags.empty?
+            hints = [
+              {dep.location_nodes.first.pos,
+               "this repository had no commits tagged in it"},
+            ]
+            dep.version.try { |version_node|
+              hints << {version_node.pos,
+                        "please tag a commit with a version tag starting with " +
+                        version_node.value.inspect}
+            }
 
-          ctx.error_at dep.name,
-            "No remote versions were found for this dependency", hints
-          next
-        end
+            ctx.error_at dep.name,
+              "No remote versions were found for this dependency", hints
+            next
+          end
 
-        # Find the first version in the sorted tags that meets the requirement.
-        version = sorted_tags.find { |tag| dep.accepts_version?(tag) }
-        if !version
-          hints = [
-            {dep.location_nodes.first.pos,
-              "this repository had no matching commit tags in it"},
-          ]
-          dep.version.try { |version_node|
-            hints << {version_node.pos,
-              "please tag a commit with a version tag starting with " +
-                  version_node.value.inspect}
-          }
-          sorted_tags.each { |tag|
-            hints << {Source::Pos.none, "this tag was found, but didn't match: #{tag}"}
-          }
+          # Find the first version in the sorted tags that meets the requirement.
+          version = sorted_tags.find { |tag| dep.accepts_version?(tag) }
+          if !version
+            hints = [
+              {dep.location_nodes.first.pos,
+               "this repository had no matching commit tags in it"},
+            ]
+            dep.version.try { |version_node|
+              hints << {version_node.pos,
+                        "please tag a commit with a version tag starting with " +
+                        version_node.value.inspect}
+            }
+            sorted_tags.each { |tag|
+              hints << {Source::Pos.none, "this tag was found, but didn't match: #{tag}"}
+            }
 
-          ctx.error_at dep.name,
-            "No matching remote version was found for this dependency", hints
-          next
-        end
+            ctx.error_at dep.name,
+              "No matching remote version was found for this dependency", hints
+            next
+          end
 
-        version
+          versions << version
+        }
       }
+      versions
     end
 
     def self.fetch_specified_versions_of_each(
@@ -130,31 +137,34 @@ module Savi::Packaging::RemoteService
       return if download_list.empty?
       STDERR.puts "Downloading new library versions from GitHub..."
 
-      # Spawn the sub-processes to shallow-clone the specified versions.
-      process_list = download_list.map { |dep, version|
-        version = version.not_nil! # this was already proved above
-        args = %w{git clone --quiet --depth 1}
-        args << "--branch" << version.not_nil!
-        args << "https://github.com/#{dep.location_without_scheme}"
-        args << File.join(into_dirname, dep.location, version)
-        process = Process.new("/usr/bin/env", args)
+      # Spawn the sub-processes to shallow-clone the specified versions,
+      # but no more than PROCESS_CONCURRENCY concurrently.
+      download_list.each_slice(PROCESS_CONCURRENCY) { |group|
+        process_list = group.map { |dep, version|
+          version = version.not_nil! # this was already proved above
+          args = %w{git clone --quiet --depth 1}
+          args << "--branch" << version.not_nil!
+          args << "https://github.com/#{dep.location_without_scheme}"
+          args << File.join(into_dirname, dep.location, version)
+          process = Process.new("/usr/bin/env", args)
 
-        {process, dep, version}
-      }
+          {process, dep, version}
+        }
 
-      # Wait for the processes to complete and handle failure if encountered.
-      process_list.each { |process, dep, version|
-        status = process.wait
-        if !status.success?
-          ctx.error_at dep.name,
-            "Failed to clone version #{version} of this dependency", [
+        # Wait for the processes to complete and handle failure if encountered.
+        process_list.each { |process, dep, version|
+          status = process.wait
+          if !status.success?
+            ctx.error_at dep.name,
+              "Failed to clone version #{version} of this dependency", [
               {dep.location_nodes.first.pos,
-                "please ensure this location is correct, or try again later"}
+               "please ensure this location is correct, or try again later"},
             ]
-          next
-        end
+            next
+          end
 
-        STDERR.puts "Downloaded #{dep.name.value} #{version}"
+          STDERR.puts "Downloaded #{dep.name.value} #{version}"
+        }
       }
     end
 
@@ -162,6 +172,7 @@ module Savi::Packaging::RemoteService
       %w{git clone --depth=1 --bare --filter=blob:none}
 
     @@location_cache = {} of String => String
+
     def self.find_location_for(ctx, dep_name : String) : String?
       # If we already have a cached location in this same compiler invocation,
       # we should not look up the location again. We may run this several
@@ -228,7 +239,6 @@ module Savi::Packaging::RemoteService
           {Source::Pos.none, "--from #{location}"}
         }
       end
-
     ensure
       # Clean up after ourselves.
       # Ensure that the temporary directory gets deleted, if it exists.
