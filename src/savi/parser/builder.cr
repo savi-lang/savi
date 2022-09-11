@@ -107,7 +107,7 @@ module Savi::Parser::Builder
         end
       AST::LiteralInteger.new(value).with_pos(state.pos(main))
     when :float
-      value = state.slice(main).to_f
+      value = state.slice(main).gsub('_', "").to_f
       AST::LiteralFloat.new(value).with_pos(state.pos(main))
     when :op
       value = state.slice(main)

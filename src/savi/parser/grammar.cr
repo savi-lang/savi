@@ -18,14 +18,15 @@ module Savi::Parser
     digit = range('0', '9')
     digithex = digit | range('a', 'f') | range('A', 'F')
     digitbin = range('0', '1')
-    digits = digit.repeat(1) | char('_')
+    numsep = char('_')
+    digits = digit >> (digit | numsep).repeat
     int =
-      (str("0x") >> (digithex | char('_')).repeat(1)) |
-      (str("0b") >> (digitbin | char('_')).repeat(1)) |
-      (char('-') >> digit19 >> digits) |
-      (char('-') >> digit) |
-      (digit19 >> digits) |
-      digit
+      (str("0x") >> numsep.repeat >> digithex >> (digithex | numsep).repeat) |
+      (str("0b") >> numsep.repeat >> digitbin >> (digitbin | numsep).repeat) |
+      (char('-') >> digit19 >> (digit | numsep).repeat) |
+      (char('-') >> char('0')) |
+      (digit19 >> (digit | numsep).repeat) |
+      char('0')
     frac = char('.') >> digits
     exp = (char('e') | char('E')) >> (char('+') | char('-')).maybe >> digits
     integer = int.named(:integer)
