@@ -21,8 +21,8 @@ module Savi::Parser
     numsep = char('_')
     digits = digit >> (digit | numsep).repeat
     int =
-      (str("0x") >> numsep.repeat >> digithex >> (digithex | numsep).repeat) |
-      (str("0b") >> numsep.repeat >> digitbin >> (digitbin | numsep).repeat) |
+      (str("0x") >> digithex >> (digithex | numsep).repeat) |
+      (str("0b") >> digitbin >> (digitbin | numsep).repeat) |
       (char('-') >> digit19 >> (digit | numsep).repeat) |
       (char('-') >> char('0')) |
       (digit19 >> (digit | numsep).repeat) |

@@ -1,0 +1,6 @@
+:module NumberSpec
+  :fun run(test MicroTest)
+    test["number separator hex"].pass = U64[0xFFFF_FFFF] == U64[0xFFFFFFFF]
+    test["number separator bin"].pass = U64[0b0000_1000] == U64[0b00001000]
+    test["number separator dec"].pass = U64[120_000_000] == U64[120000000]
+    test["number separator float"].pass = F64[123_456.789_1] == F64[123456.7891]
