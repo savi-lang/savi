@@ -2051,23 +2051,29 @@ class Savi::Compiler::CodeGen
     param_types.to_a.each_with_index do |param_type, index|
       arg = args[index]
 
-      # Don't cast if the LLVM type already matches.
-      should_skip_cast = arg.type == func.type.element_type.params_types[index]
-
-      if param_type && !should_skip_cast
-        arg_expr = arg_exprs[index].not_nil!
-        arg_frame = arg_frames[index]
-        cast_args << gen_assign_cast(arg, param_type, arg_expr, arg_frame)
-      else
+      # Don't cast if we don't know what to cast to.
+      if !param_type
         cast_args << arg
+        next
       end
+
+      # Don't cast if the LLVM type already matches.
+      llvm_param_type = func.type.element_type.params_types[index]
+      if arg.type == llvm_param_type
+        cast_args << arg
+        next
+      end
+
+      arg_expr = arg_exprs[index].not_nil!
+      arg_frame = arg_frames[index]
+      cast_args << gen_assign_cast(arg, param_type, llvm_param_type, arg_expr, arg_frame)
     end
 
     # Sometimes we need one last cast at the LLVM level.
     cast_args.each_with_index do |arg, index|
       llvm_param_type = func.type.element_type.params_types[index]
       next if arg.type == llvm_param_type
-      cast_args[index] = @builder.bit_cast(arg, llvm_param_type, "#{arg}.CAST")
+      cast_args[index] = @builder.bit_cast(arg, llvm_param_type, "#{arg.name}.CAST")
     end
 
     # Handle the special case of calling an FFI function. We need to call it
@@ -2100,7 +2106,7 @@ class Savi::Compiler::CodeGen
       end
     lhs_llvm_type = llvm_type_of(lhs_type)
 
-    cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
+    cast_value = gen_assign_cast(value, lhs_type, nil, relate.rhs)
     cast_value.name = value.name
 
     @runtime.gen_expr_post(self, relate.lhs, cast_value)
@@ -2127,7 +2133,7 @@ class Savi::Compiler::CodeGen
       end
     lhs_llvm_type = llvm_type_of(lhs_type)
 
-    cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
+    cast_value = gen_assign_cast(value, lhs_type, nil, relate.rhs)
     cast_value.name = value.name
 
     @runtime.gen_expr_post(self, relate.lhs, cast_value)
@@ -2140,6 +2146,7 @@ class Savi::Compiler::CodeGen
     displaced_value = gen_assign_cast(
       @builder.load(alloca, local_ref.as(Refer::Local).name),
       type_of(relate),
+      nil,
       func_frame.any_defn_for_local(local_ref),
     )
 
@@ -2152,7 +2159,7 @@ class Savi::Compiler::CodeGen
     value = gen_expr(node.rhs).as(LLVM::Value)
     name = value.name
 
-    value = gen_assign_cast(value, type_of(node), node.rhs)
+    value = gen_assign_cast(value, type_of(node), nil, node.rhs)
     value.name = name
 
     @di.set_loc(node)
@@ -2166,7 +2173,7 @@ class Savi::Compiler::CodeGen
     value = gen_expr(node.rhs).as(LLVM::Value)
     name = value.name
 
-    value = gen_assign_cast(value, type_of(node), node.rhs)
+    value = gen_assign_cast(value, type_of(node), nil, node.rhs)
     value.name = name
 
     @di.set_loc(node)
@@ -2403,6 +2410,7 @@ class Savi::Compiler::CodeGen
   def gen_assign_cast(
     value : LLVM::Value,
     to_type : Reach::Ref,
+    to_llvm_type : LLVM::Type?,
     from_expr : AST::Node,
     from_frame : Frame? = nil,
   )
@@ -2415,7 +2423,7 @@ class Savi::Compiler::CodeGen
         type_of(from_expr)
       end
     from_llvm_type = llvm_type_of(from_type)
-    to_llvm_type = llvm_type_of(to_type)
+    to_llvm_type ||= llvm_type_of(to_type)
 
     # Sometimes we may need to implicitly cast struct pointer to struct value.
     # We do that here by dereferencing the pointer.
@@ -2434,8 +2442,8 @@ class Savi::Compiler::CodeGen
 
     # If the runtime-specific cast kind doesn't match,
     # we need to take a runtime-specific action prior to bit casting.
-    from_kind = @runtime.cast_kind_of(self, from_type, from_expr.pos)
-    to_kind   = @runtime.cast_kind_of(self, to_type,   from_expr.pos)
+    from_kind = @runtime.cast_kind_of(self, from_type, from_llvm_type, from_expr.pos)
+    to_kind   = @runtime.cast_kind_of(self, to_type, to_llvm_type, from_expr.pos)
     if from_kind != to_kind
       value = @runtime.gen_cast_value(self,
         value, from_kind, to_kind, from_type, to_type, from_expr)
@@ -2542,6 +2550,7 @@ class Savi::Compiler::CodeGen
         gen_assign_cast(
           @builder.load(alloca, local_ref.name),
           type_of(expr),
+          nil,
           func_frame.any_defn_for_local(ref),
         )
       elsif ref.is_a?(Refer::Type)
@@ -3411,7 +3420,7 @@ class Savi::Compiler::CodeGen
     arg_type = gtype.gfuncs["<<"].reach_func.signature.params.first
 
     expr.terms.each do |term|
-      value = gen_assign_cast(gen_expr(term), arg_type, term)
+      value = gen_assign_cast(gen_expr(term), arg_type, nil, term)
       @builder.call(gtype.gfuncs["<<"].llvm_func, [receiver, value])
     end
 
@@ -3462,7 +3471,7 @@ class Savi::Compiler::CodeGen
         unless func_frame.flow.jumps_away?(fore[1])
           if func_frame.classify.value_needed?(expr)
             phi_type ||= type_of(expr)
-            value = gen_assign_cast(value, phi_type.not_nil!, fore[1])
+            value = gen_assign_cast(value, phi_type.not_nil!, nil, fore[1])
             phi_blocks << @builder.insert_block.not_nil!
             phi_values << value
           end
@@ -3498,7 +3507,7 @@ class Savi::Compiler::CodeGen
       unless func_frame.flow.jumps_away?(expr.list.last[1])
         if func_frame.classify.value_needed?(expr)
           phi_type ||= type_of(expr)
-          value = gen_assign_cast(value, phi_type.not_nil!, expr.list.last[1])
+          value = gen_assign_cast(value, phi_type.not_nil!, nil, expr.list.last[1])
           phi_blocks << @builder.insert_block.not_nil!
           phi_values << value
         end
@@ -3569,7 +3578,7 @@ class Savi::Compiler::CodeGen
       cond_value = gen_as_cond(gen_expr(expr.repeat_cond))
 
       if func_frame.classify.value_needed?(expr)
-        body_value = gen_assign_cast(body_value, phi_type, expr.body)
+        body_value = gen_assign_cast(body_value, phi_type, nil, expr.body)
         phi_blocks << @builder.insert_block.not_nil!
         phi_values << body_value
       end
@@ -3605,7 +3614,7 @@ class Savi::Compiler::CodeGen
     else_value = gen_expr(expr.else_body)
     unless func_frame.flow.jumps_away?(expr.else_body)
       if func_frame.classify.value_needed?(expr)
-        else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
+        else_value = gen_assign_cast(else_value, phi_type, nil, expr.else_body)
         phi_blocks << @builder.insert_block.not_nil!
         phi_values << else_value
       end
@@ -3654,7 +3663,7 @@ class Savi::Compiler::CodeGen
     body_value = gen_expr(expr.body)
     unless func_frame.flow.jumps_away?(expr.body)
       phi_type ||= type_of(expr)
-      body_value = gen_assign_cast(body_value, phi_type.not_nil!, expr.body)
+      body_value = gen_assign_cast(body_value, phi_type.not_nil!, nil, expr.body)
       phi_blocks << @builder.insert_block.not_nil!
       phi_values << body_value
       @builder.br(post_block)
@@ -3689,7 +3698,7 @@ class Savi::Compiler::CodeGen
       else_value = gen_expr(expr.else_body)
       unless func_frame.flow.jumps_away?(expr.else_body)
         phi_type ||= type_of(expr)
-        else_value = gen_assign_cast(else_value, phi_type.not_nil!, expr.else_body)
+        else_value = gen_assign_cast(else_value, phi_type.not_nil!, nil, expr.else_body)
         phi_blocks << @builder.insert_block.not_nil!
         phi_values << else_value
         @builder.br(post_block)
@@ -3747,7 +3756,7 @@ class Savi::Compiler::CodeGen
     next_stack_tuple = @loop_next_stack.last.not_nil!
     typ = next_stack_tuple[3]
     next_stack_tuple[1] << @builder.insert_block.not_nil!
-    next_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
+    next_stack_tuple[2] << gen_assign_cast(value, typ, nil, from_expr)
 
     @builder.br(next_stack_tuple[0])
     .tap { finish_block_and_move_to(gen_block("unreachable_after_next")) }
@@ -3759,7 +3768,7 @@ class Savi::Compiler::CodeGen
     break_stack_tuple = @loop_break_stack.last.not_nil!
     typ = break_stack_tuple[3]
     break_stack_tuple[1] << @builder.insert_block.not_nil!
-    break_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
+    break_stack_tuple[2] << gen_assign_cast(value, typ, nil, from_expr)
 
     @builder.br(break_stack_tuple[0])
     .tap { finish_block_and_move_to(gen_block("unreachable_after_break")) }

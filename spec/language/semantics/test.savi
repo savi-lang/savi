@@ -11,6 +11,7 @@
     test = MicroTest.new(env)
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
 
+    RegressionSpec.run(test)
     TrySpec.run(test)
     WhileSpec.run(test)
     ReturnSpec.run(test)

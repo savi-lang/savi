@@ -115,7 +115,7 @@ class Savi::Compiler::CodeGen
       def gen_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
         if value_expr
           value_type = gfunc.reach_func.signature.ret
-          value = g.gen_assign_cast(value, value_type, value_expr)
+          value = g.gen_assign_cast(value, value_type, nil, value_expr)
         end
         g.builder.ret(value)
       end
@@ -152,7 +152,7 @@ class Savi::Compiler::CodeGen
       def gen_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
         if value_expr
           value_type = gfunc.reach_func.signature.ret
-          value = g.gen_assign_cast(value, value_type, value_expr)
+          value = g.gen_assign_cast(value, value_type, nil, value_expr)
         end
         tuple = llvm_func_ret_type(g, gfunc).undef
         tuple = g.builder.insert_value(tuple, value, 0)
@@ -185,7 +185,7 @@ class Savi::Compiler::CodeGen
       def gen_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
         if value_expr
           value_type = gfunc.reach_func.signature.ret
-          value = g.gen_assign_cast(value, value_type, value_expr)
+          value = g.gen_assign_cast(value, value_type, nil, value_expr)
         end
         cont = g.func_frame.continuation_value
         gfunc.continuation_info.set_as_finished(cont)
@@ -199,7 +199,7 @@ class Savi::Compiler::CodeGen
           values.zip(value_exprs).map_with_index do |(value, value_expr), index|
             next value unless value_expr
             cast_type = gfunc.reach_func.signature.yield_out[index]
-            g.gen_assign_cast(value, cast_type, value_expr)
+            g.gen_assign_cast(value, cast_type, nil, value_expr)
           end
 
         # Grab the continuation value from local memory and set the next func.
@@ -231,7 +231,7 @@ class Savi::Compiler::CodeGen
       def gen_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
         if value_expr
           value_type = gfunc.reach_func.signature.ret
-          value = g.gen_assign_cast(value, value_type, value_expr)
+          value = g.gen_assign_cast(value, value_type, nil, value_expr)
         end
         cont = g.func_frame.continuation_value
         gfunc.continuation_info.set_as_finished(cont)
