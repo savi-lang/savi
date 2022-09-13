@@ -89,8 +89,8 @@ module Savi::Parser::Builder
       AST::LiteralCharacter.new(value.ord.to_i64).with_pos(state.pos(main))
     when :heredoc
       value = state.slice(main)
-      if (leading_space = value[/(?<=\A\n)[ \t]+/]?; leading_space)
-        value = value.gsub("\n#{leading_space}", "\n").strip
+      if (leading_space = value[/\A\r?\n[ \t]+/]?; leading_space)
+        value = value.gsub("#{leading_space}", "\n").strip
       end
       AST::LiteralString.new(value).with_pos(state.pos(main))
     when :integer
