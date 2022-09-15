@@ -1,0 +1,32 @@
+:class Savi.U64.BCD.Spec
+  :is Spec
+  :const describes: "U64.BCD"
+
+  :it "can be converted back into an U64"
+    assert: U64.BCD.new(0).u64 == U64[0]
+    assert: U64.BCD.new(12345).u64 == U64[12345]
+    assert: U64.BCD.new(U64.min_value).u64 == U64.min_value
+    assert: U64.BCD.new(U64.max_value).u64 == U64.max_value
+
+  :it "can test for zero"
+    assert: U64.BCD.new(0).is_zero
+    assert: U64.BCD.new(1).is_zero.is_false
+
+  :it "can retrieve number of digits"
+    assert: U64.BCD.new(0).ndigits == 1
+    assert: U64.BCD.new(9).ndigits == 1
+    assert: U64.BCD.new(10).ndigits == 2
+    assert: U64.BCD.new(12345).ndigits == 5
+    assert: U64.BCD.new(U64.max_value).ndigits == 20
+
+  :it "can access digits by position"
+    bcd = U64.BCD.new(123)
+    assert: bcd.digit!(0) == 3
+    assert: bcd.digit!(1) == 2
+    assert: bcd.digit!(2) == 1
+    assert error: bcd.digit!(3)
+
+  :it "displays as decimal string representation"
+    assert: "\(U64.BCD.new(0))" == "0"
+    assert: "\(U64.BCD.new(123))" == "123"
+    assert: "\(U64.BCD.new(U64.max_value))" == "18446744073709551615"

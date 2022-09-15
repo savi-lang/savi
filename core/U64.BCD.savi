@@ -1,0 +1,90 @@
+:: Binary Coded Decimal (BCD) representation of an U64 integer.
+:: 
+:: Each digit is represented by a nibble (4 bits), requiring
+:: a total of 80 bits for up to 20 digits of the U64.
+:: Digits are stored in reverse order, so the the decimal `123`
+:: is internally stored as `0x321`.
+::
+:: In addition, we store a termination nibble `0xF` after the last
+:: digit, so decimal `123` is internally stored `0xF321`.
+:: At bit position 58 of the high word, we store the number of digits
+:: (requires 5 bits).
+::
+:: TODO: The code would become trivial if we had a `U128` type or a
+:: bit-shift connected pair of two U64.
+::
+:struct val U64.BCD
+  :is IntoString
+
+  :let _high U64
+  :let _low U64
+
+  :new (u64 U64)
+    high U64 = 0 
+    low U64 = 0xF
+    ndigits U64 = 0
+    while True (
+      ndigits = ndigits + 1
+      digit = u64 % 10
+      u64 = u64 / 10
+      high = high.bit_shl(4).bit_or(low.bit_shr(60).bit_and(0xF))
+      low = low.bit_shl(4).bit_or(digit)
+      if (u64 == 0) (
+        break
+      )
+    )
+    @_high = high.bit_or(ndigits.bit_shl(58))
+    @_low = low
+
+  :fun box is_zero Bool
+    @_low.bit_and(0xFF) == 0xF0
+
+  :: Converts the BCD back to an U64
+  :fun box u64 U64
+    n U64 = 0
+    @each_digit -> (digit |
+      n = (n * 10) + digit.u64
+    )
+    n
+
+  :: Returns the number of digits.
+  ::
+  :fun box ndigits USize
+    @_high.bit_shr(58).bit_and(0b11111).usize
+
+  :: Returns digit at position `pos`.
+  :fun box digit!(pos USize) U8
+    // 1234  -> 0xF_4321
+    // pos=0 ->     ^-- index=3       == ndigits - (pos + 1)
+    // pos=3 ->        ^-- index=0    == ndigits - (pos + 1)
+    index USize = if (pos < @ndigits) (@ndigits - (pos + 1) | error!)
+
+    case (
+    | index < 16 |
+      // digits 0..15 in the lower word
+      @_low.bit_shr((index * 4).u8).u8.bit_and(U8[0xF])
+    |
+      // digits 16..19 in the higher word
+      @_high.bit_shr(((index - 16) * 4).u8).u8.bit_and(U8[0xF])
+    )
+
+  :fun box each_digit
+    :yields U8 for None 
+    high = @_high
+    low = @_low
+    while (low.bit_and(0xF) != 0xF) (
+      yield low.bit_and(0xF).u8
+      low = low.bit_shr(4).bit_or(high.bit_and(0xF).bit_shl(60))
+      high = high.bit_shr(4)
+    )
+
+  :fun box into_string_space USize
+    @ndigits
+
+  :fun box into_string(out String'iso) String'iso
+    @each_digit -> (digit |
+      out.push_byte('0'.u8 + digit)
+    )
+
+    --out
+
