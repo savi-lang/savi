@@ -191,11 +191,14 @@ ifneq (,$(findstring dragonfly,$(TARGET_PLATFORM)))
 	# * -flto=thin is not accepted
 	# * we have to explicitly state the linker
 	# * we cannot link libclang statically
+	# * compile with clang++
 	SAVI_LD_FLAGS=-fuse-ld=lld -L/usr/lib -L/usr/local/lib
 	LIB_CLANG=-lclang
+	SAVI_CC="${CLANGXX}"
 else
 	SAVI_LD_FLAGS=-flto=thin -no-pie
 	LIB_CLANG=`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'`
+	SAVI_CC="${CLANG}"
 endif
 
 
@@ -297,7 +300,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 # This variant of the target compiles in release mode.
 $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANGXX} -O3 -o $@ $(SAVI_LD_FLAGS) \
+	${SAVI_CC} -O3 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
@@ -312,7 +315,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llv
 # This variant of the target compiles in debug mode.
 $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANGXX} -O0 -o $@ $(SAVI_LD_FLAGS) \
+	${SAVI_CC} -O0 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
@@ -327,7 +330,7 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 # This variant of the target will be used when running tests.
 $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANGXX} -O0 -o $@ $(SAVI_LD_FLAGS) \
+	${SAVI_CC} -O0 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
