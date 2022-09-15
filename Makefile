@@ -163,7 +163,13 @@ LIB_PCRE?=$(shell find /usr /opt -name libpcre.a 2> /dev/null | head -n 1 | grep
 
 # Collect the list of libraries to link against (depending on the platform).
 # These are the libraries used by the Crystal runtime.
-CRYSTAL_RT_LIBS+=-l$(LIB_CXX_KIND)
+
+# Only add -lXXX if LIB_CXX_KIND is defined.
+# TODO: Do you need to specify LIB_CXX_KIND at all when you link with clang++?
+ifneq ("", "${LIB_CXX_KIND}")
+  CRYSTAL_RT_LIBS+=-l$(LIB_CXX_KIND)
+endif
+
 CRYSTAL_RT_LIBS+=$(LIB_GC)
 CRYSTAL_RT_LIBS+=$(LIB_EVENT)
 CRYSTAL_RT_LIBS+=$(LIB_PCRE)
@@ -174,6 +180,24 @@ endif
 ifneq (,$(findstring freebsd,$(TARGET_PLATFORM)))
 	CRYSTAL_RT_LIBS+=-L/usr/local/lib
 endif
+
+ifneq (,$(findstring dragonfly,$(TARGET_PLATFORM)))
+	CRYSTAL_RT_LIBS+=-L/usr/local/lib
+endif
+
+ifneq (,$(findstring dragonfly,$(TARGET_PLATFORM)))
+	# On DragonFly:
+	#
+	# * -flto=thin is not accepted
+	# * we have to explicitly state the linker
+	# * we cannot link libclang statically
+	SAVI_LD_FLAGS=-fuse-ld=lld -L/usr/lib -L/usr/local/lib
+	LIB_CLANG=-lclang
+else
+	SAVI_LD_FLAGS=-flto=thin -no-pie
+	LIB_CLANG=`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'`
+endif
+
 
 # This is the path to the Crystal standard library source code,
 # including the LLVM extensions C++ file we need to build and link.
@@ -273,39 +297,43 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 # This variant of the target compiles in release mode.
 $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANG} -O3 -o $@ -flto=thin -no-pie \
+	${CLANGXX} -O3 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
-		 ${CRYSTAL_RT_LIBS} \
+		${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
-		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
+		`$(LLVM_CONFIG) --ldflags ` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
-		`$(LLVM_CONFIG) --system-libs --link-static`
+		`$(LLVM_CONFIG) --system-libs --link-static` \
+		$(LIB_CLANG)
+
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in debug mode.
 $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANG} -O0 -o $@ -flto=thin -no-pie \
+	${CLANGXX} -O0 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
-		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
+		`$(LLVM_CONFIG) --ldflags ` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
-		`$(LLVM_CONFIG) --system-libs --link-static`
+		`$(LLVM_CONFIG) --system-libs --link-static` \
+		$(LIB_CLANG)
 	if uname | grep -iq 'Darwin'; then dsymutil $@; fi
 
 # Build the Savi specs executable, by linking the above targets together.
 # This variant of the target will be used when running tests.
 $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${CLANG} -O0 -o $@ -flto=thin -no-pie \
+	${CLANGXX} -O0 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
-		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
+		`$(LLVM_CONFIG) --ldflags ` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
-		`$(LLVM_CONFIG) --system-libs --link-static`
+		`$(LLVM_CONFIG) --system-libs --link-static` \
+		$(LIB_CLANG)
 	if uname | grep -iq 'Darwin'; then dsymutil $@; fi
