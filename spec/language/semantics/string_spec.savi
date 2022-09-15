@@ -5,6 +5,9 @@
     test["compose string 1"].pass = "foo \(bar) baz" == "foo bar baz"
     test["compose string 2"].pass = "\(bar)\(bar)\(bar)" == "barbarbar"
 
+    test["16-bit lowercase U escape"].pass = "\u0161" == "\xc5\xa1"
+    test["32-bit capital U escape"].pass = "\U0001fa01" == "\xf0\x9f\xa8\x81"
+
     test["byte string literal size"].pass =
       b"\xde\xad\xbe\xef\xde\xad\xbe\xef".size == 8
 
