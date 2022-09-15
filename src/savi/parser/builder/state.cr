@@ -106,7 +106,7 @@ module Savi::Parser::Builder
               end
               result.write Bytes[byte_value]
             when 'u' then
-              codepoint = 0
+              codepoint : UInt32 = 0
               4.times do
                 hex_char = reader.next_char
                 hex_value =
@@ -120,7 +120,25 @@ module Savi::Parser::Builder
                     Error.at pos_single_with_offset(token, reader.pos),
                       "This is an invalid unicode escape hex character"
                   end
-                codepoint = 16 * codepoint + hex_value
+                codepoint = 16_u32 * codepoint + hex_value
+              end
+              result << codepoint.chr
+            when 'U' then
+              codepoint = 0
+              8.times do
+                hex_char = reader.next_char
+                hex_value =
+                  if '0' <= hex_char <= '9'
+                    hex_char - '0'
+                  elsif 'a' <= hex_char <= 'f'
+                    10 + (hex_char - 'a')
+                  elsif 'A' <= hex_char <= 'F'
+                    10 + (hex_char - 'A')
+                  else
+                    Error.at pos_single_with_offset(token, reader.pos),
+                      "This is an invalid unicode escape hex character"
+                  end
+                codepoint = 16_u32 * codepoint + hex_value
               end
               result << codepoint.chr
             when '\r', '\n' then
