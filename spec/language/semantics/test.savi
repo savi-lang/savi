@@ -25,5 +25,6 @@
     TraitNonSpec.run(test)
     EnumSpec.run(test)
     StringSpec.run(test)
+    NumberSpec.run(test)
 
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
