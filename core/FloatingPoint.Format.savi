@@ -100,15 +100,12 @@
 
   :: Given a significand, determine the number of base-10 digits in it.
   :fun non _calculate_digit_count(significand U64)
-    // We will use some functions of `Integer.Format.Decimal` as a utility.
-    util = Integer.Format.Decimal(U64)
-
     // First get a possibly overestimated digit count based on the bit count.
-    digit_count = util._overestimated_digit_count(significand.significant_bits)
+    digit_count = @_overestimated_digit_count(significand.significant_bits)
 
     // Check the divisor for that digit count against the significand.
     // If the divisor is too big, we need to reduce the digit count by one.
-    divisor = try (util._powers_of_10[(digit_count - 1).usize]! | 10)
+    divisor = try (@_powers_of_10[(digit_count - 1).usize]! | 10)
     if (significand < divisor) (digit_count -= 1)
 
     // Return the now-accurate digit count.
@@ -116,10 +113,7 @@
 
   :: For this value's digit count, get the appropriate starting divisor.
   :fun initial_divisor U64
-    // We will use the lookup table from `Integer.Format.Decimal` as a utility.
-    util = Integer.Format.Decimal(U64)
-
-    try (util._powers_of_10[(@digit_count - 1).usize]! | 1)
+    try (@_powers_of_10[(@digit_count - 1).usize]! | 1)
 
   :: For this value's digit count and power of 10, get the appropriate exponent
   :: to use when printing with scientific notation.
@@ -128,6 +122,43 @@
     // more digits we are printing, the more we need to shift the decimal
     // point from its initial position at the far right of the significand.
     @power_of_10 + @digit_count.i16 - 1
+
+  :: Return a number which is greater than or equal to the number of base-10
+  :: digits needed to represent the given value (which must be positive).
+  :: This approximation will always be either exactly correct (as it is for the
+  :: majority of possible numbers), or one higher than the correct digit count.
+  :fun non _overestimated_digit_count(bit_count U8) U8
+    // Take the number of significant bits, multiply by (77 / 256), then add 1.
+    // This approximation is valid for up to 128 significant bits, and will not
+    // overflow 16-bit intermediate computation, because 128 * 77 uses 14 bits.
+    // Note that shifting by 8 bits is equivalent to floored division by 256.
+    (bit_count.u16 * 77).bit_shr(8).u8 + 1
+
+  :: All of the powers of 10 that are representable by the `U64` type,
+  :: where the index of this table is used as the exponent of 10.
+  :const _powers_of_10 Array(U64)'val: [
+    1
+    10
+    100
+    1000
+    10000
+    100000
+    1000000
+    10000000
+    100000000
+    1000000000
+    10000000000
+    100000000000
+    1000000000000
+    10000000000000
+    100000000000000
+    1000000000000000
+    10000000000000000
+    100000000000000000
+    1000000000000000000
+    10000000000000000000
+  ]
+
 
 :: Format the given floating point using one of the available format types.
 :: Call one of the methods of this struct to choose which format type to use.
