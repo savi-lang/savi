@@ -8,6 +8,7 @@
   :fun hexadecimal: Integer.Format.Hexadecimal(T)._new(@_value)
   :fun binary: Integer.Format.Binary(T)._new(@_value)
   :fun unicode: Integer.Format.Unicode(T)._new(@_value)
+  :fun printable_ascii: Integer.Format.PrintableASCII(T)._new(@_value)
 
   :fun dec: @decimal
   :fun hex: @hexadecimal
@@ -180,7 +181,7 @@
 
     --out
 
-:: Format the given integer as Unicode codepoint.
+:: Format the given integer as a Unicode codepoint.
 :struct val Integer.Format.Unicode(T Integer(T)'val)
   :is IntoString
 
@@ -195,3 +196,53 @@
   :fun into_string_space USize
     // This is only a rough guess
     if (@_value.u32 < 128) (1 | 4)
+
+:: Format the given integer (treated as a Unicode codepoint) as
+:: either a printable ASCII character (if it is one), or as a valid
+:: string escape sequence (made of printable ASCII characters) that would
+:: encode that particular Unicode codepoint in a Savi string literal.
+:struct val Integer.Format.PrintableASCII(T Integer(T)'val)
+  :is IntoString
+
+  :let _value U32
+  :new val _new(value T): @_value = value.u32
+
+  :fun into_string(out String'iso) String'iso
+    case (
+    | @_value < 127 && @_value >= 32 |
+      case @_value == (
+      | '\\' | out.push_byte('\\'), out.push_byte('\\')
+      | '\'' | out.push_byte('\\'), out.push_byte('\'')
+      | '\"' | out.push_byte('\\'), out.push_byte('\"')
+      |        out.push_byte(@_value.u8)
+      )
+    | @_value < 32 |
+      case @_value == (
+      | '\t' | out.push_byte('\\'), out.push_byte('t')
+      | '\b' | out.push_byte('\\'), out.push_byte('b')
+      | '\f' | out.push_byte('\\'), out.push_byte('f')
+      | '\r' | out.push_byte('\\'), out.push_byte('r')
+      | '\n' | out.push_byte('\\'), out.push_byte('n')
+      |
+        out.push_byte('\\'), out.push_byte('x')
+        out = @_value.u8.format.hex.bare.into_string(--out)
+      )
+    | @_value <= 0xff |
+      out.push_byte('\\'), out.push_byte('x')
+      out = @_value.u8.format.hex.bare.into_string(--out)
+    | @_value <= 0xffff |
+      out.push_byte('\\'), out.push_byte('u')
+      out = @_value.u16.format.hex.bare.into_string(--out)
+    |
+      out.push_byte('\\'), out.push_byte('U')
+      out = @_value.format.hex.bare.into_string(--out)
+    )
+    --out
+
+  :fun into_string_space USize
+    case (
+    | @_value < 127 && @_value >= 32 |  1
+    | @_value <= 0xff                |  4 // some are 2, but not all
+    | @_value <= 0xffff              |  6
+    |                                  10
+    )
