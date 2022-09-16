@@ -35,6 +35,12 @@ elif uname | grep -iq 'FreeBSD'; then
   else
     fail "On FreeBSD, the only arch currently supported is: x86_64"
   fi
+elif uname | grep -iq 'DragonFly'; then
+  if uname -m | grep -iq 'x86_64'; then
+    echo 'x86_64-unknown-dragonfly'
+  else
+    fail "On DragonFly, the only arch currently supported is: x86_64"
+  fi
 elif uname | grep -iq 'Darwin'; then
   if uname -m | grep -iq 'x86_64'; then
     echo 'x86_64-apple-macosx'

@@ -33,7 +33,7 @@ class Savi::Compiler::Binary
     # Use a linker to turn make an executable binary from the object file.
     # We use an embedded lld linker, passing link arguments of our own crafting,
     # based on information about the target platform and finding system paths.
-    if target.linux? || target.freebsd?
+    if target.linux? || target.freebsd? || target.dragonfly?
       link_for_linux_or_bsd(ctx, target, obj_path, bin_path)
     elsif target.macos?
       link_for_macosx(ctx, target, obj_path, bin_path)
@@ -185,10 +185,12 @@ class Savi::Compiler::Binary
     # TODO: Allow option to build with "-static" for linux-musl target
 
     # Link the libraries that we always need.
-    link_args << "-lgcc" << "-lgcc_s"
+    link_args << "-lgcc"
+    link_args << "-lgcc_s" unless target.dragonfly?
+
     link_args << "-lc" << "-ldl" << "-lpthread" << "-lm"
-    link_args << "-latomic" unless target.freebsd?
-    link_args << "-lexecinfo" if target.musl? || target.freebsd?
+    link_args << "-latomic" unless target.freebsd? || target.dragonfly?
+    link_args << "-lexecinfo" if target.musl? || target.freebsd? || target.dragonfly?
 
     # Link any additional libraries indicated by user code.
     ctx.link_libraries.each { |name| link_args << "-l#{name}" }
@@ -219,6 +221,10 @@ class Savi::Compiler::Binary
 
     if target.freebsd?
       return "/libexec/ld-elf.so.1"
+    end
+
+    if target.dragonfly?
+      return "/libexec/ld-elf.so.2"
     end
 
     raise NotImplementedError.new(target.inspect)
@@ -310,6 +316,10 @@ class Savi::Compiler::Binary
     yield "/usr/lib64", nil
     yield "/lib", nil
     yield "/usr/lib", nil
+
+    if target.dragonfly?
+      yield "/usr/lib/gcc80", nil
+    end
   end
 
   # Given a prioritized list of search paths and a file name, find the file.

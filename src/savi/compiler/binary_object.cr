@@ -49,6 +49,10 @@ class Savi::Compiler::BinaryObject
       if target.x86_64?
         return "x86_64-unknown-freebsd"
       end
+    elsif target.dragonfly?
+      if target.x86_64?
+        return "x86_64-unknown-dragonfly"
+      end
     elsif target.macos?
       if target.x86_64?
         return "x86_64-apple-macosx"
