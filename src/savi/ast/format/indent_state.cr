@@ -3,9 +3,14 @@ class Savi::AST::Format::IndentState
     property parent : Layer?
     property node : AST::Node
     property current_declare_indent : Int32
+    property enforce : Bool
     property pos_list : Array({Source::Pos, Int32})?
 
-    def initialize(@parent, @node, @current_declare_indent)
+    def initialize(@parent, @node, @current_declare_indent, @enforce = true)
+    end
+
+    def enforces_indent?
+      @enforce
     end
 
     def empty?
@@ -52,11 +57,18 @@ class Savi::AST::Format::IndentState
     # A single-line node never adds to the indentation stack.
     return if node.pos.single_line?
 
-    # Certain nodes are exempted from adding to the indentation stack.
+    # Certain nodes are treated in special ways. Some return early such that
+    # they don't add to the indentation stack when they otherwise would.
+    enforce = true
     case node
     when AST::Document
       # Document nodes can never add indentation.
       return
+    when AST::LiteralString
+      # Don't force any specific indentation inside a literal string,
+      # as the spacing inside the string is part of the literal string,
+      # including the indentation (or lack thereof) on new lines.
+      enforce = false
     when AST::Group
       # Declare-level groups don't add indentation in this way.
       # Their indentation is already covered in the declare depth logic.
@@ -89,7 +101,7 @@ class Savi::AST::Format::IndentState
     end
 
     # Push an indent stack layer for this node.
-    @indent_stack << Layer.new(@indent_stack.last, node, @current_declare_indent)
+    @indent_stack << Layer.new(@indent_stack.last, node, @current_declare_indent, enforce)
   end
 
   def maybe_pop_indent(visitor, node)
@@ -166,6 +178,7 @@ class Savi::AST::Format::IndentState
   def each_indent_violation
     @indent_map.each { |layer, pos_list|
       next if layer.empty?
+      next unless layer.enforces_indent?
 
       expected_level = layer.resolve_indent_level
 
