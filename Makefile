@@ -220,7 +220,6 @@ $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 	mkdir -p `dirname $@`
 	${CLANGXX} -v -emit-llvm -g \
 		-c `$(LLVM_CONFIG) --cxxflags` \
-		-stdlib=lib$(LIB_CXX_KIND) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
 		-o $@
@@ -231,7 +230,6 @@ $(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) $(shell find src/savi/ext/llvm/for_s
 	mkdir -p `dirname $@`
 	${CLANGXX} -v -emit-llvm -g \
 		-c `$(LLVM_CONFIG) --cxxflags` \
-		-stdlib=lib$(LIB_CXX_KIND) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		src/savi/ext/llvm/for_savi/main.cc \
 		-o $@
