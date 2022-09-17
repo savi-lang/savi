@@ -129,7 +129,7 @@ task:
 
   build_script:
     - mkdir -p out/bin
-    - ${MAKE} build/savi-release SAVI_VERSION=${CIRRUS_TAG:-unknown} ${MAKE_EXTRA_ARGS}
+    - ${MAKE} -j2 build/savi-release lib/libsavi_runtime SAVI_VERSION=${CIRRUS_TAG:-unknown} ${MAKE_EXTRA_ARGS}
     - mv build/savi-release out/bin/savi
 
   copy_core_script:
