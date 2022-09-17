@@ -31,78 +31,81 @@ spec.all: PHONY spec.compiler.all spec.language spec.core spec.unit.all spec.int
 
 # Run the specs that are written in markdown (mostly compiler pass tests).
 # Run the given compiler-spec target (or all targets).
-spec.compiler: PHONY $(SAVI)
+spec.compiler: PHONY SAVI
 	echo && $(SAVI) compilerspec "spec/compiler/$(name).savi.spec.md" $(extra_args)
 spec.compiler.all: PHONY $(SAVI)
 	find "spec/compiler" -name '*.savi.spec.md' | sort | xargs -I'{}' sh -c \
 		'echo && $(SAVI) compilerspec {} $(extra_args) || exit 255'
 
 # Run the specs for the basic language semantics.
-spec.language: PHONY $(SAVI)
+spec.language: PHONY SAVI
 	echo && $(SAVI) run --cd spec/language $(extra_args)
 
 # Run the specs for the core package.
-spec.core: PHONY $(SAVI)
+spec.core: PHONY SAVI
 	echo && $(SAVI) run --cd spec/core $(extra_args)
 
 # Update deps for the specs for the core package.
-spec.core.deps: PHONY $(SAVI)
+spec.core.deps: PHONY SAVI
 	echo && $(SAVI) deps update --cd spec/core $(extra_args)
 
 # Run the specs for the core package in lldb for debugging.
-spec.core.lldb: PHONY $(SAVI)
+spec.core.lldb: PHONY SAVI
 	echo && $(SAVI) build --cd spec/core $(extra_args) && \
 		lldb -o run -- spec/core/bin/spec
 
 # Run the specs that are written in Crystal (mostly compiler unit tests),
 # narrowing to those with the given name (or all of them).
-spec.unit: PHONY $(SPEC)
+spec.unit: PHONY SPEC
 	echo && $(SPEC) -v -e "$(name)"
-spec.unit.all: PHONY $(SPEC)
+spec.unit.all: PHONY SPEC
 	echo && $(SPEC)
 
 # Run the integration tests, which invoke the compiler in a real directory.
-spec.integration: PHONY $(SAVI)
+spec.integration: PHONY SAVI
 	echo && spec/integration/run-one.sh "$(name)" $(SAVI)
-spec.integration.all: PHONY $(SAVI)
+spec.integration.all: PHONY SAVI
 	echo && spec/integration/run-all.sh $(SAVI)
 
 # Check formatting of *.savi source files.
-format.check: PHONY $(SAVI)
+format.check: PHONY SAVI
 	echo && $(SAVI) format --check --backtrace
 
 # Fix formatting of *.savi source files.
-format: PHONY $(SAVI)
+format: PHONY SAVI
 	echo && $(SAVI) format --backtrace
 
 # Generate FFI code.
-ffigen: PHONY $(SAVI)
+ffigen: PHONY SAVI
 	echo && $(SAVI) ffigen "$(header)" $(extra_args) --backtrace
 
 # Evaluate a Hello World example.
-example-eval: PHONY $(SAVI)
+example-eval: PHONY SAVI
 	echo && $(SAVI) eval 'env.out.print("Hello, World!")' --backtrace
 
 # Compile and run the user program binary in the given directory.
-example: PHONY $(SAVI)
+example: PHONY SAVI
 	echo && $(SAVI) run --cd "$(dir)" $(extra_args)
 
 # Compile the files in the given directory.
-example.compile: PHONY $(SAVI)
+example.compile: PHONY SAVI
 	echo && $(SAVI) --cd "$(dir)" $(extra_args)
 
 # Update deps for the specs for the given example directory.
-example.deps: PHONY $(SAVI)
+example.deps: PHONY SAVI
 	echo && $(SAVI) deps update --cd "$(dir)" $(extra_args)
 
 # Compile the vscode extension.
-vscode: PHONY $(SAVI)
+vscode: PHONY SAVI
 	cd tooling/vscode && npm run-script compile || npm install
 
 ##
 # General utilities
 
 .PHONY: PHONY
+
+SAVI: $(SAVI) lib/libsavi_runtime
+SPEC: $(SPEC) lib/libsavi_runtime
 
 # This is a bit of Makefile voodoo we use to allow us to use the value
 # of a variable to invalidate a target file when it changes.
@@ -291,7 +294,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in release mode.
-$(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
+$(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc
 	mkdir -p `dirname $@`
 	${CLANG} -O3 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
@@ -306,7 +309,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llv
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in debug mode.
-$(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
+$(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc
 	mkdir -p `dirname $@`
 	${CLANG} -O0 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
@@ -321,7 +324,7 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 
 # Build the Savi specs executable, by linking the above targets together.
 # This variant of the target will be used when running tests.
-$(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
+$(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc
 	mkdir -p `dirname $@`
 	${CLANG} -O0 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
