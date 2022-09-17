@@ -147,8 +147,10 @@ LLVM_PATH?=$(BUILD)/llvm-static
 LLVM_CONFIG?=$(LLVM_PATH)/bin/llvm-config
 
 # Determine which flavor of the C++ standard library to link against.
-# We choose libstdc++ on Linux, and libc++ on FreeBSD and MacOS.
+# We choose libstdc++ on Linux and DragonFly, and libc++ on FreeBSD and MacOS.
 ifneq (,$(findstring linux,$(TARGET_PLATFORM)))
+	LIB_CXX_KIND?=stdc++
+else ifneq (,$(findstring dragonfly,$(TARGET_PLATFORM)))
 	LIB_CXX_KIND?=stdc++
 else
 	LIB_CXX_KIND?=c++
@@ -163,12 +165,6 @@ LIB_PCRE?=$(shell find /usr /opt -name libpcre.a 2> /dev/null | head -n 1 | grep
 
 # Collect the list of libraries to link against (depending on the platform).
 # These are the libraries used by the Crystal runtime.
-
-# Only add -lXXX if LIB_CXX_KIND is defined.
-# TODO: Do you need to specify LIB_CXX_KIND at all when you link with clang++?
-ifneq ("", "${LIB_CXX_KIND}")
-  CRYSTAL_RT_LIBS+=-l$(LIB_CXX_KIND)
-endif
 
 CRYSTAL_RT_LIBS+=$(LIB_GC)
 CRYSTAL_RT_LIBS+=$(LIB_EVENT)
@@ -185,20 +181,19 @@ ifneq (,$(findstring dragonfly,$(TARGET_PLATFORM)))
 	CRYSTAL_RT_LIBS+=-L/usr/local/lib
 endif
 
+CRYSTAL_RT_LIBS+=-l$(LIB_CXX_KIND)
+
 ifneq (,$(findstring dragonfly,$(TARGET_PLATFORM)))
 	# On DragonFly:
 	#
 	# * -flto=thin is not accepted
 	# * we have to explicitly state the linker
 	# * we cannot link libclang statically
-	# * compile with clang++
-	SAVI_LD_FLAGS=-fuse-ld=lld -L/usr/lib -L/usr/local/lib
+	SAVI_LD_FLAGS=-fuse-ld=lld -L/usr/lib -L/usr/local/lib -L/usr/lib/gcc80
 	LIB_CLANG=-lclang
-	SAVI_CC="${CLANGXX}"
 else
 	SAVI_LD_FLAGS=-flto=thin -no-pie
 	LIB_CLANG=`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'`
-	SAVI_CC="${CLANG}"
 endif
 
 
@@ -238,7 +233,6 @@ $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 	mkdir -p `dirname $@`
 	${CLANGXX} -v -emit-llvm -g \
 		-c `$(LLVM_CONFIG) --cxxflags` \
-		-stdlib=lib$(LIB_CXX_KIND) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
 		-o $@
@@ -249,7 +243,6 @@ $(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) $(shell find src/savi/ext/llvm/for_s
 	mkdir -p `dirname $@`
 	${CLANGXX} -v -emit-llvm -g \
 		-c `$(LLVM_CONFIG) --cxxflags` \
-		-stdlib=lib$(LIB_CXX_KIND) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		src/savi/ext/llvm/for_savi/main.cc \
 		-o $@
@@ -300,7 +293,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 # This variant of the target compiles in release mode.
 $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${SAVI_CC} -O3 -o $@ $(SAVI_LD_FLAGS) \
+	${CLANG} -O3 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
@@ -315,7 +308,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llv
 # This variant of the target compiles in debug mode.
 $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${SAVI_CC} -O0 -o $@ $(SAVI_LD_FLAGS) \
+	${CLANG} -O0 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
@@ -330,7 +323,7 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 # This variant of the target will be used when running tests.
 $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
-	${SAVI_CC} -O0 -o $@ $(SAVI_LD_FLAGS) \
+	${CLANG} -O0 -o $@ $(SAVI_LD_FLAGS) \
 		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
