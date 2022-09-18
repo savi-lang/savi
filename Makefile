@@ -234,7 +234,7 @@ $(BUILD)/llvm-static: $(MAKE_VAR_CACHE)/LLVM_STATIC_RELEASE_URL
 # This bitcode needs to get linked into our Savi compiler executable.
 $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 	mkdir -p `dirname $@`
-	${CLANGXX} -v -emit-llvm -g \
+	${CLANGXX} -v -emit-llvm -g -gdwarf-4 \
 		-c `$(LLVM_CONFIG) --cxxflags` \
 		-target $(CLANG_TARGET_PLATFORM) \
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
@@ -244,7 +244,7 @@ $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 # This bitcode needs to get linked into our Savi compiler executable.
 $(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) $(shell find src/savi/ext/llvm/for_savi -name '*.cc')
 	mkdir -p `dirname $@`
-	${CLANGXX} -v -emit-llvm -g \
+	${CLANGXX} -v -emit-llvm -g -gdwarf-4 \
 		-c `$(LLVM_CONFIG) --cxxflags` \
 		-target $(CLANG_TARGET_PLATFORM) \
 		src/savi/ext/llvm/for_savi/main.cc \
