@@ -34,13 +34,13 @@ It won't allow FFI functions to be a subfunc to any abstract function:
 
 ```savi
 :trait TraitCantMatchFFI
-  :fun puts(string CPointer(U8)) I32
-  :fun putz(string CPointer(U8)) I32
+  :fun non puts(string CPointer(U8)) I32
+  :fun non putz(string CPointer(U8)) I32
 
 :module ModuleWithFFI
   :is TraitCantMatchFFI
   :ffi puts(string CPointer(U8)) I32
-  :fun putz(string CPointer(U8)) I32: @puts(string)
+  :fun non putz(string CPointer(U8)) I32: @puts(string)
 ```
 ```error
 ModuleWithFFI isn't a subtype of TraitCantMatchFFI, as it is required to be here:
@@ -58,27 +58,27 @@ It requires a sub-func to have the same constructor or constant tags:
 
 ```savi
 :trait TraitNewConstFun123
-  :new constructor1
-  :new constructor2
-  :new constructor3
+  :new ref constructor1
+  :new ref constructor2
+  :new ref constructor3
   :const constant1 U64
   :const constant2 U64
   :const constant3 U64
-  :fun function1 U64
-  :fun function2 U64
-  :fun function3 U64
+  :fun ref function1 U64
+  :fun ref function2 U64
+  :fun ref function3 U64
 
 :class ConcreteNewConstFun123
   :is TraitNewConstFun123
-  :new constructor1
+  :new ref constructor1
   :const constructor2 U64: 0
-  :fun constructor3 U64: 0
-  :new constant1
+  :fun ref constructor3 U64: 0
+  :new ref constant1
   :const constant2 U64: 0
-  :fun constant3 U64: 0
-  :new function1
+  :fun ref constant3 U64: 0
+  :new ref function1
   :const function2 U64: 0
-  :fun function3 U64: 0
+  :fun ref function3 U64: 0
 ```
 ```error
 ConcreteNewConstFun123 isn't a subtype of TraitNewConstFun123, as it is required to be here:
@@ -90,48 +90,48 @@ ConcreteNewConstFun123 isn't a subtype of TraitNewConstFun123, as it is required
          ^~~~~~~~~~~~
 
 - the constructor in the supertype is here:
-  :new constructor2
-       ^~~~~~~~~~~~
+  :new ref constructor2
+           ^~~~~~~~~~~~
 
 - a non-constructor can't be a subtype of a constructor:
-  :fun constructor3 U64: 0
-       ^~~~~~~~~~~~
+  :fun ref constructor3 U64: 0
+           ^~~~~~~~~~~~
 
 - the constructor in the supertype is here:
-  :new constructor3
-       ^~~~~~~~~~~~
+  :new ref constructor3
+           ^~~~~~~~~~~~
 
 - a constructor can't be a subtype of a non-constructor:
-  :new constant1
-       ^~~~~~~~~
+  :new ref constant1
+           ^~~~~~~~~
 
 - the non-constructor in the supertype is here:
   :const constant1 U64
          ^~~~~~~~~
 
 - a non-constant can't be a subtype of a constant:
-  :fun constant3 U64: 0
-       ^~~~~~~~~
+  :fun ref constant3 U64: 0
+           ^~~~~~~~~
 
 - the constant in the supertype is here:
   :const constant3 U64
          ^~~~~~~~~
 
 - a constructor can't be a subtype of a non-constructor:
-  :new function1
-       ^~~~~~~~~
+  :new ref function1
+           ^~~~~~~~~
 
 - the non-constructor in the supertype is here:
-  :fun function1 U64
-       ^~~~~~~~~
+  :fun ref function1 U64
+           ^~~~~~~~~
 
 - a constant can't be a subtype of a non-constant:
   :const function2 U64: 0
          ^~~~~~~~~
 
 - the non-constant in the supertype is here:
-  :fun function2 U64
-       ^~~~~~~~~
+  :fun ref function2 U64
+           ^~~~~~~~~
 ```
 
 ---
@@ -140,15 +140,15 @@ It requires a sub-func to have the same number of params:
 
 ```savi
 :trait non Trait3Params
-  :fun example1(a U64, b U64, c U64) None
-  :fun example2(a U64, b U64, c U64) None
-  :fun example3(a U64, b U64, c U64) None
+  :fun non example1(a U64, b U64, c U64) None
+  :fun non example2(a U64, b U64, c U64) None
+  :fun non example3(a U64, b U64, c U64) None
 
 :module ConcreteNot3Params
   :is Trait3Params
-  :fun example1 None
-  :fun example2(a U64, b U64) None
-  :fun example3(a U64, b U64, c U64, d U64) None
+  :fun non example1 None
+  :fun non example2(a U64, b U64) None
+  :fun non example3(a U64, b U64, c U64, d U64) None
 ```
 ```error
 ConcreteNot3Params isn't a subtype of Trait3Params, as it is required to be here:
@@ -156,28 +156,28 @@ ConcreteNot3Params isn't a subtype of Trait3Params, as it is required to be here
    ^~
 
 - this function has too few parameters:
-  :fun example1 None
-       ^~~~~~~~
+  :fun non example1 None
+           ^~~~~~~~
 
 - the supertype has 3 parameters:
-  :fun example1(a U64, b U64, c U64) None
-               ^~~~~~~~~~~~~~~~~~~~~
+  :fun non example1(a U64, b U64, c U64) None
+                   ^~~~~~~~~~~~~~~~~~~~~
 
 - this function has too few parameters:
-  :fun example2(a U64, b U64) None
-               ^~~~~~~~~~~~~~
+  :fun non example2(a U64, b U64) None
+                   ^~~~~~~~~~~~~~
 
 - the supertype has 3 parameters:
-  :fun example2(a U64, b U64, c U64) None
-               ^~~~~~~~~~~~~~~~~~~~~
+  :fun non example2(a U64, b U64, c U64) None
+                   ^~~~~~~~~~~~~~~~~~~~~
 
 - this function has too many parameters:
-  :fun example3(a U64, b U64, c U64, d U64) None
-               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :fun non example3(a U64, b U64, c U64, d U64) None
+                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - the supertype has 3 parameters:
-  :fun example3(a U64, b U64, c U64) None
-               ^~~~~~~~~~~~~~~~~~~~~
+  :fun non example3(a U64, b U64, c U64) None
+                   ^~~~~~~~~~~~~~~~~~~~~
 ```
 
 ---
@@ -246,17 +246,17 @@ It requires a sub-func to have covariant return and contravariant params:
 
 ```savi
 :trait non TraitParamsReturn
-  :fun example1 Any
-  :fun example2 U64
-  :fun example3(a U64, b U64, c U64) None
-  :fun example4(a Any, b Any, c Any) None
+  :fun non example1 Any
+  :fun non example2 U64
+  :fun non example3(a U64, b U64, c U64) None
+  :fun non example4(a Any, b Any, c Any) None
 
 :module ConcreteParamsReturn
   :is TraitParamsReturn
-  :fun example1 U64: 0
-  :fun example2 Any: U64[0]
-  :fun example3(a Any, b U64, c Any) None:
-  :fun example4(a U64, b Any, c U64) None:
+  :fun non example1 U64: 0
+  :fun non example2 Any: U64[0]
+  :fun non example3(a Any, b U64, c Any) None:
+  :fun non example4(a U64, b Any, c U64) None:
 ```
 ```error
 ConcreteParamsReturn isn't a subtype of TraitParamsReturn, as it is required to be here:
@@ -264,28 +264,28 @@ ConcreteParamsReturn isn't a subtype of TraitParamsReturn, as it is required to 
    ^~
 
 - this function's return type is Any:
-  :fun example2 Any: U64[0]
-                ^~~
+  :fun non example2 Any: U64[0]
+                    ^~~
 
 - it is required to be a subtype of U64:
-  :fun example2 U64
-                ^~~
+  :fun non example2 U64
+                    ^~~
 
 - this parameter type is U64:
-  :fun example4(a U64, b Any, c U64) None:
-                ^~~~~
+  :fun non example4(a U64, b Any, c U64) None:
+                    ^~~~~
 
 - it is required to be a supertype of Any:
-  :fun example4(a Any, b Any, c Any) None
-                ^~~~~
+  :fun non example4(a Any, b Any, c Any) None
+                    ^~~~~
 
 - this parameter type is U64:
-  :fun example4(a U64, b Any, c U64) None:
-                              ^~~~~
+  :fun non example4(a U64, b Any, c U64) None:
+                                  ^~~~~
 
 - it is required to be a supertype of Any:
-  :fun example4(a Any, b Any, c Any) None
-                              ^~~~~
+  :fun non example4(a Any, b Any, c Any) None
+                                  ^~~~~
 ```
 
 ---
@@ -334,6 +334,38 @@ It can use type parameters as type arguments in the subtype assertion:
 ConcreteConvertToStringBackwards(C'val) isn't a subtype of TraitConvertAToB(String, C'val), as it is required to be here:
   :is TraitConvertAToB(String, C)
    ^~
+
+- this function's return type is String:
+  :fun convert(input C): "This one has the trait arguments backwards"
+       ^~~~~~~
+
+- it is required to be a subtype of C'val:
+  :fun convert(input A) B
+                        ^
+
+- this parameter type is C'val:
+  :fun convert(input C): "This one has the trait arguments backwards"
+               ^~~~~~~
+
+- it is required to be a supertype of String:
+  :fun convert(input A) B
+               ^~~~~~~
+
+- this function's return type is String:
+  :fun convert(input C): "This one has the trait arguments backwards"
+       ^~~~~~~
+
+- it is required to be a subtype of C'val:
+  :fun convert(input A) B
+                        ^
+
+- this parameter type is C'val:
+  :fun convert(input C): "This one has the trait arguments backwards"
+               ^~~~~~~
+
+- it is required to be a supertype of String:
+  :fun convert(input A) B
+               ^~~~~~~
 
 - this function's return type is String:
   :fun convert(input C): "This one has the trait arguments backwards"

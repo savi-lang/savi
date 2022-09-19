@@ -123,10 +123,10 @@ module Savi::Compiler::XTypes::Graph
         @receiver_cap_var = self_cap = new_cap_var("@")
         self_cap.is_input_var = true
 
-        # If it's a `:fun box`, we interpret it as a type variable constrained
+        # If it's a `:fun read`, we interpret it as a type variable constrained
         # to be one of the caps in the set called `read` (`ref`, `val`, `box`).
         # Otherwise, we bind it directly to the concrete cap that was given.
-        if cap == "box"
+        if cap == "read"
           self_cap.observe_constraint_at(pos,
             Union.from([NominalCap::VAL, NominalCap::REF, NominalCap::BOX])
           )

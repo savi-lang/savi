@@ -565,6 +565,12 @@ module Savi::Compiler::PreInfer
         @classify.value_needed?(node),
       )
 
+      # We're going to treat Self slightly differently if it happens to be
+      # the receiver of a call (relevant to completeness-related cap stuff).
+      if lhs_info.is_a?(Infer::Self)
+        lhs_info.receiver_of_call = call
+      end
+
       @analysis[node.ident] = call
 
       # Each arg needs a link back to the FromCall with an arg index.

@@ -2298,7 +2298,11 @@ class Savi::Compiler::CodeGen
         "#{lhs.name}.is.#{rhs.name}",
       )
     else
-      raise NotImplementedError.new("this comparison:\n#{pos.show}")
+      raise NotImplementedError.new([
+        "this comparison:",
+        "#{lhs_type.show_type} === #{rhs_type.show_type}",
+        "#{lhs.type} === #{rhs.type}"
+      ].join("\n"))
     end
   end
 

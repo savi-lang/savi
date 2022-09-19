@@ -224,7 +224,7 @@ This function call doesn't meet subtyping requirements:
     string String'val = wrapper.immutable_string
                                 ^~~~~~~~~~~~~~~~
 
-- the function's required receiver capability is `val` but only a `ref` or `box` function can be auto-recovered:
+- the function's required receiver capability is `val` but only a `ref`, `box`, or `read` function can be auto-recovered:
   :fun val immutable_string: @string
        ^~~
 
@@ -364,6 +364,8 @@ A `let` property can only be assigned inside a constructor:
   :let x U64
        ^
 ```
+
+---
 
 It complains when calling a `non` function with no body on a `non` reference to a trait:
 

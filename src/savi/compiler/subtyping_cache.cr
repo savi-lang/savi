@@ -219,11 +219,18 @@ class Savi::Compiler::SubtypingCache
           that_cap = MetaType::Capability.new_maybe_generic(that_func.cap.value)
           this_cap = MetaType::Capability.new_maybe_generic(this_func.cap.value)
 
-          # For "simple" capabilities, just use them to check the function.
           if that_cap.value.is_a?(Infer::Cap) && this_cap.value.is_a?(Infer::Cap)
+            # For "simple" capabilities, just use them to check the function.
             check_func(ctx, that, that_func, this_func, that_cap, this_cap, errors)
+          elsif this_cap.value.is_a?(Infer::Cap)
+            # If this cap is a simple cap but the other is generic,
+            # we can compare each reification of that generic cap.
+            that_cap.each_cap.each do |cap|
+              cap_mti = MetaType::Capability.new(cap)
+              check_func(ctx, that, that_func, this_func, cap_mti, this_cap, errors)
+            end
           else
-            # If either capability is a generic cap, they must be equivalent.
+            # If both sides are generic caps, they must be equivalent.
             # TODO: May need to revisit this requirement later and loosen it?
             if that_cap != this_cap
               errors << {this_func.cap.pos,

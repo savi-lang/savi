@@ -66,6 +66,8 @@ class Savi::Compiler
     when "pre_t_infer"      then :pre_t_infer
     when "pre_infer"        then :pre_infer
     when "pre_subtyping"    then :pre_subtyping
+    when "pre_completeness" then :pre_completeness
+    when "completeness"     then :completeness
     when "types_graph"      then :types_graph
     when "types_edge"       then :types_edge
     when "xtypes_graph"     then :xtypes_graph
@@ -74,7 +76,6 @@ class Savi::Compiler
     when "t_infer"          then :t_infer
     when "infer_edge"       then :infer_edge
     when "infer"            then :infer
-    when "completeness"     then :completeness
     when "privacy"          then :privacy
     when "verify"           then :verify
     when "reach"            then :reach
@@ -120,6 +121,8 @@ class Savi::Compiler
       when :pre_t_infer      then ctx.run(ctx.pre_t_infer)
       when :pre_infer        then ctx.run(ctx.pre_infer)
       when :pre_subtyping    then ctx.run(ctx.pre_subtyping)
+      when :pre_completeness then ctx.run(ctx.pre_completeness)
+      when :completeness     then ctx.run(ctx.completeness)
       when :types_graph      then ctx.run(ctx.types_graph)
       when :types_edge       then ctx.run(ctx.types_edge)
       when :xtypes_graph     then ctx.run(ctx.xtypes_graph)
@@ -128,7 +131,6 @@ class Savi::Compiler
       when :t_infer          then ctx.run(ctx.t_infer)
       when :infer_edge       then ctx.run(ctx.infer_edge)
       when :infer            then ctx.run(ctx.infer)
-      when :completeness     then ctx.run(ctx.completeness)
       when :privacy          then ctx.run(ctx.privacy)
       when :verify           then ctx.run(ctx.verify)
       when :reach            then ctx.run_whole_program(ctx.reach)
@@ -179,15 +181,16 @@ class Savi::Compiler
     when :pre_t_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
     when :pre_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
     when :pre_subtyping then [:inventory, :lambda, :populate]
+    when :pre_completeness then [:jumps, :pre_infer]
+    when :completeness then [:pre_completeness]
     when :types_graph then [:refer, :classify, :refer_type]
     when :types_edge then [:types_graph]
     when :xtypes_graph then [:refer, :classify, :refer_type]
     when :xtypes then [:xtypes_graph]
     when :t_infer_edge then [:pre_subtyping, :pre_t_infer, :classify, :refer_type]
     when :t_infer then [:t_infer_edge]
-    when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]
+    when :infer_edge then [:completeness, :pre_subtyping, :pre_infer, :classify, :refer_type]
     when :infer then [:infer_edge]
-    when :completeness then [:jumps, :pre_infer]
     when :privacy then [:infer]
     when :verify then [:infer, :pre_infer, :inventory, :jumps]
     when :reach then [:infer, :pre_subtyping, :namespace]

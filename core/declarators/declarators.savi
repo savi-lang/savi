@@ -317,8 +317,8 @@
   :context type
   :begins function
 
-  :term cap enum (iso, val, ref, box, tag, non)
-    :default box
+  :term cap enum (iso, val, ref, box, tag, non, read)
+    :default read
   :term name_and_params NameMaybeWithParams
   :term ret Type
     :optional
@@ -339,8 +339,8 @@
   :context type
   :begins function
 
-  :term cap enum (iso, val, ref, box, tag, non)
-    :optional // TODO: :default: @type.cap
+  :term cap enum (iso, val, ref, box, tag, non, read)
+    :default read
   :term name_and_params NameMaybeWithParams
   :body optional
 
@@ -350,8 +350,8 @@
   :context type
   :begins function
 
-  :term cap enum (iso, val, ref, box, tag, non)
-    :optional // TODO: :default: @type.cap
+  :term cap enum (iso, val, ref, box, tag, non, read)
+    :default read
   :term params Params
     :optional
   :body optional

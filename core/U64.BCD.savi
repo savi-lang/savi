@@ -1,5 +1,5 @@
 :: Binary Coded Decimal (BCD) representation of an U64 integer.
-:: 
+::
 :: Each digit is represented by a nibble (4 bits), requiring
 :: a total of 80 bits for up to 20 digits of the U64.
 :: Digits are stored in reverse order, so the the decimal `123`
@@ -19,8 +19,8 @@
   :let _high U64
   :let _low U64
 
-  :new (u64 U64)
-    high U64 = 0 
+  :new val (u64 U64)
+    high U64 = 0
     low U64 = 0xF
     ndigits U64 = 0
     while True (
@@ -36,11 +36,11 @@
     @_high = high.bit_or(ndigits.bit_shl(58))
     @_low = low
 
-  :fun box is_zero Bool
+  :fun is_zero Bool
     @_low.bit_and(0xFF) == 0xF0
 
   :: Converts the BCD back to an U64
-  :fun box u64 U64
+  :fun u64 U64
     n U64 = 0
     @each_digit -> (digit |
       n = (n * 10) + digit.u64
@@ -49,11 +49,11 @@
 
   :: Returns the number of digits.
   ::
-  :fun box ndigits USize
+  :fun ndigits USize
     @_high.bit_shr(58).bit_and(0b11111).usize
 
   :: Returns digit at position `pos`.
-  :fun box digit!(pos USize) U8
+  :fun digit!(pos USize) U8
     // 1234  -> 0xF_4321
     // pos=0 ->     ^-- index=3       == ndigits - (pos + 1)
     // pos=3 ->        ^-- index=0    == ndigits - (pos + 1)
@@ -68,8 +68,8 @@
       @_high.bit_shr(((index - 16) * 4).u8).u8.bit_and(U8[0xF])
     )
 
-  :fun box each_digit
-    :yields U8 for None 
+  :fun each_digit
+    :yields U8 for None
     high = @_high
     low = @_low
     while (low.bit_and(0xF) != 0xF) (
@@ -78,10 +78,10 @@
       high = high.bit_shr(4)
     )
 
-  :fun box into_string_space USize
+  :fun into_string_space USize
     @ndigits
 
-  :fun box into_string(out String'iso) String'iso
+  :fun into_string(out String'iso) String'iso
     @each_digit -> (digit |
       out.push_byte('0'.u8 + digit)
     )

@@ -61,7 +61,7 @@
   :: The caller is expected to only do this for indexes that are within
   :: the size of the originally allocated pointer and not to reach outside
   :: that bounds into memory owned by other pointers.
-  :fun box _offset(index USize) @'ref: compiler intrinsic
+  :fun _offset(index USize) @'ref: compiler intrinsic
 
   :: Get a pointer that points to a subset of this original pointer's memory,
   :: starting at the given element index from the current pointer's address,
@@ -78,7 +78,7 @@
   :: Return an alias of the element at the given index.
   ::
   :: The caller is expected to only do this for in-bounds indexes.
-  :fun box _get_at(index USize) (@->A)'aliased: compiler intrinsic
+  :fun _get_at(index USize) (@->A)'aliased: compiler intrinsic
 
   :: Return the element at the given index, without capability aliasing.
   :: This lack of aliasing breaks capability safety, so the caller is expected
@@ -106,7 +106,7 @@
   :: you need to copy starting at some offset, use the `_offset` method first.
   ::
   :: The caller is expected to only do this for in-bounds element counts.
-  :fun box _copy_to(other @'ref, count USize) None: compiler intrinsic
+  :fun _copy_to(other @'ref, count USize) None: compiler intrinsic
 
   :: Compare the memory referenced by this pointer to that of the other pointer,
   :: across the byte range indicated by the given element count.
@@ -119,7 +119,7 @@
   :: ramifications of what kind of representation the element has in its memory.
   ::
   :: The caller is expected to only do this for in-bounds element counts.
-  :fun box _compare(other @'box, count USize) I32: compiler intrinsic
+  :fun _compare(other @'box, count USize) I32: compiler intrinsic
 
   :: Calculate the hash of the block of memory starting at this pointer's head,
   :: continuing through the given number of elements in that memory.
@@ -132,7 +132,7 @@
   :: ramifications of what kind of representation the element has in its memory.
   ::
   :: The caller is expected to only do this for in-bounds element counts.
-  :fun box _hash(count USize) USize: compiler intrinsic
+  :fun _hash(count USize) USize: compiler intrinsic
 
   :: Return True if this is a null pointer (i.e. a zero address).
   :fun tag is_null Bool: compiler intrinsic

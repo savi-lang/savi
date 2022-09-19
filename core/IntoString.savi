@@ -5,7 +5,7 @@
 :trait box IntoString
   :: Emit a representation of this value into the given String, preserving
   :: its isolation and returning the String with the new content appended.
-  :fun box into_string(out String'iso) String'iso
+  :fun into_string(out String'iso) String'iso
 
   :: Return a conservative estimate for how much many bytes are required to hold
   :: the string representation of this value when emitted with `into_string`.
@@ -14,4 +14,4 @@
   :: is not possible, the function should prefer to over-estimate the amount
   :: of space needed, because an under-estimation would result in a potentially
   :: costly re-allocation and copy of data in the underlying string buffer.
-  :fun box into_string_space USize
+  :fun into_string_space USize

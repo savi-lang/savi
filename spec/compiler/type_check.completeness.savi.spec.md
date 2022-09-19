@@ -19,21 +19,25 @@ It complains when access to the self is shared while still incomplete:
     any
 ```
 ```error
-This usage of `@` shares field access to the object from a constructor before all fields are initialized:
+The type of this expression doesn't meet the constraints imposed on it:
     AccessWhileIncomplete.data(@)
                                ^
 
-- if this constraint were specified as `tag` or lower it would not grant field access:
+- it is required here to be a subtype of Any'box:
   :fun data(any Any'box)
                 ^~~~~~~
 
-- this field didn't get initialized:
-  :var y U64
-       ^
+- but the type of the receiver value was ItComplainsWhenAccessToTheSelfIsSharedWhileStillIncomplete0'tag:
+    AccessWhileIncomplete.data(@)
+                               ^
 
-- this field didn't get initialized:
-  :var z U64
-       ^
+- this can be reached while in an incomplete constructor (that is, before all fields are initialized) so it's not safe to share publicly here:
+    AccessWhileIncomplete.data(@)
+                               ^
+
+- it can be reached from this constructor:
+  :new ref
+   ^~~
 ```
 
 ---
