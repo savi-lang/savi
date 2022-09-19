@@ -1,5 +1,7 @@
 :module IdentitySpec
   :fun run(test MicroTest)
+    test["string literal ==="].pass = "example" === "example"
+    test["string literal !=="].pass = "example" !== "differs"
     test["identity_digest_of string literal =="].pass =
       identity_digest_of "example" ==
       identity_digest_of "example"
@@ -9,6 +11,8 @@
 
     class_instance_a = Container(String).new("example")
     class_instance_b = Container(String).new("example")
+    test["class ==="].pass = class_instance_a === class_instance_a
+    test["class !=="].pass = class_instance_a !== class_instance_b
     test["identity_digest_of class !="].pass =
       identity_digest_of class_instance_a !=
       identity_digest_of class_instance_b
@@ -19,6 +23,8 @@
     struct_instance_a = ContainerStruct(String).new("example")
     struct_instance_b = ContainerStruct(String).new("example")
     struct_instance_c = ContainerStruct(String).new("differs")
+    test["struct ==="].pass = struct_instance_a === struct_instance_b
+    test["struct !=="].pass = struct_instance_a !== struct_instance_c
     test["identity_digest_of struct =="].pass =
       identity_digest_of struct_instance_a ==
       identity_digest_of struct_instance_b
