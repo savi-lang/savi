@@ -3270,6 +3270,8 @@ class Savi::Compiler::CodeGen
         "row"     => @isize.const_int(pos.row),
         "col"     => @isize.const_int(pos.col),
         "filepath_pkgrel" => gen_string(pos.source.filepath_relative_to_package),
+        "filepath_rootpkgrel" => gen_string((Path.new(pos.source.dirname).relative_to(
+          Path.new(@ctx.not_nil!.root_package_link.path)) / pos.source.filename).to_s)
       })
 
       @source_code_pos_globals[pos] = global

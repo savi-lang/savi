@@ -4,6 +4,8 @@
   :var filename String: ""
   :: The filepath relative to the package
   :var filepath_pkgrel String: ""
+  :: The filepath relative to the root package
+  :var filepath_rootpkgrel String: ""
   :var dirname String: ""
   :var pkgname String: ""
   :var pkgpath String: ""
