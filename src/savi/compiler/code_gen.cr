@@ -3262,11 +3262,14 @@ class Savi::Compiler::CodeGen
   def gen_source_code_pos(pos : Source::Pos)
     @source_code_pos_globals.fetch pos do
       global = gen_global_const(@gtypes["SourceCodePosition"], {
-        "string"   => gen_string(pos.content),
-        "filename" => gen_string(pos.source.filename),
-        "dirname"  => gen_string(pos.source.dirname),
-        "row"      => @isize.const_int(pos.row),
-        "col"      => @isize.const_int(pos.col),
+        "string"  => gen_string(pos.content),
+        "filename"=> gen_string(pos.source.filename),
+        "dirname" => gen_string(pos.source.dirname),
+        "pkgname" => gen_string(pos.source.package.name),
+        "pkgpath" => gen_string(pos.source.package.path),
+        "row"     => @isize.const_int(pos.row),
+        "col"     => @isize.const_int(pos.col),
+        "filepath_pkgrel" => gen_string(pos.source.filepath_relative_to_package),
       })
 
       @source_code_pos_globals[pos] = global
