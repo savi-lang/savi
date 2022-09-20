@@ -14,6 +14,14 @@ struct Savi::Source
     File.join(@dirname, @filename)
   end
 
+  def filepath_relative_to_package
+    if reldir = Path.new(@dirname).relative_to?(@package.path)
+      (reldir / @filename).to_s
+    else
+      raise "File #{path} not relative to package #{@package.path}"
+    end
+  end
+
   def entire_pos
     Source::Pos.index_range(self, 0, content.bytesize)
   end

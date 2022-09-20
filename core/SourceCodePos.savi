@@ -2,5 +2,12 @@
   // TODO: include more properties from the original Savi::Source::Pos?
   :var string String: ""
   :var filename String: ""
+  :: The filepath relative to the package
+  :var filepath_pkgrel String: ""
+  :: The filepath relative to the root package
+  :var filepath_rootpkgrel String: ""
+  :var dirname String: ""
+  :var pkgname String: ""
+  :var pkgpath String: ""
   :var row USize: 0
   :var col USize: 0
