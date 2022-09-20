@@ -3264,6 +3264,7 @@ class Savi::Compiler::CodeGen
       global = gen_global_const(@gtypes["SourceCodePosition"], {
         "string"   => gen_string(pos.content),
         "filename" => gen_string(pos.source.filename),
+        "dirname"  => gen_string(pos.source.dirname),
         "row"      => @isize.const_int(pos.row),
         "col"      => @isize.const_int(pos.col),
       })
