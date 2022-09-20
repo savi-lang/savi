@@ -257,7 +257,7 @@ $(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) $(shell find src/savi/ext/llvm/for_s
 $(BUILD)/savi-release.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 	mkdir -p `dirname $@`
 	env \
-		SAVI_VERSION=$(SAVI_VERSION) \
+		SAVI_VERSION="$(SAVI_VERSION)" \
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
@@ -271,7 +271,7 @@ $(BUILD)/savi-release.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 $(BUILD)/savi-debug.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 	mkdir -p `dirname $@`
 	env \
-		SAVI_VERSION=$(SAVI_VERSION) \
+		SAVI_VERSION="$(SAVI_VERSION)" \
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
@@ -285,7 +285,7 @@ $(BUILD)/savi-debug.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '*.cr')
 	mkdir -p `dirname $@`
 	env \
-		SAVI_VERSION=$(SAVI_VERSION) \
+		SAVI_VERSION="$(SAVI_VERSION)" \
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
