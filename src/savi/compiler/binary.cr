@@ -258,7 +258,8 @@ class Savi::Compiler::Binary
   def each_sysroot_lib_glob(ctx, target)
     # For MacOS, we have just one valid sysroot path, so we can finish early.
     if target.macos?
-      yield "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib", nil
+      sdk_root = ENV["SDK_ROOT"]? || "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      yield "#{sdk_root}/usr/lib", nil
       return
     end
 
