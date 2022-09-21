@@ -40,6 +40,25 @@ module Savi
         Dir.cd(opts.cd.not_nil!) if opts.cd
         Cli.compile options, opts.backtrace
       end
+      sub "info" do
+        desc "get information"
+        usage "savi info [version|llvm-version|bin-path]"
+        help short: "-h"
+        argument "kind", type: String, desc: "kind of information to get"
+        run do |opts, args|
+          case args.kind
+          when "version"
+            puts Savi::VERSION
+          when "llvm-version"
+            puts Savi::LLVM_VERSION
+          when "bin-path"
+            puts File.dirname(Process.executable_path.not_nil!)
+          else
+            STDERR.puts "Unrecognized savi info argument: #{args.kind}"
+            exit 1
+          end
+        end
+      end
       sub "server" do
         alias_name "s"
         desc "run lsp server"
