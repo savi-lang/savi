@@ -310,6 +310,7 @@ class Savi::Compiler::Binary
           yield "/usr/lib/gcc/x86_64-pc-linux-gnu/*", nil
           yield "/usr/lib/x86_64-linux-gnu", nil
           yield "/usr/lib/gcc/x86_64-redhat-linux/*", nil
+          yield "/usr/x86_64-linux-gnu/lib", nil
         else
           raise NotImplementedError.new(target.inspect)
         end
