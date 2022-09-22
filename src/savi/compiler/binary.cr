@@ -232,9 +232,10 @@ class Savi::Compiler::Binary
   # Yield each sysroot-based path in which to search for linkable libs/objs.
   def each_sysroot_lib_path(ctx, target)
     sys_roots =
-      if ENV["SAVI_SYS_ROOT"]?
+      if ENV["SAVI_SYS_ROOT"]? && !ENV["SAVI_SYS_ROOT"].empty?
         [ENV["SAVI_SYS_ROOT"]]
-      elsif ENV["SDK_ROOT"]? # TODO: Remove deprecated SDK_ROOT synonym.
+      elsif ENV["SDK_ROOT"]? && !ENV["SDK_ROOT"].empty?
+        # TODO: Remove deprecated SDK_ROOT synonym.
         [ENV["SDK_ROOT"]]
       else
         if target.macos?
