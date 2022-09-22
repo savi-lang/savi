@@ -11,20 +11,20 @@ task:
     CXX: clang++
 
   matrix:
-    - name: x86_64-unknown-linux-gnu
-      container:
-        image: ubuntu:20.04
-      environment:
-        TRIPLE: x86_64-unknown-linux-gnu
-        DEPS_INSTALL: "\
-          apt-get update && \
-          apt-get install -y --no-install-recommends \
-            apt-transport-https ca-certificates curl clang make \
-            libgc-dev libevent-dev libpcre3-dev llvm-10-dev && \
-          curl -fsSL https://crystal-lang.org/install.sh | bash"
-        # Without this next environment var, apt-get will try to ask us
-        # interactive questions, to which we will be unable to respond...
-        DEBIAN_FRONTEND: noninteractive
+    # - name: x86_64-unknown-linux-gnu
+    #   container:
+    #     image: ubuntu:20.04
+    #   environment:
+    #     TRIPLE: x86_64-unknown-linux-gnu
+    #     DEPS_INSTALL: "\
+    #       apt-get update && \
+    #       apt-get install -y --no-install-recommends \
+    #         apt-transport-https ca-certificates curl clang make \
+    #         libgc-dev libevent-dev libpcre3-dev llvm-10-dev && \
+    #       curl -fsSL https://crystal-lang.org/install.sh | bash"
+    #     # Without this next environment var, apt-get will try to ask us
+    #     # interactive questions, to which we will be unable to respond...
+    #     DEBIAN_FRONTEND: noninteractive
 
     - name: x86_64-unknown-linux-musl
       environment:
@@ -40,85 +40,85 @@ task:
       container:
         image: alpine:3.16
 
-    - name: arm64-unknown-linux-musl
-      environment:
-        TRIPLE: arm64-unknown-linux-musl
-        DEPS_INSTALL: "\
-          apk add --no-cache --update \
-            bash curl alpine-sdk coreutils \
-            gcc g++ clang make linux-headers llvm-dev zlib-static \
-            pcre-dev libevent-static gc-dev crystal shards libexecinfo-dev"
-        # For some reason clang doesn't like it if we omit the "alpine" vendor
-        # in the triple, where we'd otherwise use `arm64-unknown-linux-musl`.
-        # We also need to use `aarch64` instead of `arm64` here...
-        MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=aarch64-alpine-linux-musl
-      arm_container:
-        image: alpine:3.16
+    # - name: arm64-unknown-linux-musl
+    #   environment:
+    #     TRIPLE: arm64-unknown-linux-musl
+    #     DEPS_INSTALL: "\
+    #       apk add --no-cache --update \
+    #         bash curl alpine-sdk coreutils \
+    #         gcc g++ clang make linux-headers llvm-dev zlib-static \
+    #         pcre-dev libevent-static gc-dev crystal shards libexecinfo-dev"
+    #     # For some reason clang doesn't like it if we omit the "alpine" vendor
+    #     # in the triple, where we'd otherwise use `arm64-unknown-linux-musl`.
+    #     # We also need to use `aarch64` instead of `arm64` here...
+    #     MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=aarch64-alpine-linux-musl
+    #   arm_container:
+    #     image: alpine:3.16
 
-    - name: x86_64-unknown-freebsd
-      environment:
-        TRIPLE: x86_64-unknown-freebsd
-        DEPS_INSTALL: "\
-          pkg update && \
-          pkg install -y llvm14 gmake libunwind bash curl crystal shards boehm-gc-threaded && \
-          ln -s /usr/local/bin/llvm-config14 /usr/bin/llvm-config"
-        MAKE: gmake
-        MAKE_EXTRA_ARGS: " \
-          LIB_GC=/usr/local/lib/libgc-threaded.a \
-          CLANG=/usr/local/bin/clang14 \
-          CLANGXX=/usr/local/bin/clang++14"
-      freebsd_instance:
-        image: freebsd-13-1-release-amd64
+    # - name: x86_64-unknown-freebsd
+    #   environment:
+    #     TRIPLE: x86_64-unknown-freebsd
+    #     DEPS_INSTALL: "\
+    #       pkg update && \
+    #       pkg install -y llvm14 gmake libunwind bash curl crystal shards boehm-gc-threaded && \
+    #       ln -s /usr/local/bin/llvm-config14 /usr/bin/llvm-config"
+    #     MAKE: gmake
+    #     MAKE_EXTRA_ARGS: " \
+    #       LIB_GC=/usr/local/lib/libgc-threaded.a \
+    #       CLANG=/usr/local/bin/clang14 \
+    #       CLANGXX=/usr/local/bin/clang++14"
+    #   freebsd_instance:
+    #     image: freebsd-13-1-release-amd64
 
-    - name: x86_64-apple-macosx
-      environment:
-        TRIPLE: x86_64-apple-macosx
-        DEPS_INSTALL: brew update --preinstall && brew install libiconv crystal && brew cleanup
-        # Set up the SDKROOT path specific to the present XCode version.
-        SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
-        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
-      macos_instance:
-        image: big-sur-xcode-12.5
-      # Caching some homebrew directories helps save some of the otherwise huge
-      # amount of time that it takes to update brew from the CI base image.
-      brew_cache:
-        folder: "$HOME/Library/Caches/Homebrew"
-      brew_usr_local_cache:
-        folder: "/usr/local/Homebrew"
+    # - name: x86_64-apple-macosx
+    #   environment:
+    #     TRIPLE: x86_64-apple-macosx
+    #     DEPS_INSTALL: brew update --preinstall && brew install libiconv crystal && brew cleanup
+    #     # Set up the SDKROOT path specific to the present XCode version.
+    #     SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+    #     HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
+    #   macos_instance:
+    #     image: big-sur-xcode-12.5
+    #   # Caching some homebrew directories helps save some of the otherwise huge
+    #   # amount of time that it takes to update brew from the CI base image.
+    #   brew_cache:
+    #     folder: "$HOME/Library/Caches/Homebrew"
+    #   brew_usr_local_cache:
+    #     folder: "/usr/local/Homebrew"
 
-    - name: arm64-apple-macosx
-      environment:
-        TRIPLE: arm64-apple-macosx
-        IS_CROSS_COMPILE: "1"
-        # Download arm64 versions of the libraries needed by Crystal runtime.
-        DEPS_INSTALL: "
-          brew update --preinstall && brew install crystal && brew cleanup && \
-          mkdir /tmp/arm64 && \
-          brew fetch --bottle-tag=arm64_big_sur libgc && \
-          brew fetch --bottle-tag=arm64_big_sur libevent && \
-          brew fetch --bottle-tag=arm64_big_sur pcre && \
-          tar -xvf `brew --cache --bottle-tag=arm64_big_sur libgc` -C /tmp/arm64 --strip-components=2 && \
-          tar -xvf `brew --cache --bottle-tag=arm64_big_sur libevent` -C /tmp/arm64 --strip-components=2 && \
-          tar -xvf `brew --cache --bottle-tag=arm64_big_sur pcre` -C /tmp/arm64 --strip-components=2 && \
-          ls /tmp/arm64/lib"
-        # Tell make to use those arm64 versions we downloaded above.
-        MAKE_EXTRA_ARGS: " \
-          TARGET_PLATFORM=arm64-apple-macosx \
-          LLVM_STATIC_PLATFORM=x86_64-apple-macosx \
-          LIB_GC=/tmp/arm64/lib/libgc.a \
-          LIB_EVENT=/tmp/arm64/lib/libevent.a  \
-          LIB_PCRE=/tmp/arm64/lib/libpcre.a"
-        # Set up the SDKROOT path specific to the present XCode version.
-        SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
-        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
-      macos_instance:
-        image: big-sur-xcode-12.5
-      # Caching some homebrew directories helps save some of the otherwise huge
-      # amount of time that it takes to update brew from the CI base image.
-      brew_cache:
-        folder: "$HOME/Library/Caches/Homebrew"
-      brew_usr_local_cache:
-        folder: "/usr/local/Homebrew"
+    # - name: arm64-apple-macosx
+    #   environment:
+    #     TRIPLE: arm64-apple-macosx
+    #     IS_CROSS_COMPILE: "1"
+    #     # Download arm64 versions of the libraries needed by Crystal runtime.
+    #     DEPS_INSTALL: "
+    #       brew update --preinstall && brew install crystal && brew cleanup && \
+    #       mkdir /tmp/arm64 && \
+    #       brew fetch --bottle-tag=arm64_big_sur libgc && \
+    #       brew fetch --bottle-tag=arm64_big_sur libevent && \
+    #       brew fetch --bottle-tag=arm64_big_sur pcre && \
+    #       tar -xvf `brew --cache --bottle-tag=arm64_big_sur libgc` -C /tmp/arm64 --strip-components=2 && \
+    #       tar -xvf `brew --cache --bottle-tag=arm64_big_sur libevent` -C /tmp/arm64 --strip-components=2 && \
+    #       tar -xvf `brew --cache --bottle-tag=arm64_big_sur pcre` -C /tmp/arm64 --strip-components=2 && \
+    #       ls /tmp/arm64/lib"
+    #     # Tell make to use those arm64 versions we downloaded above.
+    #     MAKE_EXTRA_ARGS: " \
+    #       TARGET_PLATFORM=arm64-apple-macosx \
+    #       LLVM_STATIC_PLATFORM=x86_64-apple-macosx \
+    #       LIB_GC=/tmp/arm64/lib/libgc.a \
+    #       LIB_EVENT=/tmp/arm64/lib/libevent.a  \
+    #       LIB_PCRE=/tmp/arm64/lib/libpcre.a"
+    #     # Set up the SDKROOT path specific to the present XCode version.
+    #     SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+    #     HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
+    #   macos_instance:
+    #     image: big-sur-xcode-12.5
+    #   # Caching some homebrew directories helps save some of the otherwise huge
+    #   # amount of time that it takes to update brew from the CI base image.
+    #   brew_cache:
+    #     folder: "$HOME/Library/Caches/Homebrew"
+    #   brew_usr_local_cache:
+    #     folder: "/usr/local/Homebrew"
 
   os_info_script:
     - uname
@@ -131,6 +131,8 @@ task:
 
   build_script:
     - mkdir -p out/bin
+    - ${MAKE} build/llvm-static
+    - build/llvm-static/bin/llvm-config --host-target
     - ${MAKE} -j2 build/savi-release lib/libsavi_runtime SAVI_VERSION=${CIRRUS_TAG:-unknown} ${MAKE_EXTRA_ARGS}
     - mv build/savi-release out/bin/savi
 

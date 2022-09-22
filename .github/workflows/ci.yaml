@@ -6,29 +6,29 @@ on:
       - main
 
 jobs:
-  CI:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - crystal: "1.5.0"
-            os: ubuntu-20.04
-            deps: sudo apt-get install -y libgc-dev
-          - crystal: "1.5.0"
-            os: macos-11
-            deps: echo no system deps to download
-    runs-on: ${{matrix.os}}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+  # CI:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - crystal: "1.5.0"
+  #           os: ubuntu-20.04
+  #           deps: sudo apt-get install -y libgc-dev
+  #         - crystal: "1.5.0"
+  #           os: macos-11
+  #           deps: echo no system deps to download
+  #   runs-on: ${{matrix.os}}
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v2
 
-      - name: Install Dependencies
-        run: ${{matrix.deps}}
+  #     - name: Install Dependencies
+  #       run: ${{matrix.deps}}
 
-      - name: Install Crystal
-        uses: crystal-lang/install-crystal@v1
-        with:
-          crystal: ${{matrix.crystal}}
+  #     - name: Install Crystal
+  #       uses: crystal-lang/install-crystal@v1
+  #       with:
+  #         crystal: ${{matrix.crystal}}
 
-      - name: Full CI Suite
-        run: make ci
+  #     - name: Full CI Suite
+  #       run: make ci
