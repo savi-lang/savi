@@ -51,6 +51,8 @@ module Savi
             puts Savi::VERSION
           when "llvm-version"
             puts Savi::LLVM_VERSION
+          when "llvm-platform"
+            puts LLVM.configured_default_target_triple
           when "bin-path"
             puts File.dirname(Process.executable_path.not_nil!)
           else

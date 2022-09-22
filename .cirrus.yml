@@ -143,6 +143,7 @@ task:
     - cp -r lib/libsavi_runtime out/lib/libsavi_runtime
 
   smoke_test_unless_cross_compile_script:
+    - test -n "${IS_CROSS_COMPILE}" || out/bin/savi info llvm-platform
     - test -n "${IS_CROSS_COMPILE}" || out/bin/savi eval --backtrace --print-perf 'env.out.print("No smoke!")'
 
   archive_script:
