@@ -77,7 +77,6 @@ class Savi::Compiler::Binary
     link_args << "-no_pie" unless target.arm64?
 
     # Set up the main library paths.
-    # TODO: Support overriding (supplementing?) this via the `SDK_ROOT` env var.
     each_sysroot_lib_path(ctx, target) { |lib_path|
       link_args << "-L#{lib_path}"
     }
@@ -232,22 +231,40 @@ class Savi::Compiler::Binary
 
   # Yield each sysroot-based path in which to search for linkable libs/objs.
   def each_sysroot_lib_path(ctx, target)
-    sysroot = "/" # TODO: Allow user to supply custom sysroot for cross-compile.
+    sys_roots =
+      if ENV["SAVI_SYS_ROOT"]?
+        [ENV["SAVI_SYS_ROOT"]]
+      elsif ENV["SDK_ROOT"]? # TODO: Remove deprecated SDK_ROOT synonym.
+        [ENV["SDK_ROOT"]]
+      else
+        if target.macos?
+          ["/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"]
+        elsif target.windows?
+          [
+            "/mnt/c/Program Files/Microsoft Visual Studio",
+            "/mnt/c/Program Files (x86)/Windows Kits",
+          ]
+        else
+          ["/"]
+        end
+      end
 
     yielded_any = false
     each_sysroot_lib_glob(ctx, target) { |lib_glob, check_suffix|
-      Dir.glob(lib_glob) { |lib_path|
-        # TODO: Remove this hack when we can go back to using globs for this,
-        # after this Crystal bug with Dir.glob has been fixed and released:
-        # - https://github.com/crystal-lang/crystal/issues/12056
-        if check_suffix
-          next unless lib_path.ends_with?(check_suffix)
-        end
+      sys_roots.each { |sys_root|
+        Dir.glob(File.join(sys_root, lib_glob)) { |lib_path|
+          # TODO: Remove this hack when we can go back to using globs for this,
+          # after this Crystal bug with Dir.glob has been fixed and released:
+          # - https://github.com/crystal-lang/crystal/issues/12056
+          if check_suffix
+            next unless lib_path.ends_with?(check_suffix)
+          end
 
-        next unless Dir.exists?(lib_path)
+          next unless Dir.exists?(lib_path)
 
-        yield lib_path
-        yielded_any = true
+          yield lib_path
+          yielded_any = true
+        }
       }
     }
 
@@ -258,33 +275,18 @@ class Savi::Compiler::Binary
   def each_sysroot_lib_glob(ctx, target)
     # For MacOS, we have just one valid sysroot path, so we can finish early.
     if target.macos?
-      sdk_root = ENV["SDK_ROOT"]? || "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
-      yield "#{sdk_root}/usr/lib", nil
+      yield "/usr/lib", nil
       return
     end
 
     # For Windows we only allow cross compiling and require this env var.
     if target.windows?
-      unless ctx.options.cross_compile
-        raise NotImplementedError.new("Windows is only supported by cross-compiling.")
-      end
-
-      # Gather the possible SDK tree roots to search under.
-      sdk_roots = [
-        ENV["SDK_ROOT"]?,
-        "/mnt/c/Program Files/Microsoft Visual Studio",
-        "/mnt/c/Program Files (x86)/Windows Kits",
-      ].compact
-
-      # Try various combinations of leaves of those trees.
-      sdk_roots.each { |sdk_root|
-        yield "#{sdk_root}/**/x64", "um/x64"             # MSVC style
-        yield "#{sdk_root}/**/x64", "ucrt/x64"           # MSVC style
-        yield "#{sdk_root}/**/x64", "lib/x64"            # MSVC style
-        yield "#{sdk_root}/**/x86_64", "lib/um/x86_64"   # xwin style
-        yield "#{sdk_root}/**/x86_64", "lib/ucrt/x86_64" # xwin style
-        yield "#{sdk_root}/**/x86_64", "lib/x86_64"      # xwin style
-      }
+      yield "/**/x64", "um/x64"             # MSVC style
+      yield "/**/x64", "ucrt/x64"           # MSVC style
+      yield "/**/x64", "lib/x64"            # MSVC style
+      yield "/**/x86_64", "lib/um/x86_64"   # xwin style
+      yield "/**/x86_64", "lib/ucrt/x86_64" # xwin style
+      yield "/**/x86_64", "lib/x86_64"      # xwin style
       return
     end
 
