@@ -15,6 +15,7 @@ lib LibLLVM
   fun is_unnamed_addr = LLVMIsUnnamedAddr(global : ValueRef) : Int32
   fun parse_bitcode_in_context = LLVMParseBitcodeInContext(context : ContextRef, mem_buf : MemoryBufferRef, out_m : ModuleRef*, out_message : UInt8**) : Int32
   fun link_modules = LLVMLinkModules2(dest : ModuleRef, src : ModuleRef) : Int32
+  fun strip_module_debug_info = LLVMStripModuleDebugInfo(mod : ModuleRef) : Bool
   fun const_lshr = LLVMConstLShr(lhs : ValueRef, rhs : ValueRef) : ValueRef
   fun const_and = LLVMConstAnd(lhs : ValueRef, rhs : ValueRef) : ValueRef
   fun const_shl = LLVMConstShl(lhs : ValueRef, rhs : ValueRef) : ValueRef

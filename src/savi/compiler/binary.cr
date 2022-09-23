@@ -43,12 +43,6 @@ class Savi::Compiler::Binary
       raise NotImplementedError.new(target.inspect)
     end
 
-    # If requested, strip debugging symbols from the binary.
-    if ctx.options.no_debug && !target.macos?
-      res = Process.run("/usr/bin/env", ["strip", bin_path], output: STDOUT, error: STDERR)
-      raise "strip failed" unless res.exit_code == 0
-    end
-
     # MacOS has a different way of dealing with debugging symbols - they are
     # in a subdirectory whose name matches the binary but is suffixed with .dSYM
     # rather than being embedded in the binary itself, as on other platforms.
