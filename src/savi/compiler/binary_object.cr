@@ -111,6 +111,9 @@ class Savi::Compiler::BinaryObject
     # Otherwise we will only run a minimal set of passes.
     LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
 
+    # Strip debug info from the module if requested.
+    LibLLVM.strip_module_debug_info(mod.to_unsafe) if ctx.options.no_debug
+
     # Emit the combined/optimized LLVM IR to a file if requested to do so.
     FileUtils.mkdir_p(File.dirname(Binary.path_for(ctx)))
     mod.print_to_file("#{Binary.path_for(ctx)}.ll") if ctx.options.llvm_ir
