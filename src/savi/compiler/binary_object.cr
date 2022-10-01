@@ -111,6 +111,13 @@ class Savi::Compiler::BinaryObject
     # Otherwise we will only run a minimal set of passes.
     LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
 
+    # Now that we've optimized, only actually called functions remain,
+    # so we can mark for linking those libraries that are associated to
+    # specific functions that come from those libraries.
+    ctx.link_libraries_by_foreign_function.each { |ffi_name, lib_name|
+      ctx.link_libraries.add(lib_name) if mod.functions[ffi_name]?
+    }
+
     # Strip debug info from the module if requested.
     LibLLVM.strip_module_debug_info(mod.to_unsafe) if ctx.options.no_debug
 

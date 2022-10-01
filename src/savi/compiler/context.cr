@@ -44,12 +44,11 @@ class Savi::Compiler::Context
   getter xtypes_graph = XTypes::Graph::Pass.new
 
   getter link_libraries = Set(String).new
+  getter link_libraries_by_foreign_function = Hash(String, String).new
 
   getter options : Compiler::Options
   property prev_ctx : Context?
   property! root_docs : Array(AST::Document)
-
-  getter link_libraries
 
   getter errors = [] of Error
 

@@ -842,6 +842,11 @@ class Savi::Compiler::CodeGen
 
     ffi_link_name = gfunc.func.metadata[:ffi_link_name].as(String)
 
+    ffi_link_lib = gfunc.func.metadata[:ffi_link_lib]?.as(String?)
+    if ffi_link_lib
+      ctx.link_libraries_by_foreign_function[ffi_link_name] = ffi_link_lib
+    end
+
     use_external_llvm_func(ffi_link_name, params, ret, is_variadic)
   end
 
