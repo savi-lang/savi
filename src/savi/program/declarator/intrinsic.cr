@@ -562,6 +562,9 @@ module Savi::Program::Intrinsic
       when "foreign_name"
         name = terms["name"].as(AST::Identifier)
         scope.current_function.metadata[:ffi_link_name] = name.value
+      when "link_lib"
+        name = terms["name"].as(AST::Identifier)
+        scope.current_function.metadata[:ffi_link_lib] = name.value
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end

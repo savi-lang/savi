@@ -413,6 +413,12 @@
 
   :term name Name
 
+:declarator link_lib
+  :intrinsic
+  :context ffi
+
+  :term name Name
+
 // TODO: Document this.
 :declarator inline
   :intrinsic
