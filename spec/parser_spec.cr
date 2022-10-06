@@ -217,7 +217,7 @@ describe Savi::Parser do
     [:doc,
      [:declare, [:ident, "module"], [:ident, "Example"]],
      [:declare, [:ident, "const"], [:ident, "s"], [:ident, "String"]],
-     [:group, ":", [:string, "Hello World\\u0000", nil]],
+     [:group, ":", [:string, "Hello World\\u0000", nil]]]
     AST
   end
 
