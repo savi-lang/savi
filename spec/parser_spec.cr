@@ -207,7 +207,7 @@ describe Savi::Parser do
   it "correctly parses a string containing a NUL escape character" do
     source = Savi::Source.new_example <<-SOURCE
     :module Example
-      :const s String: "Hello World\0"
+      :const s String: "Hello World\\0"
     SOURCE
 
     ast = Savi::Parser.parse(source)
@@ -217,7 +217,7 @@ describe Savi::Parser do
     [:doc,
      [:declare, [:ident, "module"], [:ident, "Example"]],
      [:declare, [:ident, "const"], [:ident, "s"], [:ident, "String"]],
-     [:group, ":", [:string, "Hello World\0", nil]],
+     [:group, ":", [:string, "Hello World\\0", nil]],
     AST
   end
 
