@@ -93,6 +93,17 @@ module Savi::Program::Intrinsic
       when "ffi_link_lib"
         name = terms["name"].as(AST::Identifier)
         ctx.link_libraries.add(name.value)
+      when "ffi_link_c_files"
+        terms["filenames"].as(AST::Group).terms.each { |term|
+          c_file_path =
+            File.join(term.pos.source.dirname, term.as(AST::Identifier).value)
+
+          if !File.exists?(c_file_path)
+            Error.at term, "#{c_file_path} does not exist"
+          end
+
+          ctx.link_c_files.add(c_file_path)
+        }
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end

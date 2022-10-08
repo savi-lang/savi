@@ -1,0 +1,14 @@
+
+:ffi_link_c_files (
+  "../vendor/mylib_add.c"
+  "../vendor/mylib_sub.c"
+)
+
+:module _FFI
+  :ffi mylib_add(a I32, b I32) I32
+  :ffi mylib_sub(a I32, b I32) I32
+
+:actor Main
+  :new (env)
+    env.out.print("2 + 2 == \(_FFI.mylib_add(2, 2))!")
+    env.out.print("4 - 2 == \(_FFI.mylib_sub(4, 2))!")

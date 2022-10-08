@@ -13,4 +13,6 @@
 
 #include "./LLVMLinkForSavi.cc"
 #include "./LLVMOptimizeForSavi.cc"
+#include "./LLVMCompileCForSavi.cc"
+#include "./LLVMDefaultCFlagsForSavi.cc"
 #include "./LLVMRemapDIDirectoryForSavi.cc"
