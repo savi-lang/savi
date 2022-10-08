@@ -87,6 +87,7 @@ module Savi::Parser::Builder
             when 'n' then result << '\n'
             when 'r' then result << '\r'
             when 't' then result << '\t'
+            when '0' then result << '\0'
             when 'x' then
               byte_value = 0
               2.times do

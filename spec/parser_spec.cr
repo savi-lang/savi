@@ -204,6 +204,23 @@ describe Savi::Parser do
     end
   end
 
+  it "correctly parses a string containing a NUL escape character" do
+    source = Savi::Source.new_example <<-SOURCE
+    :module Example
+      :const s String: "Hello World\\0"
+    SOURCE
+
+    ast = Savi::Parser.parse(source)
+
+    # Can't use array literals here because Crystal is too slow to compile them.
+    ast.to_a.pretty_inspect(74).should eq <<-AST
+    [:doc,
+     [:declare, [:ident, "module"], [:ident, "Example"]],
+     [:declare, [:ident, "const"], [:ident, "s"], [:ident, "String"]],
+     [:group, ":", [:string, "Hello World\\u0000", nil]]]
+    AST
+  end
+
   it "handles nifty heredoc string literals" do
     source = Savi::Source.new_example <<-SOURCE
     :actor Main
