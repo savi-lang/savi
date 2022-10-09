@@ -213,7 +213,7 @@ class Savi::Compiler::BinaryObject
     out_args
   end
 
-  def self.each_sysroot_include_path(ctx)
+  def self.each_sysroot_include_path(ctx, target)
     Binary.new.each_sysroot_lib_path(ctx, ctx.code_gen.target_info) { |lib_path|
       include_path = File.join(lib_path, "include")
       yield include_path if Dir.exists?(include_path)
@@ -223,13 +223,18 @@ class Savi::Compiler::BinaryObject
 
       include_path = File.join(lib_path, "../../include")
       yield include_path if Dir.exists?(include_path)
+
+      if target.macos?
+        include_path = File.join(lib_path, "../../System/Library/Frameworks/Kernel.framework/Headers")
+        yield include_path if Dir.exists?(include_path)
+      end
     }
   end
 
   def self.invoke_c_compiler(ctx, target, c_file_path) : LLVM::Module
     compile_args = get_default_c_flags(ctx)
     compile_args << "-triple" << ctx.code_gen.target_machine.triple
-    each_sysroot_include_path(ctx) { |include_path|
+    each_sysroot_include_path(ctx, target) { |include_path|
       compile_args << "-isystem" << include_path
     }
     compile_args << "-fgnuc-version=4.2.1" if target.macos?
