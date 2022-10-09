@@ -235,8 +235,11 @@ class Savi::Compiler::BinaryObject
     compile_args << "-fgnuc-version=4.2.1" if target.macos?
     compile_args << c_file_path
 
+    is_debug = !ctx.options.no_debug
+
     llvm_module = LibLLVM.compile_c_for_savi(
       ctx.code_gen.llvm,
+      is_debug,
       compile_args.size, compile_args.map(&.to_unsafe),
       out out_ptr, out out_size,
     )
