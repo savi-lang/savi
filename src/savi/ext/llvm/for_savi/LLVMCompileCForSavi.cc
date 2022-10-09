@@ -31,6 +31,7 @@ extern "C" {
 
 LLVMModuleRef LLVMCompileCForSavi(
   LLVMContextRef Context,
+  bool IsDebug,
   int ArgC, const char **ArgV,
   const char** OutPtr, int* OutSize
 ) {
@@ -59,6 +60,10 @@ LLVMModuleRef LLVMCompileCForSavi(
       new clang::DiagnosticOptions()
     ),
     false
+  );
+
+  Compiler.getInvocation().getCodeGenOpts().setDebugInfo(
+    IsDebug ? clang::codegenoptions::FullDebugInfo : clang::codegenoptions::NoDebugInfo
   );
 
   // Compile (targetting an in-memory LLVM Module only).

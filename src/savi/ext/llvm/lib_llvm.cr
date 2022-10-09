@@ -39,6 +39,6 @@ lib LibLLVM
   fun link_for_savi = LLVMLinkForSavi(flavor : UInt8*, argc : Int32, argv : UInt8**, out_ptr : UInt8**, out_size : Int32*) : Bool
   fun optimize_for_savi = LLVMOptimizeForSavi(mod : ModuleRef, wants_full_optimization : Bool)
   fun default_c_flags_for_savi = LLVMDefaultCFlagsForSavi(target : UInt8*, out_args_ptr : UInt8***, out_args_count : Int32*)
-  fun compile_c_for_savi = LLVMCompileCForSavi(context : ContextRef, argc : Int32, argv : UInt8**, out_ptr : UInt8**, out_size : Int32*) : ModuleRef
+  fun compile_c_for_savi = LLVMCompileCForSavi(context : ContextRef, is_debug : Bool, argc : Int32, argv : UInt8**, out_ptr : UInt8**, out_size : Int32*) : ModuleRef
   fun remap_di_directory_for_savi = LLVMRemapDIDirectoryForSavi(mod : ModuleRef, before_dir : UInt8*, after_dir : UInt8*)
 end
