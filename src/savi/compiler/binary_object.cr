@@ -77,6 +77,7 @@ class Savi::Compiler::BinaryObject
     # Obtain the Savi runtime as an LLVM module from the right bitcode on disk.
     runtime_bc = LLVM::MemoryBuffer.from_file(runtime_bc_path(target))
     runtime = llvm.parse_bitcode(runtime_bc).as(LLVM::Module)
+    runtime.target = ctx.code_gen.target_machine.triple
 
     # Remap the directory in debug info to point to the bundled runtime source.
     LibLLVM.remap_di_directory_for_savi(runtime,
@@ -94,6 +95,12 @@ class Savi::Compiler::BinaryObject
     if !ctx.options.runtime_asserts
       mark_runtime_asserts_as_unreachable(runtime)
     end
+
+    # Compile any C code files that we use and link those as well.
+    ctx.link_c_files.each { |c_file_path|
+      c_module = invoke_c_compiler(ctx, target, c_file_path)
+      LibLLVM.link_modules(mod.to_unsafe, c_module.to_unsafe)
+    }
 
     # Link the runtime bitcode module into the generated application module.
     LibLLVM.link_modules(mod.to_unsafe, runtime.to_unsafe)
@@ -185,5 +192,71 @@ class Savi::Compiler::BinaryObject
       func.remove_attribute(LLVM::Attribute::OptimizeNone)
       func.remove_attribute(LLVM::Attribute::UWTable)
     }
+  end
+
+  def self.get_default_c_flags(ctx)
+    LibLLVM.default_c_flags_for_savi(
+      ctx.code_gen.target_machine.triple,
+      out out_args_ptr, out out_args_count
+    )
+
+    out_args = [] of String
+    return out_args if out_args_ptr.null?
+
+    out_args_count.times { |i|
+      out_args << String.new(out_args_ptr[i]).dup
+      LibC.free(out_args_ptr[i])
+    }
+
+    LibC.free(out_args_ptr)
+
+    out_args
+  end
+
+  def self.each_sysroot_include_path(ctx)
+    Binary.new.each_sysroot_lib_path(ctx, ctx.code_gen.target_info) { |lib_path|
+      include_path = File.join(lib_path, "include")
+      yield include_path if Dir.exists?(include_path)
+
+      include_path = File.join(lib_path, "../include")
+      yield include_path if Dir.exists?(include_path)
+
+      include_path = File.join(lib_path, "../../include")
+      yield include_path if Dir.exists?(include_path)
+    }
+  end
+
+  def self.invoke_c_compiler(ctx, target, c_file_path) : LLVM::Module
+    compile_args = get_default_c_flags(ctx)
+    compile_args << "-triple" << ctx.code_gen.target_machine.triple
+    each_sysroot_include_path(ctx) { |include_path|
+      compile_args << "-isystem" << include_path
+    }
+    compile_args << "-fgnuc-version=4.2.1" if target.macos?
+    compile_args << c_file_path
+
+    llvm_module = LibLLVM.compile_c_for_savi(
+      ctx.code_gen.llvm,
+      compile_args.size, compile_args.map(&.to_unsafe),
+      out out_ptr, out out_size,
+    )
+
+    # Print the output errors/warnings/info, if any.
+    if out_size > 0
+      output = String.new(out_ptr, out_size)
+
+      output_lines = output.split("\n").reject(&.empty?)
+
+      output_lines.each { |line| STDERR.puts(line) }
+    end
+
+    # Ensure the output data pointer, which was a fresh allocation, is freed.
+    LibC.free(out_ptr)
+
+    raise "failed to compile C code" if llvm_module.null?
+
+    c_module = LLVM::Module.new(llvm_module, ctx.code_gen.llvm)
+    c_module.target = ctx.code_gen.target_machine.triple
+    c_module
   end
 end

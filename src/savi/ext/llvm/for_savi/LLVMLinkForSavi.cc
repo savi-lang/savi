@@ -14,11 +14,11 @@
 using namespace llvm;
 
 // A substitutable subclass of raw_ostream that captures its input to a string.
-class CaptureOStream : public llvm::raw_ostream {
+class LLVMLinkForSaviCaptureOStream : public llvm::raw_ostream {
 public:
   std::string Data;
 
-  CaptureOStream() : raw_ostream(/*unbuffered=*/true), Data() {}
+  LLVMLinkForSaviCaptureOStream() : raw_ostream(/*unbuffered=*/true), Data() {}
 
   void write_impl(const char *Ptr, size_t Size) override {
     Data.append(Ptr, Size);
@@ -37,7 +37,7 @@ bool LLVMLinkForSavi(
   std::vector<const char *> Args(ArgV, ArgV + ArgC);
 
   // Create an output stream that captures the stdout/stderr info to a string.
-  CaptureOStream Output;
+  LLVMLinkForSaviCaptureOStream Output;
 
   // Invoke the linker.
   bool LinkResult = false;
@@ -57,7 +57,7 @@ bool LLVMLinkForSavi(
 
   // Show a helpful error message on failure.
   if (!LinkResult) {
-    Output << "Failed to link with lld, using these args:" << "\n";
+    Output << "Failed to link with embedded lld, using these args:";
     for (auto it = Args.begin(); it != Args.end(); ++it) {
       Output << *it << "\n";
     }
