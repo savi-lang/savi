@@ -6,12 +6,36 @@ abstract class Savi::Program::Declarator::TermAcceptor
   def describe_post : String
     ""
   end
+  def accept_more?
+    false
+  end
 
   property! pos : Source::Pos
   property optional : Bool = false
   property default : AST::Term?
   def try_default : AST::Term?
     @default
+  end
+
+  class Any < TermAcceptor
+    def initialize(@pos)
+    end
+
+    def name : String
+      "_" # we don't care about where we save the term
+    end
+
+    def try_accept(term : AST::Term) : AST::Term?
+      term
+    end
+
+    def describe : String
+      "any terms"
+    end
+
+    def accept_more?
+      true
+    end
   end
 
   class Keyword < TermAcceptor

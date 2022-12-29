@@ -629,3 +629,10 @@
 
   :keyword on
   :term other Name
+
+// TODO: Remove this.
+:declarator my
+  :keyword module
+  :term name Name
+  :generate module (inject @terms.name)
+  :generate fun example: "example"

@@ -1,0 +1,6 @@
+:my module MyModule
+
+:module DeclaratorSpec
+  :fun run(test MicroTest)
+    test["MyModule.example"].pass =
+      MyModule.example == "MyModule example"

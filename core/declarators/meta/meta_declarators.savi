@@ -236,3 +236,15 @@
     required :: a body must be provided as part of the declaration
     optional :: a body may be provided as part of the declaration
   )
+
+// TODO: Document this.
+:declarator any_terms
+  :intrinsic
+  :context declarator
+
+// TODO: Document this.
+:declarator generate
+  :intrinsic
+  :context declarator
+  :any_terms
+  :body optional

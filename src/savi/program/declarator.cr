@@ -4,6 +4,7 @@ class Savi::Program::Declarator
   property context : AST::Identifier
   property begins : Array(String)
   property terms : Array(Declarator::TermAcceptor)
+  property generates : Array(AST::Declare)
   property body_allowed : Bool
   property body_required : Bool
 
@@ -13,6 +14,7 @@ class Savi::Program::Declarator
     @context = AST::Identifier.new("top").with_pos(Source::Pos.none),
     @begins = [] of String,
     @terms = [] of Declarator::TermAcceptor,
+    @generates = [] of AST::Declare,
     @body_allowed = false,
     @body_required = false,
   )
@@ -93,7 +95,9 @@ class Savi::Program::Declarator
             return
           end
 
-          acceptor_index += 1
+          unless acceptor.accept_more?
+            acceptor_index += 1
+          end
         end
       end
     }
@@ -104,6 +108,8 @@ class Savi::Program::Declarator
     loop do
       acceptor = @terms[acceptor_index]?
       break unless acceptor
+
+      break if acceptor.is_a?(Declarator::TermAcceptor::Any)
 
       if (defaulted = acceptor.try_default)
         accepted_terms[acceptor.name] = defaulted
@@ -117,18 +123,5 @@ class Savi::Program::Declarator
     end
 
     accepted_terms
-  end
-
-  def run(ctx, scope, declare, terms)
-    raise NotImplementedError.new "custom declarators:\n#{declare.pos.show}" \
-      unless intrinsic
-
-    Intrinsic.run(ctx, scope, self, declare, terms)
-  end
-
-  def finish(ctx, scope)
-    raise NotImplementedError.new "custom declarators" unless intrinsic
-
-    Intrinsic.finish(ctx, scope, self)
   end
 end

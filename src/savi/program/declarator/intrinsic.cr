@@ -142,6 +142,11 @@ module Savi::Program::Intrinsic
           else
             raise NotImplementedError.new(declarator.pretty_inspect)
           end
+      when "any_terms"
+        scope.current_declarator.terms <<
+          Declarator::TermAcceptor::Any.new(declare.pos)
+      when "generate"
+        scope.current_declarator.generates << declare
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end

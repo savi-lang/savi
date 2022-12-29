@@ -153,7 +153,16 @@ module Savi::Program::Declarator::Interpreter
     terms = declarator.matches_head?(declare.terms).not_nil!
 
     # Run the initial action for this declaration.
-    declarator.run(ctx, scope, declare, terms)
+    if declarator.intrinsic
+      Intrinsic.run(ctx, scope, declarator, declare, terms)
+    else
+      declarator.generates.each { |template|
+        generated = generate_declare(ctx, scope, template, terms)
+        pp generated
+        accept_declare(ctx, scope, generated)
+        puts "AFTER accept_declare"
+      }
+    end
 
     # Handle the body, if present.
     body = declare.body
@@ -170,11 +179,144 @@ module Savi::Program::Declarator::Interpreter
 
     # Interpret all of the nested declarations.
     declare.nested.each { |inner|
+      puts "NESTED inside #{declare} #{inner.pretty_inspect}"
       interpret(ctx, scope, inner, inner.declarator.not_nil!)
     }
 
     # Pop from scope and finish interpreting the outer declaration.
     scope.pop_layer?
-    declarator.finish(ctx, scope)
+    if declarator.intrinsic
+      Intrinsic.finish(ctx, scope, declarator)
+    end
+  end
+
+  def self.generate_declare(ctx, scope, template, terms)
+    visitor = Interpreter::InjectVisitor.new(scope, terms)
+    terms = template.terms[1..-1].map(&.accept(ctx, visitor))
+
+    declare = AST::Declare.new(terms).with_pos(template.pos)
+    declare.body = template.body # TODO: mark body for later injection
+    declare
+  end
+
+  class InjectVisitor < AST::CopyOnMutateVisitor
+    def initialize(scope, terms)
+      @evaluator = Evaluator.new(scope, terms)
+    end
+
+    def try_group_as_injectable(ctx, node : AST::Group) : AST::Node?
+      case node.style
+
+      # A whitespace-delimited group starting with the inject word
+      # as a pseudo-macro keyword marks an inject pseudo-macro invocation.
+      when " "
+        kind_ast = node.terms[0]
+        if kind_ast.is_a?(AST::Identifier) \
+        && kind_ast.value == "inject"
+          if node.terms.size != 2
+            Error.at node, "expected this to have a single term after the inject keyword"
+          end
+          return node.terms[1]
+        end
+
+      # A parenthetical group that contains an inject pseudo-macro as its only
+      # term can be unwrapped, treating as if the parentheses weren't there.
+      when "("
+        if node.terms.size == 1
+          child = node.terms.first?
+          if child.is_a?(AST::Group)
+            injectable = try_group_as_injectable(ctx, child)
+            return injectable if injectable
+          end
+        end
+      end
+
+      # Everything else doesn't qualify as an inject pseudo-macro
+      nil
+    end
+
+    # If a Group node is an injectable, then evaluate and inject it now!
+    def visit_pre(ctx, node : AST::Group)
+      injectable = try_group_as_injectable(ctx, node)
+      if injectable
+        return @evaluator.evaluate(ctx, injectable)
+      end
+
+      node
+    end
+
+    # All other nodes have no modification.
+    def visit_pre(ctx, node : AST::Node)
+      node
+    end
+  end
+
+  class Evaluator
+    alias ObjMap = Hash(String, AST::Node)
+    alias Obj = AST::Node | ObjMap
+
+    getter scope : Scope
+    getter terms : ObjMap
+    def initialize(@scope, terms)
+      @terms = ObjMap.new
+      terms.each { |key, value|
+        if value
+          @terms[key] = value
+        end
+      }
+    end
+
+    def not_implemented!(node)
+      raise NotImplementedError.new \
+        "evaluate: #{node.pretty_inspect}\n#{node.pos.show}"
+    end
+
+    def evaluate(ctx, node : AST::Node) : AST::Node
+      result = visit(ctx, node)
+      case result
+      when AST::Node
+        result
+      else
+        Error.at node, "This expression didn't produce an AST Node", [
+          {Source::Pos.none, "it produced a #{result.class}"}
+        ]
+      end
+    end
+
+    def visit(ctx, node : AST::Identifier) : Obj
+      case node.value
+      when "@terms"
+        return @terms
+      else
+        Error.at node, "the compiler doesn't know how to resolve this name " \
+          "(in a metaprogramming context"
+      end
+
+      not_implemented!(node)
+    end
+
+    def visit(ctx, node : AST::Relate) : Obj
+      case node.op.value
+      when "."
+        lhs = visit(ctx, node.lhs)
+        node_rhs = node.rhs
+        if lhs.is_a?(ObjMap) && node_rhs.is_a?(AST::Identifier)
+          result = lhs[node_rhs.value]?
+          if result
+            return result
+          else
+            Error.at node_rhs, "'#{node_rhs.value}' does not exist here", [
+              {node.lhs.pos, "known names are: #{lhs.keys.join(", ")}"}
+            ]
+          end
+        end
+      end
+
+      not_implemented!(node)
+    end
+
+    def visit(ctx, node : AST::Node) : Obj
+      not_implemented!(node)
+    end
   end
 end

@@ -176,7 +176,7 @@ module Savi::AST
       dup.tap do |node|
         node.terms = new_terms
         node.nested = new_nested
-        node.body = new_body
+        node.body = new_body.as(AST::Group)
       end
     end
 
@@ -241,9 +241,9 @@ module Savi::AST
       dup.tap do |node|
         node.cap = new_cap.as(AST::Identifier)
         node.ident = new_ident.as(AST::Identifier)
-        node.params = new_params
+        node.params = new_params.as(AST::Group)
         node.ret = new_ret
-        node.body = new_body
+        node.body = new_body.as(AST::Group)
         node.yield_out = new_yield_out
         node.yield_in = new_yield_in
       end
@@ -481,7 +481,7 @@ module Savi::AST
       return self unless term_changed || group_changed
       dup.tap do |node|
         node.term = new_term
-        node.group = new_group
+        node.group = new_group.as(AST::Group)
       end
     end
   end
@@ -754,9 +754,9 @@ module Savi::AST
       dup.tap do |node|
         node.receiver = new_receiver
         node.ident = new_ident.as(Identifier)
-        node.args = new_args
-        node.yield_params = new_yield_params
-        node.yield_block = new_yield_block
+        node.args = new_args.as(AST::Group)
+        node.yield_params = new_yield_params.as(AST::Group)
+        node.yield_block = new_yield_block.as(AST::Group)
       end
     end
   end
