@@ -161,6 +161,18 @@
     assert: (Bytes.new << b"example").clear.is_empty
     assert: (Bytes.new << b"example").clear.is_not_empty.is_false
 
+  :it "fills all or part of a range with zeros"
+    assert: Bytes.new.fill_with_zeros(0, 3) == b"\x00\x00\x00"
+    assert: b"foo bar".clone.fill_with_zeros(0, 3) == b"\x00\x00\x00 bar"
+    assert: b"foo bar".clone.fill_with_zeros(5, 9) == b"foo b\x00\x00\x00\x00"
+    assert: b"foo bar".clone.fill_with_zeros(5, 0) == b"foo bar"
+    assert: b"foo bar".clone.fill_with_zeros(7, 9) == b"foo bar\x00\x00"
+    assert: b"foo bar".clone.fill_with_zeros(8, 9) == b"foo bar\x00\x00"
+    assert: b"foo bar".clone.fill_with_zeros(9, 9) == b"foo bar\x00\x00"
+    assert: b"foo bar".clone.fill_with_zeros(10, 9) == b"foo bar\x00\x00"
+    assert: b"foo bar".clone.fill_with_zeros(0, 9) ==
+      b"\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+
   :it "clones itself into a new bytes buffer"
     string Bytes = b"example"
     assert: string.clone == b"example"
