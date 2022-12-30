@@ -190,6 +190,43 @@
 
     new_value_alias
 
+  :: Delete the element at the given `index`, discarding it.
+  :: Raises an error if the given `index` is beyond the size of the array.
+  ::
+  :: Elements at all later indexes will be shifted one index to fill the hole
+  :: left by the element that was deleted.
+  ::
+  :: If you want to return the removed element, use `remove_at!` instead.
+  :fun ref delete_at!(index)
+    error! if (@size <= index)
+    tail_size = @size - index
+
+    if (tail_size > 0) (
+      @_ptr._offset(index + 1)._copy_to(@_ptr._offset(index), tail_size)
+    )
+
+    @_size -= 1
+    @
+
+  :: Remove the element at the given `index`, returning it.
+  :: Raises an error if the given `index` is beyond the size of the array.
+  ::
+  :: Elements at all later indexes will be shifted one index to fill the hole
+  :: left by the element that was removed.
+  ::
+  :: If you want to discard the removed element, use `delete_at!` instead.
+  :fun ref remove_at!(index) A
+    error! if (@size <= index)
+    element = @_ptr._get_at_no_alias(index)
+    tail_size = @size - index
+
+    if (tail_size > 0) (
+      @_ptr._offset(index + 1)._copy_to(@_ptr._offset(index), tail_size)
+    )
+
+    @_size -= 1
+    --element
+
   :fun each_with_index(
     from USize = 0
     to = USize.max_value
