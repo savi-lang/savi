@@ -84,6 +84,61 @@
 
   :fun ref clear: @_size = 0, @
 
+  :: Fill all or part of the buffer with a repetition of the given `byte` value.
+  ::
+  :: If specified, the fill range starts with the `from` parameter (inclusive)
+  :: and goes up to the `to` parameter (exclusive). If not specified, then all
+  :: currently populated bytes will be overwritten with the given `byte` value.
+  ::
+  :: If `to` is beyond the end of the currently populated bytes, the buffer
+  :: will be expanded as needed to that new size. If `from` is beyond the end
+  :: of the currently populated bytes, it will be silently moved to that point
+  :: such that all bytes added to the buffer will have the given `byte` value.
+  :: If `to` is less than `from`, this operation will have no effect.
+  ::
+  :: For the common case of filling with zeros, use `fill_with_zeros` instead.
+  :fun ref fill_with(byte U8, from USize = 0, to USize = @_size)
+    // Ensure that we won't leave a "hole" of undefined bytes.
+    from = from.at_most(@_size)
+
+    // If the fill range size is empty or negative, we have nothing to do.
+    return @ if (to <= from)
+
+    // We may need to expand the buffer, if the fill range goes beyond it.
+    if (@_size < to) (
+
+      // We may need to allocate a new pointer, if the fill range goes past it.
+      if (@_space < to) (
+        // If we're not filling the entire buffer, we need to reallocate the
+        // pointer so that existing data is copied. Otherwise we will allocate
+        // a new pointer with undefined data, because all of it will be memset.
+        if (from > 0) (@_ptr_reallocate(to) | @_ptr_allocate(to))
+      )
+      // The extended buffer has the size extended to include the fill range.
+      @_size = to
+    )
+
+    // Finally, fill the range.
+    _FFI.memset(@_ptr._offset(from), byte.i32, to - from)
+
+    @
+
+  :: Fill all or part of the buffer with zero-valued bytes.
+  ::
+  :: If specified, the fill range starts with the `from` parameter (inclusive)
+  :: and goes up to the `to` parameter (exclusive). If not specified, then all
+  :: currently populated bytes will be overwritten with the given `byte` value.
+  ::
+  :: If `to` is beyond the end of the currently populated bytes, the buffer
+  :: will be expanded as needed to that new size. If `from` is beyond the end
+  :: of the currently populated bytes, it will be silently moved to that point
+  :: such that all bytes added to the buffer will have the given `byte` value.
+  :: If `to` is less than `from`, this operation will have no effect.
+  ::
+  :: To fill with a byte value other than zero, use `fill_with` instead.
+  :fun ref fill_with_zeros(from USize = 0, to USize = @_size)
+    @fill_with(0, from, to)
+
   :fun format: Bytes.Format._new(@)
 
   :fun clone @'iso
