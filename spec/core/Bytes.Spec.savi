@@ -173,6 +173,17 @@
     assert: b"foo bar".clone.fill_with_zeros(0, 9) ==
       b"\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 
+  :it "copies all or part of its content from another bytes buffer"
+    assert: Bytes.new.copy_from(b"foo") == b"foo"
+    assert: b"foo ".clone.copy_from(b"bar") == b"foo bar"
+    assert: b"foo ".clone.copy_from(b"bar", 0, 3) == b"foo bar"
+    assert: b"foo ".clone.copy_from(b"bar", 0, 9999) == b"foo bar"
+    assert: b"foo ".clone.copy_from(b"bar", 9999, 3) == b"foo "
+    assert: b"foo ".clone.copy_from(b"bar", 1, 2, 3) == b"fooa"
+    assert: b"foo ".clone.copy_from(b"bar", 0, 3, 0) == b"bar "
+    assert: b"foo ".clone.copy_from(b"bar", 0, 3, 1) == b"fbar"
+    assert: b"foo ".clone.copy_from(b"bar", 0, 3, 9999) == b"foo bar"
+
   :it "clones itself into a new bytes buffer"
     string Bytes = b"example"
     assert: string.clone == b"example"
