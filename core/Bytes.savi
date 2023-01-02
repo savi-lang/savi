@@ -139,6 +139,42 @@
   :fun ref fill_with_zeros(from USize = 0, to USize = @_size)
     @fill_with(0, from, to)
 
+  :: Copy all or some of the bytes from the `source` buffer into this buffer.
+  :: Returns this buffer.
+  ::
+  :: The `dest_offset`, if specified, will determine where in the buffer
+  :: the source range will be copied into. If not specified, the content will be
+  :: appended to the end of the buffer, growing the size of the buffer, so
+  :: specifying a `dest_offset` is only necessary to copy to an earlier offset.
+  :: If too high of a `dest_offset` is given it will be silently truncated
+  :: to the highest allowed offset (appending to the end of the buffer).
+  ::
+  :: The `from` and `to` parameters, if given, specify the range in the source
+  :: buffer to copy (and indirectly determine how many bytes will be copied).
+  :: If these are out of bounds in the source buffer, they will be silently
+  :: trimmed to the buffer bounds, and if the range is zero sized then the
+  :: overall operation will have no effect.
+  :fun ref copy_from(
+    source Bytes'box
+    from USize = 0
+    to USize = USize.max_value
+    dest_offset USize = USize.max_value
+  )
+    // Silently truncate the ranges to the respective bounds.
+    // Return early if the source range is zero-sized.
+    dest_offset = dest_offset.at_most(@_size)
+    to = to.at_most(source.size)
+    return @ if (from >= to)
+
+    // Reserve space in the buffer and copy into it.
+    copy_size = to - from
+    dest_end = dest_offset + copy_size
+    @reserve(dest_end)
+    source._ptr._offset(from)._copy_to(@_ptr._offset(dest_offset), copy_size)
+    if (@_size < dest_end) (@_size = dest_end)
+
+    @
+
   :fun format: Bytes.Format._new(@)
 
   :fun clone @'iso
