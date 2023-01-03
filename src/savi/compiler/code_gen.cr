@@ -107,6 +107,10 @@ class Savi::Compiler::CodeGen
     @target_machine = @target.create_target_machine(@target_triple).as(LLVM::TargetMachine)
     @target_info = Target.new(@target_machine.triple)
     @llvm = LLVM::Context.new
+
+    # TODO: Enable opaque pointers before they are mandatory in LLVM 16.
+    LibLLVM.context_set_opaque_pointers(@llvm, false)
+
     @mod = @llvm.new_module("main")
     @builder = @llvm.new_builder
 

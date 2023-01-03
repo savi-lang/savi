@@ -238,7 +238,7 @@ class Savi::Compiler::CodeGen::PonyRT
       ]},
       {"ponyint_hash_block", [@ptr, @isize], @isize, [
         LLVM::Attribute::NoRecurse, LLVM::Attribute::NoUnwind,
-        LLVM::Attribute::ReadOnly, LLVM::Attribute::UWTable,
+        LLVM::Attribute::ReadOnly,
         {1, LLVM::Attribute::ReadOnly},
       ]},
 

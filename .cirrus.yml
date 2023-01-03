@@ -70,15 +70,15 @@ task:
       freebsd_instance:
         image: freebsd-13-1-release-amd64
 
-    - name: x86_64-apple-macosx
+    - name: arm64-apple-macosx
       environment:
-        TRIPLE: x86_64-apple-macosx
+        TRIPLE: arm64-apple-macosx
         DEPS_INSTALL: brew update --preinstall && brew install libiconv crystal && brew cleanup
         # Set up the SDKROOT path specific to the present XCode version.
-        SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+        SDKROOT: /Applications/Xcode-14.2.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
       macos_instance:
-        image: big-sur-xcode-12.5
+        image: ghcr.io/cirruslabs/macos-ventura-xcode:14.2
       # Caching some homebrew directories helps save some of the otherwise huge
       # amount of time that it takes to update brew from the CI base image.
       brew_cache:
@@ -86,33 +86,33 @@ task:
       brew_usr_local_cache:
         folder: "/usr/local/Homebrew"
 
-    - name: arm64-apple-macosx
+    - name: x86_64-apple-macosx
       environment:
-        TRIPLE: arm64-apple-macosx
+        TRIPLE: x86_64-apple-macosx
         IS_CROSS_COMPILE: "1"
-        # Download arm64 versions of the libraries needed by Crystal runtime.
+        # Download x86_64 versions of the libraries needed by Crystal runtime.
         DEPS_INSTALL: "
           brew update --preinstall && brew install crystal && brew cleanup && \
-          mkdir /tmp/arm64 && \
-          brew fetch --bottle-tag=arm64_big_sur libgc && \
-          brew fetch --bottle-tag=arm64_big_sur libevent && \
-          brew fetch --bottle-tag=arm64_big_sur pcre && \
-          tar -xvf `brew --cache --bottle-tag=arm64_big_sur libgc` -C /tmp/arm64 --strip-components=2 && \
-          tar -xvf `brew --cache --bottle-tag=arm64_big_sur libevent` -C /tmp/arm64 --strip-components=2 && \
-          tar -xvf `brew --cache --bottle-tag=arm64_big_sur pcre` -C /tmp/arm64 --strip-components=2 && \
-          ls /tmp/arm64/lib"
-        # Tell make to use those arm64 versions we downloaded above.
+          mkdir /tmp/x86_64 && \
+          brew fetch --bottle-tag=ventura libgc && \
+          brew fetch --bottle-tag=ventura libevent && \
+          brew fetch --bottle-tag=ventura pcre && \
+          tar -xvf `brew --cache --bottle-tag=ventura libgc` -C /tmp/x86_64 --strip-components=2 && \
+          tar -xvf `brew --cache --bottle-tag=ventura libevent` -C /tmp/x86_64 --strip-components=2 && \
+          tar -xvf `brew --cache --bottle-tag=ventura pcre` -C /tmp/x86_64 --strip-components=2 && \
+          ls /tmp/x86_64/lib"
+        # Tell make to use those x86_64 versions we downloaded above.
         MAKE_EXTRA_ARGS: " \
-          TARGET_PLATFORM=arm64-apple-macosx \
-          LLVM_STATIC_PLATFORM=x86_64-apple-macosx \
-          LIB_GC=/tmp/arm64/lib/libgc.a \
-          LIB_EVENT=/tmp/arm64/lib/libevent.a  \
-          LIB_PCRE=/tmp/arm64/lib/libpcre.a"
+          TARGET_PLATFORM=x86_64-apple-macosx \
+          LLVM_STATIC_PLATFORM=arm64-apple-macosx \
+          LIB_GC=/tmp/x86_64/lib/libgc.a \
+          LIB_EVENT=/tmp/x86_64/lib/libevent.a \
+          LIB_PCRE=/tmp/x86_64/lib/libpcre.a"
         # Set up the SDKROOT path specific to the present XCode version.
-        SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+        SDKROOT: /Applications/Xcode-14.2.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
       macos_instance:
-        image: big-sur-xcode-12.5
+        image: ghcr.io/cirruslabs/macos-ventura-xcode:14.2
       # Caching some homebrew directories helps save some of the otherwise huge
       # amount of time that it takes to update brew from the CI base image.
       brew_cache:

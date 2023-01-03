@@ -1,4 +1,5 @@
 lib LibLLVM
+  fun context_set_opaque_pointers = LLVMContextSetOpaquePointers(context : ContextRef, value : Bool)
   fun clear_insertion_position = LLVMClearInsertionPosition(builder : BuilderRef)
   fun get_entry_basic_block = LLVMGetEntryBasicBlock(function : ValueRef) : BasicBlockRef
   fun get_basic_block_terminator = LLVMGetBasicBlockTerminator(basic_block : BasicBlockRef) : ValueRef
