@@ -156,6 +156,18 @@
 
     assert: array == ["foo", "BAR", "baz"]
 
+  :it "inserts an element at the given index"
+    array Array(String) = ["foo", "bar"]
+
+    assert error: array.insert_at!(3, "baz")
+    assert: array == ["foo", "bar"]
+
+    assert: array.insert_at!(2, "baz") == "baz"
+    assert: array == ["foo", "bar", "baz"]
+
+    assert: array.insert_at!(1, "baz") == "baz"
+    assert: array == ["foo", "baz", "bar", "baz"]
+
   :it "deletes the element at the given index, discarding it"
     array Array(String) = ["foo", "bar", "baz"]
 
