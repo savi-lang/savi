@@ -190,6 +190,30 @@
 
     new_value_alias
 
+  :: Insert an element with the given `value` at the given `index`.
+  :: Returns an alias of the `value`.
+  :: Raises an error if the given `index` is beyond the size of the array.
+  ::
+  :: Elements at all later indexes will be shifted one index to make room
+  :: for the insertion of the new element.
+  :fun ref insert_at!(index, value)
+    error! if (@_size < index)
+
+    // Make sure the buffer is large enough to hold another element.
+    @reserve(@_size + 1)
+
+    // Copy the tail of later elements forward, to make room for the element.
+    if (@_size > index) (
+      tail_size = @size - index
+      @_ptr._offset(index)._copy_to(@_ptr._offset(index + 1), tail_size)
+    )
+
+    // Insert the element and return its alias.
+    value_alias = value
+    @_ptr._assign_at(index, --value)
+    @_size += 1
+    value_alias
+
   :: Delete the element at the given `index`, discarding it.
   :: Raises an error if the given `index` is beyond the size of the array.
   ::
@@ -199,7 +223,7 @@
   :: If you want to return the removed element, use `remove_at!` instead.
   :fun ref delete_at!(index)
     error! if (@size <= index)
-    tail_size = @size - index
+    tail_size = @size - index - 1
 
     if (tail_size > 0) (
       @_ptr._offset(index + 1)._copy_to(@_ptr._offset(index), tail_size)
@@ -218,7 +242,7 @@
   :fun ref remove_at!(index) A
     error! if (@size <= index)
     element = @_ptr._get_at_no_alias(index)
-    tail_size = @size - index
+    tail_size = @size - index - 1
 
     if (tail_size > 0) (
       @_ptr._offset(index + 1)._copy_to(@_ptr._offset(index), tail_size)
