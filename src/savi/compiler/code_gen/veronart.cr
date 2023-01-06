@@ -136,17 +136,17 @@ class Savi::Compiler::CodeGen::VeronaRT
   def gen_hacky_stubs(g)
     fn = g.mod.functions["pony_os_stdout"]
     g.gen_func_start(fn)
-    g.builder.ret g.builder.bit_cast(@ptr.null, fn.return_type)
+    g.builder.ret @ptr.null
     g.gen_func_end
 
     fn = g.mod.functions["pony_os_stderr"]
     g.gen_func_start(fn)
-    g.builder.ret g.builder.bit_cast(@ptr.null, fn.return_type)
+    g.builder.ret @ptr.null
     g.gen_func_end
   end
 
   def gen_alloc_ctx_get(g : CodeGen)
-    g.builder.call(g.mod.functions["RTAlloc_get"], "ALLOC_CTX")
+    g.gen_call_named("RTAlloc_get", [] of LLVM::Value, "ALLOC_CTX")
   end
 
   @current_root_thread_local : LLVM::Value?
@@ -164,7 +164,7 @@ class Savi::Compiler::CodeGen::VeronaRT
   end
 
   def gen_current_root_get(g : CodeGen)
-    g.builder.load(gen_current_root_thread_local(g), "CURRENT.ROOT")
+    g.builder.load(@ptr, gen_current_root_thread_local(g), "CURRENT.ROOT")
   end
 
   def gen_current_root_set(g : CodeGen, value : LLVM::Value)
@@ -291,7 +291,11 @@ class Savi::Compiler::CodeGen::VeronaRT
   end
 
   def gen_traits_gep_get(g, desc, name)
-    raise NotImplementedError.new("Verona runtime: gen_vtable_traits_get")
+    raise NotImplementedError.new("Verona runtime: gen_traits_gep_get")
+  end
+
+  def gen_traits_get(g, desc, name)
+    raise NotImplementedError.new("Verona runtime: gen_traits_get")
   end
 
   def gen_type_name_get(g, desc, name)
@@ -331,8 +335,7 @@ class Savi::Compiler::CodeGen::VeronaRT
   def gen_get_desc(g : CodeGen, value : LLVM::Value)
     # Verona hacks the lower bits of the desc pointer, so we don't want to
     # reach to it directly. Instead we call the runtime function to get it.
-    g.builder.call(
-      g.mod.functions["RTObject_get_descriptor"],
+    g.gen_call_named("RTObject_get_descriptor",
       [g.builder.bit_cast(value, @obj_ptr)],
     )
   end
@@ -363,7 +366,7 @@ class Savi::Compiler::CodeGen::VeronaRT
     gen_iso_freeze_region(g, env)
 
     if USE_SYSTEMATIC_TESTING
-      g.builder.call(g.mod.functions["RTSystematicTestHarness_run"], [
+      g.gen_call_named("RTSystematicTestHarness_run", [
         argc,
         argv,
         g.mod.functions["main.INNER"].to_value,
@@ -383,11 +386,7 @@ class Savi::Compiler::CodeGen::VeronaRT
     g.gen_func_start(fn)
 
     # We receive the Env object as an opaque void pointer. Cast it to Env here.
-    env = g.builder.bit_cast(
-      fn.params[0].tap &.name=("env.OPAQUE"),
-      g.gtypes["Env"].struct_ptr,
-      "env",
-    )
+    env = fn.params[0].tap &.name=("env")
 
     # Acquire the Env object an extra time, since Main.new fails to do this.
     # TODO: Add lifetime analysis and codegen for acquiring stuff into scope.
@@ -397,7 +396,11 @@ class Savi::Compiler::CodeGen::VeronaRT
     main_actor = gen_alloc_actor(g, g.gtype_main, "main")
 
     # Call the Main actor's asynchronous constructor function, passing the Env.
-    g.builder.call(g.gtype_main["new"].send_llvm_func, [main_actor, env])
+    g.builder.call(
+      g.gtype_main["new"].send_llvm_func.function_type,
+      g.gtype_main["new"].send_llvm_func,
+      [main_actor, env],
+    )
 
     # Release the Env object, now that the program is otherwise done.
     # This is the counterpart to the implicit acquire at its original creation.
@@ -464,7 +467,7 @@ class Savi::Compiler::CodeGen::VeronaRT
     when {:iso, :val}
       # TODO: find a way to have both compile-time and runtime String'val
       raise NotImplementedError.new("runtime-alloc'd String'val in Verona") \
-        if value.type == g.gtypes["String"].struct_ptr
+        if to_type.singular? && g.gtype_of(to_type) == g.gtypes["String"]
 
       # When an ephemeral iso is moved to an immutable cap,
       # it needs to be frozen, rendering its whole region immutable.
@@ -525,6 +528,7 @@ class Savi::Compiler::CodeGen::VeronaRT
 
           gen_val_release_from_scope(g,
             g.builder.load(
+              g.llvm_type_of(local_defn),
               g.func_frame.current_locals[info.local],
               info.local.name,
             )
@@ -543,7 +547,7 @@ class Savi::Compiler::CodeGen::VeronaRT
   end
 
   def gen_iso_merge_into_current_region(g : CodeGen, value : LLVM::Value)
-    g.builder.call(g.mod.functions["RTObject_region_merge"], [
+    g.gen_call_named("RTObject_region_merge", [
       g.alloc_ctx,
       gen_current_root_get(g),
       g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
@@ -552,7 +556,7 @@ class Savi::Compiler::CodeGen::VeronaRT
   end
 
   def gen_iso_freeze_region(g : CodeGen, value : LLVM::Value)
-    g.builder.call(g.mod.functions["RTObject_region_freeze"], [
+    g.gen_call_named("RTObject_region_freeze", [
       g.alloc_ctx,
       g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
     ])
@@ -560,14 +564,14 @@ class Savi::Compiler::CodeGen::VeronaRT
   end
 
   def gen_val_acquire_into_scope(g : CodeGen, value : LLVM::Value)
-    g.builder.call(g.mod.functions["RTImmutable_acquire"], [
+    g.gen_call_named("RTImmutable_acquire", [
       g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
     ])
     value
   end
 
   def gen_val_release_from_scope(g : CodeGen, value : LLVM::Value)
-    g.builder.call(g.mod.functions["RTImmutable_release"], [
+    g.gen_call_named("RTImmutable_release", [
       g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
       g.alloc_ctx,
     ])
@@ -575,14 +579,14 @@ class Savi::Compiler::CodeGen::VeronaRT
   end
 
   def gen_actor_acquire_into_scope(g : CodeGen, value : LLVM::Value)
-    g.builder.call(g.mod.functions["RTCown_acquire"], [
+    g.gen_call_named("RTCown_acquire", [
       g.builder.bit_cast(value, @cown_ptr, "#{value.name}.OPAQUE"),
     ])
     value
   end
 
   def gen_actor_release_from_scope(g : CodeGen, value : LLVM::Value)
-    g.builder.call(g.mod.functions["RTCown_release"], [
+    g.gen_call_named("RTCown_release", [
       g.builder.bit_cast(value, @cown_ptr, "#{value.name}.OPAQUE"),
       g.alloc_ctx,
     ])
@@ -606,48 +610,44 @@ class Savi::Compiler::CodeGen::VeronaRT
   end
 
   def gen_alloc_object(g : CodeGen, gtype : GenType, name)
-    allocated = g.builder.call(g.mod.functions["RTObject_new_mut"], [
+    g.gen_call_named("RTObject_new_mut", [
       g.alloc_ctx,
-      g.gen_get_desc_opaque(gtype),
+      gtype.desc,
       gen_current_root_get(g),
     ], "#{name}.OPAQUE")
-    g.builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
 
   def gen_alloc_object_iso(g : CodeGen, gtype : GenType, name)
-    allocated = g.builder.call(g.mod.functions["RTObject_new_iso"], [
+    g.gen_call_named("RTObject_new_iso", [
       g.alloc_ctx,
-      g.gen_get_desc_opaque(gtype),
+      gtype.desc,
     ], "#{name}.OPAQUE")
-    g.builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
 
   def gen_alloc_actor(g : CodeGen, gtype : GenType, name)
-    allocated = g.builder.call(g.mod.functions["RTCown_new"], [
+    actor = g.gen_call_named("RTCown_new", [
       g.alloc_ctx,
-      g.gen_get_desc_opaque(gtype),
+      gtype.desc,
     ], "#{name}.OPAQUE")
-    actor = g.builder.bit_cast(allocated, gtype.struct_ptr, "#{name}.OPAQUE")
 
     # Every actor object needs an iso root allocated for region bookkeeping.
-    iso_root = g.builder.call(g.mod.functions["RTObject_new_iso"], [
+    iso_root = g.gen_call_named("RTObject_new_iso", [
       g.alloc_ctx,
       gen_desc_empty(g),
     ], "#{name}.ROOT")
     g.builder.store(
       iso_root,
-      g.builder.struct_gep(actor, 2, "#{name}.ROOT.GEP")
+      g.builder.struct_gep(gtype.struct_type, actor, 2, "#{name}.ROOT.GEP")
     )
 
     actor
   end
 
-  def gen_alloc_action(g : CodeGen, action_desc, action_type, name)
-    allocated = g.builder.call(g.mod.functions["RTAction_new"], [
+  def gen_alloc_action(g : CodeGen, action_desc, name)
+    g.gen_call_named("RTAction_new", [
       g.alloc_ctx,
       action_desc,
     ], "#{name}.OPAQUE")
-    g.builder.bit_cast(allocated, action_type.pointer, name)
   end
 
   def gen_action_type(g : CodeGen, gtype : GenType, gfunc : GenFunc, params_types)
@@ -681,20 +681,22 @@ class Savi::Compiler::CodeGen::VeronaRT
     args = [] of LLVM::Value
     action = g.builder.bit_cast(fn.params[0], action_type.pointer, "ACTION")
     gfunc.llvm_func.params.types.each_with_index do |param_type, i|
-      arg_gep = g.builder.struct_gep(action, i + 1, "ACTION.#{i + 1}.GEP")
-      args << g.builder.load(arg_gep, "ACTION.#{i + 1}")
+      arg_gep = g.builder.struct_gep(action_type, action, i + 1, "ACTION.#{i + 1}.GEP")
+      arg_type = action_type.struct_element_types[i + 1]
+      args << g.builder.load(arg_type, arg_gep, "ACTION.#{i + 1}")
     end
 
     # Set the current root to be the root object stored in this actor.
     gen_current_root_set(g,
       g.builder.load(
-        g.builder.struct_gep(args[0], 2, "@.ROOT.GEP"),
+        gtype.struct_type.struct_element_types[2],
+        g.builder.struct_gep(gtype.struct_type, args[0], 2, "@.ROOT.GEP"),
         "@.ROOT",
       )
     )
 
     # Finally, call the function itself, with the program logic inside it.
-    g.builder.call(gfunc.llvm_func, args)
+    g.gen_call_gfunc(gfunc, args)
 
     g.builder.ret
     g.gen_func_end
@@ -703,7 +705,7 @@ class Savi::Compiler::CodeGen::VeronaRT
 
   def gen_intrinsic_cpointer_alloc(g : CodeGen, params, llvm_type, elem_size_value)
     g.builder.bit_cast(
-      g.builder.call(g.mod.functions["RTAlloc_alloc"], [
+      g.gen_call_named("RTAlloc_alloc", [
         g.alloc_ctx,
         g.builder.mul(params[0], @isize.const_int(elem_size_value)),
       ]),
@@ -725,11 +727,11 @@ class Savi::Compiler::CodeGen::VeronaRT
     g.gen_func_start(fn)
 
     # Create the action object to be scheduled.
-    action = gen_alloc_action(g, action_desc, action_type, "ACTION")
+    action = gen_alloc_action(g, action_desc, "ACTION")
 
     # Fill the action with the arguments we were passed.
     fn.params.to_a.each_with_index do |param, i|
-      arg_gep = g.builder.struct_gep(action, i + 1, "ACTION.#{i + 1}.GEP")
+      arg_gep = g.builder.struct_gep(action_type, action, i + 1, "ACTION.#{i + 1}.GEP")
       g.builder.store(param, arg_gep)
     end
 
@@ -741,7 +743,7 @@ class Savi::Compiler::CodeGen::VeronaRT
     g.builder.store(cown, cown_alloca)
 
     # Schedule the action to executed when the cown is available.
-    g.builder.call(g.mod.functions["RTAction_schedule"], [
+    g.gen_call_named("RTAction_schedule", [
       g.builder.bit_cast(action, @action_ptr),
       cown_alloca,
       @isize.const_int(1),
@@ -772,15 +774,16 @@ class Savi::Compiler::CodeGen::VeronaRT
 
     g.gen_func_start(fn)
 
-    receiver = g.builder.bit_cast(fn.params[0], gtype.struct_ptr, "@")
+    receiver = fn.params[0]
     obj_stack = fn.params[1]
 
     # For actors, it is necessary to trace the iso root.
     if gtype.type_def.is_actor?(g.ctx)
-      g.builder.call(g.mod.functions["RTObjectStack_push"], [
+      g.gen_call_named("RTObjectStack_push", [
         obj_stack,
         g.builder.load(
-          g.builder.struct_gep(receiver, 2, "@.ROOT.GEP"),
+          gtype.struct_type.struct_element_types[2],
+          g.builder.struct_gep(gtype.struct_type, receiver, 2, "@.ROOT.GEP"),
           "@.ROOT",
         )
       ])
@@ -806,15 +809,16 @@ class Savi::Compiler::CodeGen::VeronaRT
 
     g.gen_func_start(fn)
 
-    receiver = g.builder.bit_cast(fn.params[0], gtype.struct_ptr, "@")
+    receiver = fn.params[0]
     obj_stack = fn.params[1]
 
     # For actors, it is necessary to trace the iso root.
     if gtype.type_def.is_actor?(g.ctx)
-      g.builder.call(g.mod.functions["RTObjectStack_push"], [
+      g.gen_call_named("RTObjectStack_push", [
         obj_stack,
         g.builder.load(
-          g.builder.struct_gep(receiver, 2, "@.ROOT.GEP"),
+          gtype.struct_type.struct_element_types[2],
+          g.builder.struct_gep(gtype.struct_type, receiver, 2, "@.ROOT.GEP"),
           "@.ROOT",
         )
       ])

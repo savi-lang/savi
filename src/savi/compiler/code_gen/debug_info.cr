@@ -82,7 +82,7 @@ class Savi::Compiler::CodeGen
         name,
         file,
         pos.row + 1,
-        di_type(t, storage.type.element_type),
+        di_type(t, ctx.code_gen.llvm_type_of(t)),
         0,
       )
       expr = @di.create_expression(nil, 0)
@@ -147,7 +147,7 @@ class Savi::Compiler::CodeGen
 
     def di_create_object_struct_pointer_type(
       t : Reach::Ref,
-      llvm_type : LLVM::Type,
+      llvm_struct_type : LLVM::Type,
     )
       ident = t.single!.defn(ctx).ident
       name = ident.value
@@ -160,7 +160,7 @@ class Savi::Compiler::CodeGen
 
       # Create the debug type, as a struct pointer to the struct type.
       debug_type = di_create_pointer_type(name,
-        di_create_object_struct_type(t, llvm_type.element_type)
+        di_create_object_struct_type(t, llvm_struct_type)
       )
 
       # Finally, replace the temporary stand-in we created above and return.
@@ -289,21 +289,25 @@ class Savi::Compiler::CodeGen
         elsif t.is_numeric?(ctx)
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Unsigned)
         elsif t.llvm_use_type(ctx) == :ptr
+          elem_type_ref = t.single_def!(ctx).cpointer_type_arg(ctx)
           di_create_pointer_type(
             t.show_type,
             di_type(
-              t.single_def!(ctx).cpointer_type_arg(ctx),
-              llvm_type.element_type,
+              elem_type_ref,
+              ctx.code_gen.llvm_mem_type_of(elem_type_ref),
             ),
           )
         elsif t.llvm_use_type(ctx) == :struct_value
           if llvm_type.kind == LLVM::Type::Kind::Pointer
-            di_create_object_struct_pointer_type(t, llvm_type)
+            di_create_object_struct_pointer_type(t, ctx.code_gen.llvm_type_of(t))
           else
             di_create_fields_struct_type(t, llvm_type)
           end
         elsif t.llvm_use_type(ctx) == :struct_ptr
-          di_create_object_struct_pointer_type(t, llvm_type)
+          di_create_object_struct_pointer_type(
+            t,
+            ctx.code_gen.gtypes[ctx.reach[t.single!].llvm_name].struct_type,
+          )
         elsif t.llvm_use_type(ctx) == :struct_ptr_opaque
           # TODO: Some more descriptive debug type?
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Address)

@@ -1,11 +1,9 @@
 lib LibLLVM
-  fun context_set_opaque_pointers = LLVMContextSetOpaquePointers(context : ContextRef, value : Bool)
   fun clear_insertion_position = LLVMClearInsertionPosition(builder : BuilderRef)
   fun get_entry_basic_block = LLVMGetEntryBasicBlock(function : ValueRef) : BasicBlockRef
   fun get_basic_block_terminator = LLVMGetBasicBlockTerminator(basic_block : BasicBlockRef) : ValueRef
   fun position_builder_before = LLVMPositionBuilderBefore(builder : BuilderRef, instruction : ValueRef)
   fun intptr_type_in_context = LLVMIntPtrTypeInContext(ContextRef, TargetDataRef) : TypeRef
-  fun build_struct_gep = LLVMBuildStructGEP(builder : BuilderRef, pointer : ValueRef, index : UInt32, name : UInt8*) : ValueRef
   fun build_frem = LLVMBuildFRem(builder : BuilderRef, lhs : ValueRef, rhs : ValueRef, name : UInt8*) : ValueRef
   fun build_extract_value = LLVMBuildExtractValue(builder : BuilderRef, aggregate : ValueRef, index : UInt32, name : UInt8*) : ValueRef
   fun build_insert_value = LLVMBuildInsertValue(builder : BuilderRef, aggregate : ValueRef, element : ValueRef, index : UInt32, name : UInt8*) : ValueRef
@@ -25,6 +23,14 @@ lib LibLLVM
   fun get_dll_storage_class = LLVMGetDLLStorageClass(global : ValueRef) : LLVM::DLLStorageClass
   fun set_dll_storage_class = LLVMSetDLLStorageClass(global : ValueRef, cls : LLVM::DLLStorageClass)
   fun remove_enum_attribute_at_index = LLVMRemoveEnumAttributeAtIndex(f : ValueRef, idx : AttributeIndex, kind : UInt32)
+
+  # Changes related to opaque pointers (LLVM 15).
+  fun global_get_value_type = LLVMGlobalGetValueType(value : ValueRef) : TypeRef
+  fun get_allocated_value_type = LLVMGetAllocatedType(value : ValueRef) : TypeRef
+  fun build_load_2 = LLVMBuildLoad2(builder : BuilderRef, type : TypeRef, pointer : ValueRef, name : UInt8*) : ValueRef
+  fun build_struct_gep_2 = LLVMBuildStructGEP2(builder : BuilderRef, type : TypeRef, pointer : ValueRef, index : UInt32, name : UInt8*) : ValueRef
+  fun build_inbounds_gep_2 = LLVMBuildInBoundsGEP2(builder : BuilderRef, type : TypeRef, pointer : ValueRef, indices : ValueRef*, num_indices : UInt32, name : UInt8*) : ValueRef
+  fun const_inbounds_gep_2 = LLVMConstInBoundsGEP2(type : TypeRef, pointer : ValueRef, indices : ValueRef*, num_indices : UInt32) : ValueRef
 
   enum ByteOrdering
     BigEndian

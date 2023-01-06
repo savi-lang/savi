@@ -80,6 +80,11 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
       0 # TODO
     end
 
+    def is_none?
+      # TODO: better reach the one true None instead of a namespaced impostor?
+      singular? && single!.link.name == "None"
+    end
+
     def is_none!
       # TODO: better reach the one true None instead of a namespaced impostor?
       raise "#{self} is not None" unless single!.link.name == "None"

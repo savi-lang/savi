@@ -7,8 +7,8 @@ class LLVM::Context
     Type.new LibLLVM.struct_create_named(self, name)
   end
 
-  def const_inbounds_gep(value : Value, indices : Array(Value))
-    Value.new LibLLVM.const_inbounds_gep(value, indices.to_unsafe.as(LibLLVM::ValueRef*), indices.size)
+  def const_inbounds_gep(type : Type, value : Value, indices : Array(Value))
+    Value.new LibLLVM.const_inbounds_gep_2(type, value, indices.to_unsafe.as(LibLLVM::ValueRef*), indices.size)
   end
 
   def const_bit_cast(value : Value, to_type : Type)
