@@ -116,7 +116,9 @@ class Savi::Compiler::BinaryObject
 
     # Now run LLVM passes, doing full optimization if in release mode.
     # Otherwise we will only run a minimal set of passes.
-    LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
+    unless ctx.options.llvm_optimize_nothing
+      LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
+    end
 
     # Now that we've optimized, only actually called functions remain,
     # so we can mark for linking those libraries that are associated to

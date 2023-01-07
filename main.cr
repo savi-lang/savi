@@ -21,6 +21,7 @@ module Savi
       option "--with-runtime-asserts", desc: "Compile with runtime assertions even in release mode", type: Bool, default: false
       option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
       option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
+      option "--llvm-optimize-nothing", desc: "Don't allow LLVM to do any IR optimization at all", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
       option "-X", "--cross-compile=TRIPLE", desc: "Cross compile to the given target triple"
       option "-C", "--cd=DIR", desc: "Change the working directory"
@@ -34,6 +35,7 @@ module Savi
         options.runtime_asserts = opts.with_runtime_asserts || !opts.release
         options.llvm_ir = true if opts.llvm_ir
         options.llvm_keep_fns = true if opts.llvm_keep_fns
+        options.llvm_optimize_nothing = true if opts.llvm_optimize_nothing
         options.auto_fix = true if opts.fix
         options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
         options.cross_compile = opts.cross_compile.not_nil! if opts.cross_compile
@@ -108,6 +110,7 @@ module Savi
         option "--with-runtime-asserts", desc: "Compile with runtime assertions even in release mode", type: Bool, default: false
         option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
         option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
+        option "--llvm-optimize-nothing", desc: "Don't allow LLVM to do any IR optimization at all", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-X", "--cross-compile=TRIPLE", desc: "Cross compile to the given target triple"
         option "-C", "--cd=DIR", desc: "Change the working directory"
@@ -121,6 +124,7 @@ module Savi
           options.runtime_asserts = opts.with_runtime_asserts || !opts.release
           options.llvm_ir = true if opts.llvm_ir
           options.llvm_keep_fns = true if opts.llvm_keep_fns
+          options.llvm_optimize_nothing = true if opts.llvm_optimize_nothing
           options.auto_fix = true if opts.fix
           options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
           options.cross_compile = opts.cross_compile.not_nil! if opts.cross_compile
@@ -142,6 +146,7 @@ module Savi
         option "--with-runtime-asserts", desc: "Compile with runtime assertions even in release mode", type: Bool, default: false
         option "--llvm-ir", desc: "Write generated LLVM IR to a file", type: Bool, default: false
         option "--llvm-keep-fns", desc: "Don't allow LLVM to remove functions from the output", type: Bool, default: false
+        option "--llvm-optimize-nothing", desc: "Don't allow LLVM to do any IR optimization at all", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-X", "--cross-compile=TRIPLE", desc: "Cross compile to the given target triple"
         option "-C", "--cd=DIR", desc: "Change the working directory"
@@ -154,6 +159,7 @@ module Savi
           options.runtime_asserts = opts.with_runtime_asserts || !opts.release
           options.llvm_ir = true if opts.llvm_ir
           options.llvm_keep_fns = true if opts.llvm_keep_fns
+          options.llvm_optimize_nothing = true if opts.llvm_optimize_nothing
           options.auto_fix = true if opts.fix
           options.manifest_name = args.name.not_nil! if args.name
           options.cross_compile = opts.cross_compile.not_nil! if opts.cross_compile
