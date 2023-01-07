@@ -213,6 +213,23 @@
     assert:
       array_a == ["baz", "bar", "foo"]
 
+  :it "won't violate memory safety when the array is mutated during iteration"
+    seen Array(String) = []
+    array = ["foo", "bar", "baz"]
+    array.each_with_index -> (string, index |
+      array.clear
+      seen << string
+    )
+    assert: seen == ["foo"]
+
+    seen.clear
+    array = ["foo", "bar", "baz"]
+    array.reverse_each_with_index -> (string, index |
+      array.clear
+      seen << string
+    )
+    assert: seen == ["baz"]
+
   :it "swaps the elements in the array if both indices are in range"
     array = ["foo", "bar", "baz"]
 

@@ -13,6 +13,8 @@
   :fun size: @_size
   :fun space: @_space
 
+  :fun ref clear: @_size = 0, @
+
   :fun ref _ptr_set_null
     @_space = 0
     @_ptr = CPointer(U8)._null
@@ -216,33 +218,25 @@
     @
 
   :fun each_byte(from USize = 0, to = USize.max_value, stride USize = 1)
-    to = @_size.at_most(to)
-    index = from
-    while (index < to) (
-      yield @_ptr._get_at(index)
-      index = index + stride
+    @each_byte_with_index(from, to, stride) -> (value, index |
+      yield value
     )
-    @
 
+  // TODO: Move to be on a new `Indexable.Bytes` trait?
   :fun each_byte_until(from USize = 0, to = USize.max_value, stride USize = 1)
     :yields for Bool
-    early_stop = False
-    to = @_size.at_most(to)
-    index = from
-    while (index < to && !early_stop) (
-      early_stop = yield @_ptr._get_at(index)
-      index += stride
+    @each_byte(from, to, stride) -> (byte |
+      return True if (yield byte)
     )
-    early_stop
+    False
 
   :fun each_byte_with_index(from USize = 0, to = USize.max_value, stride USize = 1)
-    to = @_size.at_most(to)
     index = from
-    while (index < to) (
+    while (index < to.at_most(@_size)) (
       yield (@_ptr._get_at(index), index)
-      index = index + stride
+      index += stride
     )
-    @
+    None
 
   :: Starting from the given byte index and continuing up to the given end,
   :: yield each UTF8-encoded Unicode codepoint, its starting byte index,
@@ -263,11 +257,10 @@
   :fun each_char_with_index_and_width(from USize = 0, to = USize.max_value)
     codepoint U32 = 0
     state U8 = 0
-    to = @_size.at_most(to)
     index = from
     start_index = index
 
-    while (index < to) (
+    while (index < to.at_most(@_size)) (
       byte = @_ptr._get_at(index)
       codepoint = UTF8Decoding.read_byte_into_codepoint(byte, state, codepoint)
       state = UTF8Decoding.next_state(byte, state)
