@@ -42,20 +42,20 @@ elif uname | grep -iq 'DragonFly'; then
     fail "On DragonFly, the only arch currently supported is: x86_64"
   fi
 elif uname | grep -iq 'Darwin'; then
-  if uname -m | grep -iq 'x86_64'; then
-    echo 'x86_64-apple-macosx'
-  elif uname -m | grep -iq 'arm64'; then
+  if uname -m | grep -iq 'arm64'; then
+    echo 'arm64-apple-macosx'
+  elif uname -m | grep -iq 'x86_64'; then
     # LLVM static pre-built libraries are dual-arch, but we upload them
-    # under the name of the x86_64 arch - so we fake that arch here only
+    # under the name of the arm64 arch - so we fake that arch here only
     # for the case of determining paltform for downloading llvm-static libs.
     # For all other purposes we return the true platform triple.
     if [ "$purpose" = 'llvm-static' ]; then
-      echo 'x86_64-apple-macosx'
-    else
       echo 'arm64-apple-macosx'
+    else
+      echo 'x86_64-apple-macosx'
     fi
   else
-    fail "On Darwin, the only arches currently supported are: x86_64, arm64"
+    fail "On Darwin, the only arches currently supported are: arm64, x86_64"
   fi
 else
   fail "The only supported operating systems are: Linux, FreeBSD, Darwin"

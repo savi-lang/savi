@@ -238,7 +238,7 @@ class Savi::Compiler::CodeGen::PonyRT
       ]},
       {"ponyint_hash_block", [@ptr, @isize], @isize, [
         LLVM::Attribute::NoRecurse, LLVM::Attribute::NoUnwind,
-        LLVM::Attribute::ReadOnly, LLVM::Attribute::UWTable,
+        LLVM::Attribute::ReadOnly,
         {1, LLVM::Attribute::ReadOnly},
       ]},
 
@@ -255,7 +255,7 @@ class Savi::Compiler::CodeGen::PonyRT
   end
 
   def gen_alloc_ctx_get(g : CodeGen)
-    g.builder.call(g.mod.functions["pony_ctx"], "ALLOC_CTX")
+    g.gen_call_named("pony_ctx", [] of LLVM::Value, "ALLOC_CTX")
   end
 
   def cast_kind_of(
@@ -504,17 +504,35 @@ class Savi::Compiler::CodeGen::PonyRT
   end
 
   def gen_vtable_gep_get(g, desc, name)
-    g.builder.struct_gep(desc, DESC_VTABLE, name)
+    g.builder.struct_gep(@desc, desc, DESC_VTABLE, name)
+  end
+
+  def gen_vtable_get(g, desc, name)
+    g.builder.load(
+      @desc.struct_element_types[DESC_VTABLE],
+      gen_vtable_gep_get(g, desc, name),
+      "#{name}.DESC.TRAITS",
+    )
   end
 
   def gen_traits_gep_get(g, desc, name)
-    g.builder.struct_gep(desc, DESC_TRAITS, name)
+    g.builder.struct_gep(@desc, desc, DESC_TRAITS, name)
+  end
+
+  def gen_traits_get(g, desc, name)
+    g.builder.load(
+      @desc.struct_element_types[DESC_TRAITS],
+      gen_traits_gep_get(g, desc, name),
+      "#{name}.DESC.TRAITS",
+    )
   end
 
   def gen_type_name_get(g, desc, name)
-    gep = g.builder.struct_gep(desc, DESC_TYPE_NAME, "#{name}.GEP")
-    opaque = g.builder.load(gep, "#{name}.OPAQUE")
-    opaque = g.builder.bit_cast(opaque, g.gtypes["String"].struct_ptr, name)
+    g.builder.load(
+      @ptr,
+      g.builder.struct_gep(@desc, desc, DESC_TYPE_NAME, "#{name}.GEP"),
+      name,
+    )
   end
 
   def gen_struct_type(g : CodeGen, gtype : GenType)
@@ -537,8 +555,8 @@ class Savi::Compiler::CodeGen::PonyRT
   end
 
   def gen_get_desc(g : CodeGen, value : LLVM::Value)
-    desc_gep = g.builder.struct_gep(value, 0, "#{value.name}.DESC.GEP")
-    g.builder.load(desc_gep, "#{value.name}.DESC")
+    desc_gep = g.builder.struct_gep(@obj, value, 0, "#{value.name}.DESC.GEP")
+    g.builder.load(@ptr, desc_gep, "#{value.name}.DESC")
   end
 
   def gen_main(g : CodeGen)
@@ -557,7 +575,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
     # Call pony_init, letting it optionally consume some of the CLI args,
     # giving us a new value for argc and a mutated argv array.
-    argc = g.builder.call(g.mod.functions["pony_init"], [argc, argv], "argc")
+    argc = g.gen_call_named("pony_init", [argc, argv], "argc")
 
     # Get the current alloc_ctx and hold on to it.
     alloc_ctx = gen_alloc_ctx_get(g)
@@ -567,19 +585,26 @@ class Savi::Compiler::CodeGen::PonyRT
     main_actor = gen_alloc_actor(g, g.gtype_main, nil, "main", become_now: true)
 
     env = gen_alloc(g, g.gtypes["Env"], nil, "env")
-    g.builder.call(g.gtypes["Env"]["_create"].llvm_func, [env, argc, argv, envp])
+    g.gen_call_gfunc(g.gtypes["Env"]["_create"], [env, argc, argv, envp])
 
     # TODO: Run module initialisers using the main actor's heap.
 
     # Send the env in a message to the main actor's constructor
-    g.builder.call(g.gtype_main.default_constructor.send_llvm_func, [main_actor, env])
+    g.builder.call(
+      g.gtype_main.default_constructor.send_llvm_func.function_type,
+      g.gtype_main.default_constructor.send_llvm_func,
+      [main_actor, env],
+    )
 
     # Start the runtime.
-    start_success = g.builder.call(g.mod.functions["pony_start"], [
-      @i1.const_int(0),
-      @i32_ptr.null,
-      @ptr.null, # TODO: pony_language_features_init_t*
-    ], "start_success")
+    start_success = g.gen_call_named("pony_start",
+      [
+        @i1.const_int(0),
+        @i32_ptr.null,
+        @ptr.null, # TODO: pony_language_features_init_t*
+      ],
+      "start_success"
+    )
 
     # Branch based on the value of `start_success`.
     start_fail_block = g.gen_block("start_fail")
@@ -588,9 +613,9 @@ class Savi::Compiler::CodeGen::PonyRT
 
     # On failure, just write a failure message then continue to the post_block.
     g.finish_block_and_move_to(start_fail_block)
-    g.builder.call(g.mod.functions["puts"], [
-      g.gen_cstring("Error: couldn't start the runtime!")
-    ])
+    g.gen_call_named("puts",
+      [g.gen_cstring("Error: couldn't start the runtime!")]
+    )
     g.builder.br(post_block)
 
     # On success (or after running the failure block), do the following:
@@ -599,14 +624,11 @@ class Savi::Compiler::CodeGen::PonyRT
     # TODO: Run module finalizers.
 
     # Become nothing (stop being the main actor).
-    g.builder.call(g.mod.functions["ponyint_become"], [
-      g.func_frame.alloc_ctx,
-      @obj_ptr.null,
-    ])
+    g.gen_call_named("ponyint_become", [g.func_frame.alloc_ctx, @obj_ptr.null])
 
     # Get the program's chosen exit code (or 0 by default), but override
     # it with -1 if we failed to start the runtime.
-    exitcode = g.builder.call(g.mod.functions["pony_get_exitcode"], "exitcode")
+    exitcode = g.gen_call_named("pony_get_exitcode", [] of LLVM::Value, "exitcode")
     ret = g.builder.select(start_success, exitcode, @i32.const_int(-1), "ret")
     g.builder.ret(ret)
 
@@ -659,11 +681,11 @@ class Savi::Compiler::CodeGen::PonyRT
         index = PonyRT.heap_index(size).to_i32
         args << @i32.const_int(index)
         # TODO: handle case where final_fn is present (pony_alloc_small_final)
-        g.builder.call(g.mod.functions["pony_alloc_small"], args, "#{name}.MEM")
+        g.gen_call_named("pony_alloc_small", args, "#{name}.MEM")
       else
         args << @isize.const_int(size)
         # TODO: handle case where final_fn is present (pony_alloc_large_final)
-        g.builder.call(g.mod.functions["pony_alloc_large"], args, "#{name}.MEM")
+        g.gen_call_named("pony_alloc_large", args, "#{name}.MEM")
       end
 
     g.builder.bit_cast(allocated, llvm_type.pointer, name)
@@ -678,25 +700,24 @@ class Savi::Compiler::CodeGen::PonyRT
     # optimizations related to the actor reference count and the cycle detector.
     no_inc_rc = from_expr && g.func_frame.classify.value_not_needed?(from_expr)
 
-    allocated = g.builder.call(g.mod.functions["pony_create"], [
+    allocated = g.gen_call_named("pony_create", [
       g.alloc_ctx,
-      g.gen_get_desc_opaque(gtype),
+      gtype.desc,
       @i1.const_int(no_inc_rc ? 1 : 0)
     ], "#{name}.OPAQUE")
 
     if become_now
-      g.builder.call(
-        g.mod.functions["ponyint_become"],
+      g.gen_call_named("ponyint_become",
         [g.gen_frame.alloc_ctx, allocated],
       )
     end
 
-    g.builder.bit_cast(allocated, gtype.struct_ptr, name)
+    allocated
   end
 
   def gen_intrinsic_cpointer_alloc(g : CodeGen, params, llvm_type, elem_size_value)
     g.builder.bit_cast(
-      g.builder.call(g.mod.functions["pony_alloc"], [
+      g.gen_call_named("pony_alloc", [
         g.alloc_ctx,
         g.builder.mul(params[0], @isize.const_int(elem_size_value)),
       ]),
@@ -706,7 +727,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
   def gen_intrinsic_cpointer_realloc(g : CodeGen, params, llvm_type, elem_size_value)
     g.builder.bit_cast(
-      g.builder.call(g.mod.functions["pony_realloc"], [
+      g.gen_call_named("pony_realloc", [
         g.alloc_ctx,
         g.builder.bit_cast(params[0], @ptr),
         g.builder.mul(params[1], @isize.const_int(elem_size_value)),
@@ -726,7 +747,7 @@ class Savi::Compiler::CodeGen::PonyRT
     # Allocate a message object of the specific size/type used by this function.
     msg_size = g.abi_size_of(msg_type)
     pool_index = PonyRT.pool_index(msg_size)
-    msg_opaque = g.builder.call(g.mod.functions["pony_alloc_msg"],
+    msg_opaque = g.gen_call_named("pony_alloc_msg",
       [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg.OPAQUE")
     msg = g.builder.bit_cast(msg_opaque, msg_type.pointer, "msg")
 
@@ -749,7 +770,7 @@ class Savi::Compiler::CodeGen::PonyRT
       needs_trace ||= src_types.last.trace_needed?(g.ctx, dst_types.last)
 
       # Store the parameter as an argument in the message.
-      arg_gep = g.builder.struct_gep(msg, i, "msg.#{i - 2}.GEP")
+      arg_gep = g.builder.struct_gep(msg_type, msg, i, "msg.#{i - 2}.GEP")
       g.builder.store(param, arg_gep)
 
       # TODO: Remove/refactor this distinction? Is this really correct?
@@ -758,13 +779,13 @@ class Savi::Compiler::CodeGen::PonyRT
     end
 
     if needs_trace
-      g.builder.call(g.mod.functions["pony_gc_send"], [g.alloc_ctx])
+      g.gen_call_named("pony_gc_send", [g.alloc_ctx])
 
       src_values.each_with_index do |src_value, i|
         gen_trace(g, src_value, dst_values[i], src_types[i], dst_types[i])
       end
 
-      g.builder.call(g.mod.functions["pony_send_done"], [g.alloc_ctx])
+      g.gen_call_named("pony_send_done", [g.alloc_ctx])
     end
 
     # If this is a constructor, we know that we are the only message producer
@@ -774,7 +795,7 @@ class Savi::Compiler::CodeGen::PonyRT
       gfunc.func.has_tag?(:constructor) ? "pony_sendv_single" : "pony_sendv"
 
     # Send the message.
-    g.builder.call(g.mod.functions[sendv_name], [
+    g.gen_call_named(sendv_name, [
       g.alloc_ctx,
       g.builder.bit_cast(fn.params[0], @obj_ptr, "@.OPAQUE"),
       msg_opaque,
@@ -808,10 +829,9 @@ class Savi::Compiler::CodeGen::PonyRT
     g.gen_func_start(fn)
 
     fn.params[0].name = "PONY_CTX"
-    fn.params[1].name = "@.OPAQUE"
+    fn.params[1].name = "@"
     g.func_frame.alloc_ctx = fn.params[0]
-    g.func_frame.receiver_value =
-      g.builder.bit_cast(fn.params[1], gtype.struct_ptr, "@")
+    g.func_frame.receiver_value = fn.params[1]
 
     if gtype.type_def.is_array?(g.ctx)
       # We have a special-case implementation for Array (unfortunately).
@@ -832,12 +852,13 @@ class Savi::Compiler::CodeGen::PonyRT
   end
 
   def gen_trace_impl_for_array(g : CodeGen, gtype : GenType, fn)
-    elem_type_ref = gtype.type_def.array_type_arg(g.ctx)
-    array_size    = g.gen_field_load("_size", gtype)
-    array_ptr     = g.gen_field_load("_ptr", gtype)
+    elem_type_ref  = gtype.type_def.array_type_arg(g.ctx)
+    elem_llvm_type = g.llvm_type_of(elem_type_ref)
+    array_size     = g.gen_field_load("_size", gtype)
+    array_ptr      = g.gen_field_load("_ptr", gtype)
 
     # First, trace the base pointer itself.
-    g.builder.call(g.mod.functions["pony_trace"], [
+    g.gen_call_named("pony_trace", [
       g.alloc_ctx,
       g.builder.bit_cast(array_ptr, @ptr),
     ])
@@ -861,7 +882,7 @@ class Savi::Compiler::CodeGen::PonyRT
     # In the cond block, compare the index variable to the array size,
     # jumping to the body block if still within bounds; else, the post block.
     g.finish_block_and_move_to(cond_block)
-    index = g.builder.load(index_alloca, "ARRAY.TRACE.LOOP.INDEX")
+    index = g.builder.load(@isize, index_alloca, "ARRAY.TRACE.LOOP.INDEX")
     continue = g.builder.icmp(LLVM::IntPredicate::ULT, index, array_size)
     g.builder.cond(continue, body_block, post_block)
 
@@ -869,9 +890,11 @@ class Savi::Compiler::CodeGen::PonyRT
     g.finish_block_and_move_to(body_block)
     elem =
       g.builder.load(
+        elem_llvm_type,
         g.builder.inbounds_gep(
+          elem_llvm_type,
           array_ptr,
-          g.builder.load(index_alloca, "ARRAY.TRACE.LOOP.INDEX"),
+          g.builder.load(@isize, index_alloca, "ARRAY.TRACE.LOOP.INDEX"),
           "ARRAY.TRACE.LOOP.ELEM.GEP",
         ),
         "ARRAY.TRACE.LOOP.ELEM",
@@ -902,18 +925,16 @@ class Savi::Compiler::CodeGen::PonyRT
     g.gen_func_start(fn)
 
     fn.params[0].name = "PONY_CTX"
-    fn.params[1].name = "@.OPAQUE"
+    fn.params[1].name = "@"
     fn.params[2].name = "msg"
 
     g.func_frame.alloc_ctx = fn.params[0]
-    receiver_opaque = fn.params[1]
-    g.func_frame.receiver_value = receiver =
-      g.builder.bit_cast(receiver_opaque, gtype.struct_ptr, "@")
+    g.func_frame.receiver_value = receiver = fn.params[1]
 
     # Get the message id from the first field of the message object
     # (which was the third parameter to this function).
-    msg_id_gep = g.builder.struct_gep(fn.params[2], 1, "msg.id.GEP")
-    msg_id = g.builder.load(msg_id_gep, "msg.id")
+    msg_id_gep = g.builder.struct_gep(@msg, fn.params[2], 1, "msg.id.GEP")
+    msg_id = g.builder.load(@msg.struct_element_types[1], msg_id_gep, "msg.id")
 
     # Capture the current insert block so we can come back to it later,
     # after we jump around into each case block that we need to generate.
@@ -932,7 +953,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
       # Create the block to execute when the message id matches.
       cases[id] = block = g.gen_block("DISPATCH.#{func_name}")
-      g.@builder.position_at_end(block)
+      g.builder.position_at_end(block)
 
       src_types = [] of Reach::Ref
       dst_types = [] of Reach::Ref
@@ -951,8 +972,8 @@ class Savi::Compiler::CodeGen::PonyRT
         src_types << dst_types.last # TODO: are these ever different?
         needs_trace ||= src_types.last.trace_needed?(g.ctx, dst_types.last)
 
-        arg_gep = g.builder.struct_gep(msg, i, "msg.#{func_name}.#{i - 2}.GEP")
-        src_value = g.builder.load(arg_gep, "msg.#{func_name}.#{i - 2}")
+        arg_gep = g.builder.struct_gep(msg_type, msg, i, "msg.#{func_name}.#{i - 2}.GEP")
+        src_value = g.builder.load(msg_type.struct_element_types[i], arg_gep, "msg.#{func_name}.#{i - 2}")
         src_values << src_value
 
         dst_value = src_value
@@ -963,17 +984,17 @@ class Savi::Compiler::CodeGen::PonyRT
       args = [receiver] + dst_values
 
       if needs_trace
-        g.builder.call(g.mod.functions["pony_gc_recv"], [g.alloc_ctx])
+        g.gen_call_named("pony_gc_recv", [g.alloc_ctx])
 
         src_values.each_with_index do |src_value, i|
           gen_trace(g, src_value, dst_values[i], src_types[i], dst_types[i])
         end
 
-        g.builder.call(g.mod.functions["pony_recv_done"], [g.alloc_ctx])
+        g.gen_call_named("pony_recv_done", [g.alloc_ctx])
       end
 
       # Call the underlying function and return void.
-      g.builder.call(gfunc.llvm_func, args)
+      g.gen_call_gfunc(gfunc, args)
       g.builder.ret
     end
 
@@ -992,7 +1013,7 @@ class Savi::Compiler::CodeGen::PonyRT
   end
 
   def gen_trace_unknown(g : CodeGen, dst, ponyrt_trace_kind)
-    g.builder.call(g.mod.functions["pony_traceunknown"], [
+    g.gen_call_named("pony_traceunknown", [
       g.alloc_ctx,
       g.builder.bit_cast(dst, @obj_ptr, "#{dst.name}.OPAQUE"),
       @i32.const_int(ponyrt_trace_kind),
@@ -1002,7 +1023,7 @@ class Savi::Compiler::CodeGen::PonyRT
   def gen_trace_known(g : CodeGen, dst, src_type, ponyrt_trace_kind)
     src_gtype = g.gtype_of(src_type)
 
-    g.builder.call(g.mod.functions["pony_traceknown"], [
+    g.gen_call_named("pony_traceknown", [
       g.alloc_ctx,
       g.builder.bit_cast(dst, @obj_ptr, "#{dst.name}.OPAQUE"),
       g.builder.bit_cast(src_gtype.desc, @desc_ptr, "#{dst.name}.DESC"),

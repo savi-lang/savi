@@ -1,4 +1,10 @@
 struct LLVM::Function
+  # Override the Crystal implementation of this method because the old one
+  # doesn't work with opaque pointers (beginning in LLVM 15).
+  def function_type
+    Type.new LibLLVM.global_get_value_type self
+  end
+
   def entry_block
     BasicBlock.new LibLLVM.get_entry_basic_block self
   end

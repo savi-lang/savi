@@ -133,16 +133,16 @@ class Savi::Compiler::CodeGen
       @fields.find(&.first.==(name)).try(&.last)
     end
 
-    def struct_ptr
-      struct_type.pointer
-    end
-
     def fields_struct_index
       struct_type.struct_element_types.size - 1
     end
 
     def field_index(name)
       @fields.index { |n, _| n == name }.not_nil!
+    end
+
+    def field_llvm_type(name)
+      fields_struct_type.struct_element_types[field_index(name)]
     end
 
     def each_gfunc

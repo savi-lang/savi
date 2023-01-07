@@ -107,6 +107,7 @@ class Savi::Compiler::CodeGen
     @target_machine = @target.create_target_machine(@target_triple).as(LLVM::TargetMachine)
     @target_info = Target.new(@target_machine.triple)
     @llvm = LLVM::Context.new
+
     @mod = @llvm.new_module("main")
     @builder = @llvm.new_builder
 
@@ -138,7 +139,7 @@ class Savi::Compiler::CodeGen
       [] of LLVM::Type, @i32).as(LLVM::Function)
 
     @bitwidth = @isize.int_width.to_u.as(UInt32)
-    @memcpy = mod.functions.add("llvm.memcpy.p0i8.p0i8.i#{@bitwidth}",
+    @memcpy = mod.functions.add("llvm.memcpy.p0.p0.i#{@bitwidth}",
       [@ptr, @ptr, @isize, @i1], @void).as(LLVM::Function)
 
     @frames = [] of Frame
@@ -292,14 +293,12 @@ class Savi::Compiler::CodeGen
     when :i64 then @i64
     when :f32 then @f32
     when :f64 then @f64
-    when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg(ctx)).pointer
     when :isize then @isize
+    when :ptr then @ptr
+    when :struct_ptr then @ptr
+    when :struct_ptr_opaque then @ptr
     when :struct_value then
       @gtypes[ctx.reach[ref.single!].llvm_name].fields_struct_type
-    when :struct_ptr then
-      @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
-    when :struct_ptr_opaque then
-      @obj_ptr
     else raise NotImplementedError.new(ref.llvm_use_type(ctx))
     end
   end
@@ -313,14 +312,12 @@ class Savi::Compiler::CodeGen
     when :i64 then @i64
     when :f32 then @f32
     when :f64 then @f64
-    when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg(ctx)).pointer
     when :isize then @isize
+    when :ptr then @ptr
+    when :struct_ptr then @ptr
+    when :struct_ptr_opaque then @ptr
     when :struct_value then
       @gtypes[ctx.reach[ref.single!].llvm_name].fields_struct_type
-    when :struct_ptr then
-      @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
-    when :struct_ptr_opaque then
-      @obj_ptr
     else raise NotImplementedError.new(ref.llvm_mem_type(ctx))
     end
   end
@@ -426,17 +423,17 @@ class Savi::Compiler::CodeGen
     # Construct the following arguments to pass to the main function:
     # i32 argc = 0, i8** argv = ["savijit", NULL], i8** envp = [NULL]
     argc = @i32.const_int(1)
-    argv = @builder.alloca(@i8.pointer.array(2), "argv")
-    envp = @builder.alloca(@i8.pointer.array(1), "envp")
-    argv_0 = @builder.inbounds_gep(argv, @i32_0, @i32_0, "argv_0")
-    argv_1 = @builder.inbounds_gep(argv, @i32_0, @i32.const_int(1), "argv_1")
-    envp_0 = @builder.inbounds_gep(envp, @i32_0, @i32_0, "envp_0")
+    argv = @builder.alloca(@ptr.array(2), "argv")
+    envp = @builder.alloca(@ptr.array(1), "envp")
+    argv_0 = @builder.inbounds_gep(@ptr.array(2), argv, @i32_0, @i32_0, "argv_0")
+    argv_1 = @builder.inbounds_gep(@ptr.array(2), argv, @i32_0, @i32.const_int(1), "argv_1")
+    envp_0 = @builder.inbounds_gep(@ptr.array(1), envp, @i32_0, @i32_0, "envp_0")
     @builder.store(gen_cstring("savijit"), argv_0)
     @builder.store(@ptr.null, argv_1)
     @builder.store(@ptr.null, envp_0)
 
     # Call the main function with the constructed arguments.
-    res = @builder.call(@mod.functions["main"], [argc, argv_0, envp_0], "res")
+    res = gen_call_named("main", [argc, argv_0, envp_0], "res")
     @builder.ret(res)
   end
 
@@ -545,6 +542,24 @@ class Savi::Compiler::CodeGen
     frame.llvm_func.basic_blocks.append(name)
   end
 
+  def gen_call_named(
+    func_name : String,
+    args : Array(LLVM::Value),
+    value_name : String = ""
+  ) : LLVM::Value
+    func = @mod.functions[func_name]
+    @builder.call(func.function_type, func, args, value_name)
+  end
+
+  def gen_call_gfunc(
+    gfunc : GenFunc,
+    args : Array(LLVM::Value),
+    value_name : String = ""
+  ) : LLVM::Value
+    func = gfunc.llvm_func
+    @builder.call(func.function_type, func, args, value_name)
+  end
+
   def gen_llvm_func(name, param_types, ret_type)
     @mod.functions.add(name, param_types, ret_type) { |f|
       # Give the function private linkage unless the flag to keep all functions
@@ -587,7 +602,7 @@ class Savi::Compiler::CodeGen
     if gfunc.needs_receiver?
       receiver_type =
         if gfunc.boxed_fields_receiver?(ctx)
-          gtype.struct_ptr
+          @ptr
         else
           llvm_type_of(gtype)
         end
@@ -621,7 +636,7 @@ class Savi::Compiler::CodeGen
         # includes a receiver parameter, but throws it away without using it.
         vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
         vparam_types = param_types.dup
-        vparam_types.unshift(gtype.struct_ptr)
+        vparam_types.unshift(@ptr)
 
         gen_llvm_func vtable_name, vparam_types, ret_type do |fn|
           next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
@@ -631,7 +646,7 @@ class Savi::Compiler::CodeGen
           forward_args =
             (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
 
-          result = @builder.call(gfunc.llvm_func, forward_args)
+          result = gen_call_gfunc(gfunc, forward_args)
           if ret_type == @void
             @builder.ret
           else
@@ -647,7 +662,7 @@ class Savi::Compiler::CodeGen
         vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
         vparam_types = param_types.dup
         vparam_types.shift
-        vparam_types.unshift(gtype.struct_ptr)
+        vparam_types.unshift(@ptr)
 
         gen_llvm_func vtable_name, vparam_types, ret_type do |fn|
           next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
@@ -658,7 +673,7 @@ class Savi::Compiler::CodeGen
             (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
           forward_args.unshift(gen_unboxed_fields(fn.params[0], gtype))
 
-          result = @builder.call(gfunc.llvm_func, forward_args)
+          result = gen_call_gfunc(gfunc, forward_args)
           if ret_type == @void
             @builder.ret
           else
@@ -667,9 +682,9 @@ class Savi::Compiler::CodeGen
 
           gen_func_end
         end
-      elsif param_types.first != gtype.struct_ptr
-        # If the receiver parameter type doesn't match the struct pointer,
-        # we assume it is a boxed machine value, so we need a wrapper function
+      elsif param_types.first != @ptr
+        # If the receiver parameter type isn't a pointer, we assume
+        # the pointer is a boxed machine value, so we need a wrapper function
         # that will unwrap the raw machine value to use as the receiver.
         elem_types = gtype.fields_struct_type.struct_element_types
         raise "expected the receiver type to be a raw machine value" \
@@ -678,7 +693,7 @@ class Savi::Compiler::CodeGen
         vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
         vparam_types = param_types.dup
         vparam_types.shift
-        vparam_types.unshift(gtype.struct_ptr)
+        vparam_types.unshift(@ptr)
 
         gen_llvm_func vtable_name, vparam_types, ret_type do |fn|
           next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
@@ -689,7 +704,7 @@ class Savi::Compiler::CodeGen
             (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
           forward_args.unshift(gen_unboxed_value(fn.params[0], gtype))
 
-          result = @builder.call(gfunc.llvm_func, forward_args)
+          result = gen_call_gfunc(gfunc, forward_args)
           if ret_type == @void
             @builder.ret
           else
@@ -712,9 +727,12 @@ class Savi::Compiler::CodeGen
       send_name = "#{gfunc.llvm_name}.SEND"
       msg_name = "#{gfunc.llvm_name}.SEND.MSG"
 
+      # The return type is None, which is a pointer.
+      none_ptr = @ptr
+
       # We'll fill in the implementation of this later, in gen_send_impl.
       gfunc.virtual_llvm_func = gfunc.send_llvm_func =
-        gen_llvm_func(send_name, param_types, @gtypes["None"].struct_ptr) {}
+        gen_llvm_func(send_name, param_types, none_ptr) {}
 
       # We also need to create a message type to use in the send operation.
       gfunc.send_msg_llvm_type =
@@ -754,7 +772,11 @@ class Savi::Compiler::CodeGen
             forward_args =
               (virtual_continue_param_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
 
-            result = @builder.call(gfunc.continue_llvm_func.not_nil!, forward_args)
+            result = @builder.call(
+              gfunc.continue_llvm_func.not_nil!.function_type,
+              gfunc.continue_llvm_func.not_nil!,
+              forward_args,
+            )
             if ret_type == @void
               @builder.ret
             else
@@ -808,7 +830,7 @@ class Savi::Compiler::CodeGen
         next if init_func.nil?
 
         call_args = [func_frame.receiver_value]
-        init_value = @builder.call(init_func.llvm_func, call_args)
+        init_value = gen_call_gfunc(init_func, call_args)
         gen_field_store(name, init_value)
       end
     end
@@ -868,33 +890,20 @@ class Savi::Compiler::CodeGen
   def gen_ffi_call(gfunc, args)
     llvm_ffi_func = gen_ffi_decl(gfunc)
 
-    # Sometimes different user libraries may bind to the same
-    # FFI function with different (but ABI-compatible) signatures.
-    # In such a case, the first binding "wins" and the other one
-    # ends up with possible different (but ABI-compatible) LLVM types,
-    # so we must cast the arguments to the appropriate types here.
-    param_types = llvm_ffi_func.type.element_type.params_types
-    cast_args = [] of LLVM::Value
-    args.each_with_index { |arg, index|
-      param_type = param_types[index]?
-      cast_args <<
-        if param_type && arg.type != param_type
-          @builder.bit_cast(arg, param_type, "#{arg.name}.FFICAST")
-        else
-          arg
-        end
-    }
-
     # Now call the FFI function, according to its convention.
     case gfunc.calling_convention
     when GenFunc::Simple
-      value = @builder.call llvm_ffi_func, cast_args
+      value = @builder.call(
+        llvm_ffi_func.function_type,
+        llvm_ffi_func,
+        args,
+      )
       value = gen_none if llvm_ffi_func.return_type == @void
       value
     when GenFunc::Errorable
       then_block = gen_block("invoke_then")
       else_block = gen_block("invoke_else")
-      value = @builder.invoke llvm_ffi_func, cast_args, then_block, else_block
+      value = @builder.invoke llvm_ffi_func, args, then_block, else_block
       value = gen_none if llvm_ffi_func.return_type == @void
 
       # In the else block, make a landing pad to catch the Pony-style error,
@@ -917,9 +926,6 @@ class Savi::Compiler::CodeGen
     # And possibly cast the return type, for the same reasons
     # that we possibly cast the argument types earlier above.
     ret_type = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
-    if value.type != ret_type
-      value = @builder.bit_cast(value, ret_type, "#{value.name}.FFICAST")
-    end
 
     value
   end
@@ -949,51 +955,36 @@ class Savi::Compiler::CodeGen
       when "_unsafe", "_unsafe_val"
         params[0]
       when "_offset", "offset"
-        @builder.bit_cast(
-          @builder.inbounds_gep(
-            @builder.bit_cast(params[0], elem_llvm_type.pointer),
-            params[1]
-          ),
-          params[0].type
-        )
+        @builder.inbounds_gep(elem_llvm_type, params[0], params[1])
       when "_get_at"
-        gep = @builder.inbounds_gep(params[0], params[1])
-        @builder.load(gep)
+        gep = @builder.inbounds_gep(elem_llvm_type, params[0], params[1])
+        @builder.load(elem_llvm_type, gep)
       when "_get_at_no_alias"
-        gep = @builder.inbounds_gep(params[0], params[1])
-        @builder.load(gep)
+        gep = @builder.inbounds_gep(elem_llvm_type, params[0], params[1])
+        @builder.load(elem_llvm_type, gep)
       when "_assign_at"
-        gep = @builder.inbounds_gep(params[0], params[1])
+        gep = @builder.inbounds_gep(elem_llvm_type, params[0], params[1])
         new_value = params[2]
         @builder.store(new_value, gep)
         new_value
       when "_displace_at"
-        gep = @builder.inbounds_gep(params[0], params[1])
+        gep = @builder.inbounds_gep(elem_llvm_type, params[0], params[1])
         new_value = params[2]
-        old_value = @builder.load(gep)
+        old_value = @builder.load(elem_llvm_type, gep)
         @builder.store(new_value, gep)
         old_value
       when "_copy_to"
-        @builder.call(@memcpy, [
-          @builder.bit_cast(params[1], @ptr),
-          @builder.bit_cast(params[0], @ptr),
-          @builder.mul(
-            params[2],
-            @isize.const_int(elem_size_value),
-          ),
+        @builder.call(@memcpy.function_type, @memcpy, [
+          params[1],
+          params[0],
+          @builder.mul(params[2], @isize.const_int(elem_size_value)),
           @i1.const_int(0),
         ])
         gen_none
       when "_compare"
-        @builder.call(
-          @mod.functions["memcmp"],
-          [params[0], params[1], params[2]],
-        )
+        gen_call_named("memcmp", [params[0], params[1], params[2]])
       when "_hash"
-        @builder.call(
-          @mod.functions["ponyint_hash_block"],
-          [params[0], params[1]],
-        )
+        gen_call_named("ponyint_hash_block", [params[0], params[1]])
       when "is_null"
         @builder.is_null(params[0])
       when "is_not_null"
@@ -1049,12 +1040,11 @@ class Savi::Compiler::CodeGen
       case gfunc.func.ident.value
       when "[]"
         param_type = params[0].type
+        asm_fn_type = LLVM::Type.function([param_type], @void)
         asm_fn = LLVM::Function.from_value(
-          LLVM::Type.function([param_type], @void).inline_asm(
-            "", "imr,~{memory}", true, false
-          )
+          asm_fn_type.inline_asm("", "imr,~{memory}", true, false)
         )
-        call = @builder.call(asm_fn, [params[0]])
+        call = @builder.call(asm_fn_type, asm_fn, [params[0]])
         call.add_instruction_attribute(
           LLVM::AttributeIndex::FunctionIndex.to_u32,
           LLVM::Attribute::NoUnwind, @llvm)
@@ -1067,12 +1057,11 @@ class Savi::Compiler::CodeGen
             if param_type.kind == LLVM::Type::Kind::Pointer
         gen_none
       when "observe_side_effects"
+        asm_fn_type = LLVM::Type.function([] of LLVM::Type, @void)
         asm_fn = LLVM::Function.from_value(
-          LLVM::Type.function([] of LLVM::Type, @void).inline_asm(
-            "", "~{memory}", true, false
-          )
+          asm_fn_type.inline_asm("", "~{memory}", true, false)
         )
-        call = @builder.call(asm_fn)
+        call = @builder.call(asm_fn_type, asm_fn, [] of LLVM::Value)
         call.add_instruction_attribute(
           LLVM::AttributeIndex::FunctionIndex.to_u32,
           LLVM::Attribute::NoUnwind, @llvm)
@@ -1387,7 +1376,7 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.bitreverse.i64", [@i64], @i64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
-        @builder.call(op_func, [params[0]])
+        @builder.call(op_func.function_type, op_func, [params[0]])
       when "swap_bytes"
         raise "swap_bytes float" if gtype.type_def.is_floating_point_numeric?(ctx)
         case bit_width_of(gtype)
@@ -1396,15 +1385,15 @@ class Savi::Compiler::CodeGen
         when 16
           op_func =
             use_external_llvm_func("llvm.bswap.i16", [@i16], @i16)
-          @builder.call(op_func, [params[0]])
+          @builder.call(op_func.function_type, op_func, [params[0]])
         when 32
           op_func =
             use_external_llvm_func("llvm.bswap.i32", [@i32], @i32)
-          @builder.call(op_func, [params[0]])
+          @builder.call(op_func.function_type, op_func, [params[0]])
         when 64
           op_func =
             use_external_llvm_func("llvm.bswap.i64", [@i64], @i64)
-          @builder.call(op_func, [params[0]])
+          @builder.call(op_func.function_type, op_func, [params[0]])
         else raise NotImplementedError.new(bit_width_of(gtype))
         end
       when "leading_zero_bits"
@@ -1424,7 +1413,7 @@ class Savi::Compiler::CodeGen
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"],
-          @builder.call(op_func, [params[0], @i1_false])
+          @builder.call(op_func.function_type, op_func, [params[0], @i1_false])
       when "trailing_zero_bits"
         raise "trailing_zero_bits float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
@@ -1442,7 +1431,7 @@ class Savi::Compiler::CodeGen
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"],
-          @builder.call(op_func, [params[0], @i1_false])
+          @builder.call(op_func.function_type, op_func, [params[0], @i1_false])
       when "total_one_bits"
         raise "total_one_bits float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
@@ -1460,7 +1449,7 @@ class Savi::Compiler::CodeGen
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"], \
-          @builder.call(op_func, [params[0]])
+          @builder.call(op_func.function_type, op_func, [params[0]])
       when "+!", "-!", "*!"
         raise NotImplementedError.new("overflow-checked arithmetic for float") \
           if gtype.type_def.is_floating_point_numeric?(ctx)
@@ -1494,7 +1483,7 @@ class Savi::Compiler::CodeGen
         overflow_block = gen_block("overflow")
         after_block = gen_block("after")
 
-        result = @builder.call(op_func, [params[0], params[1]])
+        result = @builder.call(op_func.function_type, op_func, [params[0], params[1]])
 
         is_overflow = @builder.extract_value(result, 1)
         @builder.cond(is_overflow, overflow_block, after_block)
@@ -1534,7 +1523,7 @@ class Savi::Compiler::CodeGen
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
 
-        @builder.call(op_func, [params[0], params[1]])
+        @builder.call(op_func.function_type, op_func, [params[0], params[1]])
       when "bits"
         raise "bits integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
         case bit_width_of(gtype)
@@ -1559,7 +1548,7 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.log.f64", [@f64], @f64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
-        @builder.call(op_func, [params[0]])
+        @builder.call(op_func.function_type, op_func, [params[0]])
       when "log2"
         raise "log2 integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
@@ -1570,7 +1559,7 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.log2.f64", [@f64], @f64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
-        @builder.call(op_func, [params[0]])
+        @builder.call(op_func.function_type, op_func, [params[0]])
       when "log10"
         raise "log10 integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
@@ -1581,7 +1570,7 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.log10.f64", [@f64], @f64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
-        @builder.call(op_func, [params[0]])
+        @builder.call(op_func.function_type, op_func, [params[0]])
       when "pow"
         raise "pow integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
@@ -1592,7 +1581,7 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.pow.f64", [@f64, @f64], @f64)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
-        @builder.call(op_func, [params[0], params[1]])
+        @builder.call(op_func.function_type, op_func, [params[0], params[1]])
       when "next_pow2"
         raise "next_pow2 float" if gtype.type_def.is_floating_point_numeric?(ctx)
 
@@ -1602,7 +1591,7 @@ class Savi::Compiler::CodeGen
           else
             @builder.zext(params[0], @isize)
           end
-        res = @builder.call(@mod.functions["ponyint_next_pow2"], [arg])
+        res = gen_call_named("ponyint_next_pow2", [arg])
 
         if bit_width_of(gtype) < bit_width_of(@isize)
           @builder.trunc(res, llvm_type_of(gtype))
@@ -1704,7 +1693,7 @@ class Savi::Compiler::CodeGen
 
     member = member_ast.value
     arg_exprs = args_ast.try(&.terms.map(&.as(AST::Node?))) || [] of AST::Node?
-    args = arg_exprs.map { |x| gen_expr(x.not_nil!).as(LLVM::Value) }
+    args = arg_exprs.map { |x| gen_expr(x.not_nil!) }
     arg_frames = arg_exprs.map { nil.as(Frame?) }
 
     lhs_type = type_of(call.receiver)
@@ -1764,7 +1753,6 @@ class Savi::Compiler::CodeGen
         gen_vtable_func_get(
           receiver,
           lhs_type,
-          gfunc.virtual_llvm_func.type,
           gfunc.vtable_index,
           member,
         )
@@ -1790,14 +1778,7 @@ class Savi::Compiler::CodeGen
     if gfunc.needs_continuation?
       cont = gen_yielding_call_cont_gep(call, "#{gfunc.llvm_name}.CONT")
 
-      # We need to cast the cont argument if this is a virtual call.
-      if needs_virtual_call
-        cont_param_index = use_receiver ? 1 : 0
-        cont_param_type = llvm_func.type.element_type.params_types[cont_param_index]
-        cont_cast = @builder.bit_cast(cont, cont_param_type, "#{cont.name}.CAST")
-      end
-
-      args.unshift((cont_cast || cont).not_nil!)
+      args.unshift(cont.not_nil!)
       arg_exprs.unshift(nil)
       arg_frames.unshift(nil)
     end
@@ -1823,11 +1804,13 @@ class Savi::Compiler::CodeGen
     @di.set_loc(call.ident)
     result = gen_call(
       gfunc.reach_func.signature,
+      gfunc,
       llvm_func,
       args,
       arg_exprs,
       arg_frames,
       gfunc.func.has_tag?(:ffi) ? gfunc : nil,
+      needs_virtual_call,
       use_receiver,
       !cont.nil?,
     )
@@ -1914,7 +1897,6 @@ class Savi::Compiler::CodeGen
             gen_local_alloca(yield_param_ref, llvm_type_of(yield_param_ast))
 
           yield_out = @builder.extract_value(yield_out_all, index, yield_param_ref.name)
-          yield_out = @builder.bit_cast(yield_out, llvm_type_of(yield_param_ast))
           @builder.store(yield_out, yield_param_alloca)
         end
       end
@@ -1940,9 +1922,7 @@ class Savi::Compiler::CodeGen
       # If None is the yield in value type expected, just generate None,
       # allowing us to ignore the actual result value of the yield block.
       yield_in_value = gen_expr(yield_block_ast.not_nil!)
-      if llvm_type_of(yield_in_type) == @gtypes["None"].struct_type.pointer
-        yield_in_value = gen_none
-      end
+      yield_in_value = gen_none if yield_in_type.is_none?
       yield_in_block = @builder.insert_block.not_nil!
       @builder.br(continue_block)
 
@@ -1959,27 +1939,40 @@ class Savi::Compiler::CodeGen
 
       # We're now ready to call the continue function for this function.
       # We pass the continuation data and yield_in_value back as the arguments.
+      continue_llvm_func_type : LLVM::Type =
+        if needs_virtual_call
+          gfunc.virtual_continue_llvm_func.function_type
+        else
+          gfunc.continue_llvm_func.not_nil!.function_type
+        end
       continue_llvm_func =
         if needs_virtual_call
           gen_vtable_func_get(
             receiver,
             lhs_type,
-            gfunc.virtual_continue_llvm_func.type,
             gfunc.vtable_index_continue,
             "#{member}.CONTINUE",
           )
         else
           gfunc.continue_llvm_func.not_nil!
         end
-      again_args = [(cont_cast || cont).not_nil!, yield_in_value]
+      again_args = [cont.not_nil!, yield_in_value]
       again_arg_frames = arg_exprs.map { nil.as(Frame?) }
       if use_receiver
-        again_receiver = @builder.load(receiver_gep.not_nil!, "#{gfunc.llvm_name}.@")
+        again_receiver = @builder.load(
+          llvm_type_of(call.receiver),
+          receiver_gep.not_nil!,
+          "#{gfunc.llvm_name}.@",
+        )
         again_args.unshift(again_receiver)
         again_arg_frames.unshift(nil)
       end
       @di.set_loc(call.ident)
-      @builder.call(LLVM::Function.from_value(continue_llvm_func), again_args)
+      @builder.call(
+        continue_llvm_func_type,
+        LLVM::Function.from_value(continue_llvm_func),
+        again_args,
+      )
 
       # Return to the "maybe block", to determine if we need to iterate again.
       @builder.br(maybe_block)
@@ -2015,7 +2008,6 @@ class Savi::Compiler::CodeGen
   def gen_vtable_func_get(
     receiver : LLVM::Value,
     type_ref : Reach::Ref,
-    llvm_func_type : LLVM::Type,
     vtable_index : Int32,
     name : String,
   )
@@ -2028,23 +2020,38 @@ class Savi::Compiler::CodeGen
     desc = gen_get_desc(receiver)
     vtable_gep = @runtime.gen_vtable_gep_get(self, desc, "#{rname}.DESC.VTABLE")
     vtable_idx = @i32.const_int(vtable_index)
-    gep = @builder.inbounds_gep(vtable_gep, @i32_0, vtable_idx, "#{fname}.GEP")
-    load = @builder.load(gep, "#{fname}.LOAD")
-    func = @builder.bit_cast(load, llvm_func_type, fname)
+    gep = @builder.inbounds_gep(
+      @ptr,
+      @builder.inbounds_gep(@ptr, vtable_gep, @i32_0, "#{fname}.VTABLE.ARRAY"),
+      vtable_idx,
+      "#{fname}.GEP"
+    )
+    func = @builder.load(@ptr, gep, "#{fname}.LOAD")
 
     func
   end
 
   def gen_call(
     signature : Reach::Signature,
+    signature_gfunc : GenFunc,
     func : (LLVM::Function | LLVM::Value),
     args : Array(LLVM::Value),
     arg_exprs : Array(AST::Node?),
     arg_frames : Array(Frame?),
     is_ffi_gfunc : GenFunc?,
+    is_virtual_call : Bool,
     use_receiver : Bool,
     use_cont : Bool,
   )
+    llvm_func_type =
+      if func.is_a?(LLVM::Function)
+        func.function_type
+      elsif is_virtual_call
+        signature_gfunc.virtual_llvm_func.function_type
+      else
+        signature_gfunc.llvm_func.function_type
+      end
+
     # Get the list of parameter types, prepending the receiver type
     # and/or the continuation type if either or both is in use.
     param_types = signature.params.map(&.as(Reach::Ref?))
@@ -2063,7 +2070,7 @@ class Savi::Compiler::CodeGen
       end
 
       # Don't cast if the LLVM type already matches.
-      llvm_param_type = func.type.element_type.params_types[index]
+      llvm_param_type = llvm_func_type.params_types[index]
       if arg.type == llvm_param_type
         cast_args << arg
         next
@@ -2072,13 +2079,6 @@ class Savi::Compiler::CodeGen
       arg_expr = arg_exprs[index].not_nil!
       arg_frame = arg_frames[index]
       cast_args << gen_assign_cast(arg, param_type, llvm_param_type, arg_expr, arg_frame)
-    end
-
-    # Sometimes we need one last cast at the LLVM level.
-    cast_args.each_with_index do |arg, index|
-      llvm_param_type = func.type.element_type.params_types[index]
-      next if arg.type == llvm_param_type
-      cast_args[index] = @builder.bit_cast(arg, llvm_param_type, "#{arg.name}.CAST")
     end
 
     # Handle the special case of calling an FFI function. We need to call it
@@ -2096,12 +2096,12 @@ class Savi::Compiler::CodeGen
       return gen_ffi_call(is_ffi_gfunc, cast_args)
     end
 
-    @builder.call(LLVM::Function.from_value(func), cast_args)
+    @builder.call(llvm_func_type, func, cast_args)
   end
 
   def gen_eq(relate)
     ref = func_frame.refer[relate.lhs]
-    value = gen_expr(relate.rhs).as(LLVM::Value)
+    value = gen_expr(relate.rhs)
     name = value.name
     lhs_type =
       if ref.is_a?(Refer::Local)
@@ -2128,7 +2128,7 @@ class Savi::Compiler::CodeGen
 
   def gen_displacing_eq(relate)
     ref = func_frame.refer[relate.lhs]
-    value = gen_expr(relate.rhs).as(LLVM::Value)
+    value = gen_expr(relate.rhs)
     name = value.name
     lhs_type =
       if ref.is_a?(Refer::Local)
@@ -2149,7 +2149,7 @@ class Savi::Compiler::CodeGen
     @di.set_loc(relate.op)
 
     displaced_value = gen_assign_cast(
-      @builder.load(alloca, local_ref.as(Refer::Local).name),
+      @builder.load(lhs_llvm_type, alloca, local_ref.as(Refer::Local).name),
       type_of(relate),
       nil,
       func_frame.any_defn_for_local(local_ref),
@@ -2161,7 +2161,7 @@ class Savi::Compiler::CodeGen
   end
 
   def gen_field_eq(node : AST::FieldWrite)
-    value = gen_expr(node.rhs).as(LLVM::Value)
+    value = gen_expr(node.rhs)
     name = value.name
 
     value = gen_assign_cast(value, type_of(node), nil, node.rhs)
@@ -2175,7 +2175,7 @@ class Savi::Compiler::CodeGen
   def gen_field_displace(node : AST::FieldDisplace)
     old_value = gen_field_load(node.value)
 
-    value = gen_expr(node.rhs).as(LLVM::Value)
+    value = gen_expr(node.rhs)
     name = value.name
 
     value = gen_assign_cast(value, type_of(node), nil, node.rhs)
@@ -2296,12 +2296,7 @@ class Savi::Compiler::CodeGen
     && rhs.type.kind == LLVM::Type::Kind::Pointer
       # Objects (not boxed machine words) of the same type are compared by
       # integer comparison of the pointer to the object.
-      @builder.icmp(
-        pred,
-        @builder.bit_cast(lhs, @obj_ptr, "#{lhs.name}.CAST"),
-        @builder.bit_cast(rhs, @obj_ptr, "#{rhs.name}.CAST"),
-        "#{lhs.name}.is.#{rhs.name}",
-      )
+      @builder.icmp(pred, lhs, rhs, "#{lhs.name}.is.#{rhs.name}")
     else
       raise NotImplementedError.new("this comparison:\n#{pos.show}")
     end
@@ -2437,8 +2432,8 @@ class Savi::Compiler::CodeGen
     if rhs_type.is_concrete?(ctx)
       rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
 
-      lhs_desc = gen_get_desc_opaque(lhs)
-      rhs_desc = gen_get_desc_opaque(rhs_gtype)
+      lhs_desc = gen_get_desc(lhs)
+      rhs_desc = rhs_gtype.desc
 
       # For a positive check, we check if the type descriptors are equal.
       # For a negative check, we succeed if they are NOT equal.
@@ -2461,10 +2456,9 @@ class Savi::Compiler::CodeGen
 
       # Load the trait bitmap of the concrete type descriptor of the lhs.
       desc = gen_get_desc(lhs)
-      traits_gep = @runtime.gen_traits_gep_get(self, desc, "#{lhs.name}.DESC.TRAITS.GEP")
-      traits = @builder.load(traits_gep, "#{lhs.name}.DESC.TRAITS")
-      bits_gep = @builder.inbounds_gep(traits, @i32_0, shift, "#{lhs.name}.DESC.TRAITS.GEP.#{rhs_name}")
-      bits = @builder.load(bits_gep, "#{lhs.name}.DESC.TRAITS.#{rhs_name}")
+      traits = @runtime.gen_traits_get(self, desc, "#{lhs.name}.DESC.TRAITS")
+      bits_gep = @builder.inbounds_gep(@isize.array(0), traits, @i32_0, shift, "#{lhs.name}.DESC.TRAITS.GEP.#{rhs_name}")
+      bits = @builder.load(@isize, bits_gep, "#{lhs.name}.DESC.TRAITS.#{rhs_name}")
 
       # For a positive check, we check if the trait bit intersection is nonzero.
       # For a negative check, we succeed if it DOES equal zero.
@@ -2499,11 +2493,10 @@ class Savi::Compiler::CodeGen
     # Sometimes we may need to implicitly cast struct pointer to struct value.
     # We do that here by dereferencing the pointer.
     if value.type != from_llvm_type \
-    && value.type.kind == LLVM::Type::Kind::Pointer \
-    && value.type.element_type.kind == LLVM::Type::Kind::Struct \
-    && value.type.element_type.struct_element_types[-1] == from_llvm_type
+    && value.type.kind == LLVM::Type::Kind::Pointer
       value = gen_unboxed_fields(value, gtype_of(from_type))
     end
+    from_llvm_type = value.type
 
     # We assert that the origin llvm type derived from type analysis is the
     # same as the actual type of the llvm value we are being asked to cast.
@@ -2520,11 +2513,6 @@ class Savi::Compiler::CodeGen
         value, from_kind, to_kind, from_type, to_type, from_expr)
     end
 
-    # Finally, if the LLVM type doesn't yet match, proceed with a bit cast.
-    if value.type != to_llvm_type
-      value = @builder.bit_cast(value, to_llvm_type, "#{value.name}.CAST")
-    end
-
     value
   end
 
@@ -2537,7 +2525,9 @@ class Savi::Compiler::CodeGen
     @builder.store(
       value,
       @builder.struct_gep(
+        gtype.fields_struct_type,
         @builder.struct_gep(
+          gtype.struct_type,
           boxed,
           gtype.fields_struct_index,
           "#{value.name}.BOXED.FIELDS.GEP"
@@ -2554,13 +2544,12 @@ class Savi::Compiler::CodeGen
   def gen_unboxed_value(boxed, gtype)
     # Load the value itself from the value field of the boxed struct pointer.
     @builder.load(
+      gtype.fields_struct_type.struct_element_types[0],
       @builder.struct_gep(
+        gtype.fields_struct_type,
         @builder.struct_gep(
-          @builder.bit_cast(
-            boxed,
-            gtype.struct_ptr,
-            "#{boxed.name}.BOXED"
-          ),
+          gtype.struct_type,
+          boxed,
           gtype.fields_struct_index,
           "#{boxed.name}.FIELDS.GEP"
         ),
@@ -2580,6 +2569,7 @@ class Savi::Compiler::CodeGen
     @builder.store(
       fields_value,
       @builder.struct_gep(
+        gtype.struct_type,
         boxed,
         gtype.fields_struct_index,
         "#{fields_value.name}.BOXED.FIELDS.GEP"
@@ -2593,12 +2583,10 @@ class Savi::Compiler::CodeGen
   def gen_unboxed_fields(boxed, gtype)
     # Load the fields value from the fields struct of the boxed struct pointer.
     @builder.load(
+      gtype.fields_struct_type,
       @builder.struct_gep(
-        @builder.bit_cast(
-          boxed,
-          gtype.struct_ptr,
-          "#{boxed.name}.BOXED"
-        ),
+        gtype.struct_type,
+        boxed,
         gtype.fields_struct_index,
         "#{boxed.name}.FIELDS.GEP"
       ),
@@ -2619,7 +2607,7 @@ class Savi::Compiler::CodeGen
 
         alloca = func_frame.current_locals[local_ref]
         gen_assign_cast(
-          @builder.load(alloca, local_ref.name),
+          @builder.load(alloca.allocated_type, alloca, local_ref.name),
           type_of(expr),
           nil,
           func_frame.any_defn_for_local(ref),
@@ -2767,10 +2755,6 @@ class Savi::Compiler::CodeGen
     @gtypes["None"].singleton
   end
 
-  def gen_none_type
-    @gtypes["None"].struct_type.pointer
-  end
-
   def gen_bool(bool)
     @i1.const_int(bool ? 1 : 0)
   end
@@ -2811,18 +2795,7 @@ class Savi::Compiler::CodeGen
       # meaning that we need to unbox it as such here. This will fail
       # in a silent and ugly way if the type system doesn't properly
       # ensure that the value we hold here is truly a Bool.
-      @builder.load(
-        @builder.struct_gep(
-          @builder.bit_cast(
-            value,
-            @gtypes["Bool"].struct_ptr,
-            "#{value.name}.BOXED",
-          ),
-          1,
-          "#{value.name}.VALUE",
-        ),
-        "#{value.name}.VALUE.LOAD",
-      )
+      gen_unboxed_value(value, @gtypes["Bool"])
     else
       raise NotImplementedError.new(value.type)
     end
@@ -3212,6 +3185,7 @@ class Savi::Compiler::CodeGen
 
   def gen_cstring(value : String) : LLVM::Value
     @llvm.const_inbounds_gep(
+      @ptr,
       @cstring_globals.fetch value do
         global = gen_global_for_const(@llvm.const_string(value))
 
@@ -3253,7 +3227,7 @@ class Savi::Compiler::CodeGen
       gen_global_const(array_gtype, {
         "_size"  => @isize.const_int(values.size),
         "_space" => @isize.const_int(values.size),
-        "_ptr"   => @llvm.const_inbounds_gep(values_global, [@i32_0, @i32_0])
+        "_ptr"   => @llvm.const_inbounds_gep(@ptr, values_global, [@i32_0, @i32_0])
       })
     else
       gen_global_const(array_gtype, {
@@ -3291,18 +3265,14 @@ class Savi::Compiler::CodeGen
     alloca
   end
 
-  def gen_static_address_of_function(expr : AST::Relate)
+  def gen_static_address_of_function(expr : AST::Relate) : LLVM::Value
     receiver = gen_expr(expr.lhs)
 
     gtype, gfunc = resolve_call(
       AST::Call.new(expr.lhs, expr.rhs.as(AST::Identifier)).from(expr)
     )
 
-    @builder.bit_cast(
-      gfunc.llvm_func.to_value,
-      gen_none_type.pointer,
-      "#{gfunc.llvm_name}.PTR"
-    )
+    gfunc.llvm_func.to_value
   end
 
   def gen_reflection_of_type(expr, term_expr)
@@ -3346,7 +3316,7 @@ class Savi::Compiler::CodeGen
               mutator =
                 if gfunc.func.cap.value == "ref" \
                 && (gfunc.func.params.try(&.terms.size) || 0) == 0 \
-                && gfunc.llvm_func.return_type == @gtypes["None"].struct_type.pointer
+                && gfunc.reach_func.signature.ret.is_none?
                   gen_reflection_mutator_of_type(mutator_gtype, gtype, gfunc)
                 else
                   gen_none
@@ -3399,7 +3369,11 @@ class Savi::Compiler::CodeGen
         mutator_call_gfunc.virtual_llvm_func.function_type.return_type,
       ) do |fn|
         gen_func_start(fn)
-        @builder.ret @builder.call(gfunc.llvm_func, [fn.params[1]])
+        @builder.ret @builder.call(
+          gfunc.llvm_func.function_type,
+          gfunc.llvm_func,
+          [fn.params[1]]
+        )
         gen_func_end
       end
 
@@ -3408,13 +3382,11 @@ class Savi::Compiler::CodeGen
 
     # Create a vtable that places our via function in the proper index.
     vtable = mutator_gtype.gen_vtable(self)
-    vtable[mutator_call_gfunc.vtable_index] =
-      @llvm.const_bit_cast(via_llvm_func.to_value, @ptr)
+    vtable[mutator_call_gfunc.vtable_index] = via_llvm_func.to_value
 
     # Save the name of the mutator gtype's type_def as a proper String,
     # casting it to an opaque pointer to avoid circular dependency on descs.
-    type_name_string_opaque =
-      @builder.bit_cast(gen_string(mutator_gtype.type_def.llvm_name), @ptr)
+    type_name_string = gen_string(mutator_gtype.type_def.llvm_name)
 
     # Generate a type descriptor, so this can masquerade as a real module.
     raise NotImplementedError.new("gen_reflection_mutator_of_type in Verona") \
@@ -3435,7 +3407,7 @@ class Savi::Compiler::CodeGen
       @final_fn_ptr.null,                  # 12: final fn
       @i32.const_int(-1),                  # 13: event notify
       traits_bitmap_global,                # 14: traits bitmap
-      type_name_string_opaque,             # 15: type name (REPLACES unused field descriptors from Pony)
+      type_name_string,                    # 15: type name (REPLACES unused field descriptors from Pony)
       @ptr.const_array(vtable),            # 16: vtable
     ])
 
@@ -3448,8 +3420,7 @@ class Savi::Compiler::CodeGen
     value_type = value.type
 
     desc =
-      if value_type.kind == LLVM::Type::Kind::Pointer \
-        && value_type.element_type.kind == LLVM::Type::Kind::Struct
+      if value_type.kind == LLVM::Type::Kind::Pointer
         # This has an object header, so we can get the descriptor at runtime.
         gen_get_desc(value)
       else
@@ -3477,7 +3448,7 @@ class Savi::Compiler::CodeGen
     # TODO: Pop the scope frame?
   end
 
-  def gen_dynamic_array(expr : AST::Group)
+  def gen_dynamic_array(expr : AST::Group) : LLVM::Value
     gtype = gtype_of(expr)
 
     # If this array expression is inside of a constant, we know that it has
@@ -3485,20 +3456,26 @@ class Savi::Compiler::CodeGen
     # TODO: Is it possible to determine that other array expressions in other
     # code snippets are safe to be lifted to constant expressions?
     if func_frame.gfunc.try(&.func.has_tag?(:constant))
-      return gen_array(gtype, expr.terms.map { |term|
-        gen_expr(term).as(LLVM::Value)
-      })
+      return gen_array(gtype, expr.terms.map { |term| gen_expr(term) })
     end
 
     receiver = gen_alloc(gtype, expr, "#{gtype.type_def.llvm_name}.new")
     size_arg = @i64.const_int(expr.terms.size)
-    @builder.call(gtype.default_constructor.llvm_func, [receiver, size_arg])
+    @builder.call(
+      gtype.default_constructor.llvm_func.function_type,
+      gtype.default_constructor.llvm_func,
+      [receiver, size_arg],
+    )
 
     arg_type = gtype.gfuncs["<<"].reach_func.signature.params.first
 
     expr.terms.each do |term|
       value = gen_assign_cast(gen_expr(term), arg_type, nil, term)
-      @builder.call(gtype.gfuncs["<<"].llvm_func, [receiver, value])
+      @builder.call(
+        gtype.gfuncs["<<"].llvm_func.function_type,
+        gtype.gfuncs["<<"].llvm_func,
+        [receiver, value]
+      )
     end
 
     receiver
@@ -3875,7 +3852,7 @@ class Savi::Compiler::CodeGen
     end
 
     # Generate code for the values of the yield, and capture the values.
-    yield_values = expr.terms.map { |term| gen_expr(term).as(LLVM::Value) }
+    yield_values = expr.terms.map { |term| gen_expr(term) }
 
     # Capture the current value of each local variable, because we store every
     # local not only in the continuation but also in its own dedicated alloca.
@@ -3891,12 +3868,15 @@ class Savi::Compiler::CodeGen
     # but this can't always happen (e.g. for recursive yielding calls).
     ctx.inventory[gfunc.link].each_local.each_with_index do |ref, ref_index|
       cont = func_frame.continuation_value
-      cont_local = @builder.bit_cast(
-        gfunc.continuation_info.struct_gep_for_local(cont, ref),
-        llvm_type_of(func_frame.any_defn_for_local(ref)).pointer
-      )
+      cont_local =
+        gfunc.continuation_info.struct_gep_for_local(cont, ref)
       local = frame.current_locals[ref]
-      @builder.store(builder.load(local, "#{ref.name}.CURRENT"), cont_local)
+      local_llvm_type = llvm_type_of(func_frame.any_defn_for_local(ref))
+
+      @builder.store(
+        builder.load(local_llvm_type, local, "#{ref.name}.CURRENT"),
+        cont_local,
+      )
     end
 
     # Generate the return statement, which terminates this basic block and
@@ -3941,14 +3921,7 @@ class Savi::Compiler::CodeGen
     # with an alloca in between the two as a pointer that we can cast.
     alloca = gen_alloca(value.type, "#{value.name}.PTR")
     @builder.store(value, alloca)
-    @builder.load(
-      @builder.bit_cast(
-        alloca,
-        to_type.pointer,
-        "#{value.name}.CAST.PTR",
-      ),
-      "#{value.name}.CAST",
-    )
+    @builder.load(to_type, alloca, "#{value.name}.CAST")
   end
 
   # Create an alloca at the entry block then return us back to whence we came.
@@ -4057,31 +4030,19 @@ class Savi::Compiler::CodeGen
     @runtime.gen_alloc_struct(self, llvm_type, name)
   end
 
-  # Get the global constant value for the type descriptor of the given type.
-  def gen_get_desc_opaque(gtype : GenType)
-    @llvm.const_bit_cast(gtype.desc, @desc_ptr)
-  end
-
-  # Get the global constant value for the type descriptor of the given type.
-  def gen_get_desc_opaque(value : LLVM::Value)
-    desc = gen_get_desc(value)
-    @builder.bit_cast(desc, @desc_ptr, "#{value.name}.OPAQUE")
-  end
-
   # Dereference the type descriptor header of the given LLVM value,
   # loading the type descriptor of the object at runtime.
   # Prefer the above function instead when the type is statically known.
   def gen_get_desc(value : LLVM::Value)
     value_type = value.type
     raise "not a struct pointer: #{value}" \
-      unless value_type.kind == LLVM::Type::Kind::Pointer \
-        && value_type.element_type.kind == LLVM::Type::Kind::Struct
+      unless value_type.kind == LLVM::Type::Kind::Pointer
 
     @runtime.gen_get_desc(self, value)
   end
 
   def gen_put_desc(value, gtype, name = "")
-    desc_p = @builder.struct_gep(value, 0, "#{name}.DESC.GEP")
+    desc_p = @builder.struct_gep(@obj, value, 0, "#{name}.DESC.GEP")
     @builder.store(gtype.desc, desc_p)
     # TODO: tbaa? (from set_descriptor in libponyc/codegen/gencall.c)
   end
@@ -4124,12 +4085,14 @@ class Savi::Compiler::CodeGen
     raise "inconsistent frames" if @frames.size > 1
     object = func_frame.receiver_value
 
-    if object.type != gtype.struct_ptr
-      raise "current receiver is not a pointer to the expected gtype pointer: #{object.inspect}"
+    if object.type != @ptr
+      raise "current receiver is not a pointer: #{object.inspect}"
     end
 
     @builder.struct_gep(
+      gtype.struct_type.struct_element_types[gtype.fields_struct_index],
       @builder.struct_gep(
+        gtype.struct_type,
         object,
         gtype.fields_struct_index,
         "@.FIELDS.GEP"
@@ -4146,7 +4109,7 @@ class Savi::Compiler::CodeGen
     if object.type == gtype.fields_struct_type
       @builder.extract_value(object, gtype.field_index(name), "@.#{name}")
     else
-      @builder.load(gen_field_gep(name, gtype), "@.#{name}")
+      @builder.load(gtype.field_llvm_type(name), gen_field_gep(name, gtype), "@.#{name}")
     end
   end
 

@@ -83,9 +83,7 @@ class Savi::Compiler::CodeGen
 
         # Then come the nested yielding call continuations.
         # These exist when there is a yield block within another yield block.
-        ctx.inventory[gfunc.link].each_yielding_call.each do |call|
-          cont_type = g.resolve_yielding_call_cont_type(call, gfunc)
-
+        nested_cont_struct_types.each do |cont_type|
           # If this yielding function contains a recursive call to itself,
           # we won't know what struct size to allocate, and thus need to
           # make an indirection by turning this into a pointer element,
@@ -104,47 +102,26 @@ class Savi::Compiler::CodeGen
       end).not_nil!
     end
 
+    @nested_cont_struct_types : Array(LLVM::Type)?
+    def nested_cont_struct_types
+      (@nested_cont_struct_types ||= begin
+        list = [] of LLVM::Type
+
+        ctx.inventory[gfunc.link].each_yielding_call.each do |call|
+          list << g.resolve_yielding_call_cont_type(call, gfunc)
+        end
+
+        list
+      end).not_nil!
+    end
+
     def struct_gep_for_next_yield_index(cont : LLVM::Value)
-      builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
-    end
-
-    def struct_gep_for_local(cont : LLVM::Value, ref : Refer::Local)
-      index = 3
-      index += ctx.inventory[gfunc.link].each_local.index(ref).not_nil!
-
-      builder.struct_gep(cont, index, "CONT.#{ref.name}.GEP")
-    end
-
-    def struct_gep_for_yielding_call_cont(cont : LLVM::Value, call : AST::Call)
-      index = 3
-      index += ctx.inventory[gfunc.link].local_count
-      index += ctx.inventory[gfunc.link].each_yielding_call.index(call).not_nil!
-
-      gep = builder.struct_gep(cont, index, "CONT.#{call.ident.value}.NESTED.CONT.GEP")
-      gep = builder.load(gep, gep.name) if gep.type.element_type.kind == LLVM::Type::Kind::Pointer
-      gep
-    end
-
-    def struct_gep_for_yielding_call_receiver(cont : LLVM::Value, call : AST::Call)
-      index = 3
-      index += ctx.inventory[gfunc.link].local_count
-      index += ctx.inventory[gfunc.link].each_yielding_call.size
-      index += ctx.inventory[gfunc.link].each_yielding_call.index(call).not_nil!
-
-      builder.struct_gep(cont, index, "CONT.#{call.ident.value}.NESTED.RECEIVER.GEP")
-    end
-
-    def each_struct_index_for_yielding_call_conts
-      index = 3
-      index += ctx.inventory[gfunc.link].local_count;         from_index = index
-      index += ctx.inventory[gfunc.link].yielding_call_count; upto_index = index
-
-      from_index...upto_index
+      builder.struct_gep(struct_type, cont, 0, "CONT.NEXT.GEP")
     end
 
     def get_next_yield_index(cont : LLVM::Value)
       next_yield_index_gep = struct_gep_for_next_yield_index(cont)
-      builder.load(next_yield_index_gep, "CONT.NEXT")
+      builder.load(struct_element_types[0], next_yield_index_gep, "CONT.NEXT")
     end
 
     def set_next_yield_index(cont : LLVM::Value, next_yield_index : Int32)
@@ -177,6 +154,53 @@ class Savi::Compiler::CodeGen
       )
     end
 
+    def struct_gep_for_local(cont : LLVM::Value, ref : Refer::Local)
+      index = 3
+      index += ctx.inventory[gfunc.link].each_local.index(ref).not_nil!
+
+      builder.struct_gep(struct_type, cont, index, "CONT.#{ref.name}.GEP")
+    end
+
+    def call_index_for_yielding_call_cont(call : AST::Call)
+      ctx.inventory[gfunc.link].each_yielding_call.index(call).not_nil!
+    end
+
+    def struct_index_for_yielding_call_cont(call : AST::Call)
+      index = 3
+      index += ctx.inventory[gfunc.link].local_count
+      index += call_index_for_yielding_call_cont(call)
+      index
+    end
+
+    def struct_gep_for_yielding_call_cont(cont : LLVM::Value, call : AST::Call)
+      index = struct_index_for_yielding_call_cont(call)
+      gep = builder.struct_gep(struct_type, cont, index, "CONT.#{call.ident.value}.NESTED.CONT.GEP")
+
+      if struct_type.struct_element_types[index].kind == LLVM::Type::Kind::Pointer
+        nested_cont_struct_type = nested_cont_struct_types[call_index_for_yielding_call_cont(call)]
+        gep = builder.load(nested_cont_struct_type, gep, gep.name)
+      end
+
+      gep
+    end
+
+    def struct_gep_for_yielding_call_receiver(cont : LLVM::Value, call : AST::Call)
+      index = 3
+      index += ctx.inventory[gfunc.link].local_count
+      index += ctx.inventory[gfunc.link].each_yielding_call.size
+      index += ctx.inventory[gfunc.link].each_yielding_call.index(call).not_nil!
+
+      builder.struct_gep(struct_type, cont, index, "CONT.#{call.ident.value}.NESTED.RECEIVER.GEP")
+    end
+
+    def each_struct_index_for_yielding_call_conts
+      index = 3
+      index += ctx.inventory[gfunc.link].local_count;         from_index = index
+      index += ctx.inventory[gfunc.link].yielding_call_count; upto_index = index
+
+      from_index...upto_index
+    end
+
     def check_is_error(cont : LLVM::Value)
       # Check if next_yield_index was set to the error value by set_as_error.
       builder.icmp(LLVM::IntPredicate::EQ,
@@ -205,11 +229,12 @@ class Savi::Compiler::CodeGen
     end
 
     def struct_gep_for_final_return(cont : LLVM::Value)
-      builder.struct_gep(cont, 1, "CONT.FINAL.GEP")
+      builder.struct_gep(struct_type, cont, 1, "CONT.FINAL.GEP")
     end
 
     def get_final_return(cont : LLVM::Value)
-      builder.load(struct_gep_for_final_return(cont), "CONT.FINAL")
+      type = struct_element_types[1]
+      builder.load(type, struct_gep_for_final_return(cont), "CONT.FINAL")
     end
 
     def set_final_return(cont : LLVM::Value, value : LLVM::Value)
@@ -221,11 +246,12 @@ class Savi::Compiler::CodeGen
     end
 
     def struct_gep_for_yield_out(cont : LLVM::Value)
-      builder.struct_gep(cont, 2, "CONT.YIELDOUT.GEP")
+      builder.struct_gep(struct_type, cont, 2, "CONT.YIELDOUT.GEP")
     end
 
     def get_yield_out(cont : LLVM::Value)
-      builder.load(struct_gep_for_yield_out(cont), "CONT.YIELDOUT")
+      type = struct_element_types[2]
+      builder.load(type, struct_gep_for_yield_out(cont), "CONT.YIELDOUT")
     end
 
     def set_yield_out(cont : LLVM::Value, value : LLVM::Value)
@@ -240,14 +266,17 @@ class Savi::Compiler::CodeGen
       cont = frame.continuation_value = frame.llvm_func.params[cont_param_index]
 
       unless is_continue
-        each_struct_index_for_yielding_call_conts.each do |index|
-          cont_type = struct_element_types[index]
-          next unless cont_type.kind == LLVM::Type::Kind::Pointer
+        ctx.inventory[gfunc.link].each_yielding_call.each_with_index do |call, call_index|
+          struct_index = struct_index_for_yielding_call_cont(call)
+          nested_cont_type = struct_element_types[struct_index]
+          next unless nested_cont_type.kind == LLVM::Type::Kind::Pointer
+
+          nested_cont_struct_type = nested_cont_struct_types[call_index]
 
           # We have a recursive nested cont that we need to heap-allocate.
           builder.store(
-            g.gen_alloc_struct(cont_type.element_type, "#{cont.name}.NEST.#{index}"),
-            builder.struct_gep(cont, index, "#{cont.name}.NEST.#{index}.GEP"),
+            g.gen_alloc_struct(nested_cont_struct_type, "#{cont.name}.NEST.#{struct_index}"),
+            builder.struct_gep(struct_type, cont, struct_index, "#{cont.name}.NEST.#{struct_index}.GEP"),
           )
         end
       end
@@ -266,11 +295,11 @@ class Savi::Compiler::CodeGen
         # then we also need to restore the value of each local variable.
         if is_continue
           ref_defn = ctx.local[gfunc.link].any_initial_site_for(ref).node
-          cont_local = builder.bit_cast(
-            gfunc.continuation_info.struct_gep_for_local(cont, ref),
-            g.llvm_type_of(ref_defn).pointer,
+          cont_local = gfunc.continuation_info.struct_gep_for_local(cont, ref)
+          builder.store(
+            builder.load(g.llvm_type_of(ref_defn), cont_local, "#{ref.name}.RESTORED"),
+            local
           )
-          builder.store(builder.load(cont_local, "#{ref.name}.RESTORED"), local)
         end
       end
 

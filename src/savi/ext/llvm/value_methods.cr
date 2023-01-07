@@ -16,6 +16,10 @@ module LLVM::ValueMethods
     cls
   end
 
+  def allocated_type
+    Type.new LibLLVM.get_allocated_value_type(self)
+  end
+
   def to_value
     Value.new to_unsafe
   end
