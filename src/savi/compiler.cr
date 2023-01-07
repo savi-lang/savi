@@ -11,6 +11,7 @@ class Savi::Compiler
     property runtime_asserts = true
     property llvm_ir = false
     property llvm_keep_fns = false
+    property llvm_optimize_nothing = false
     property auto_fix = false
     property cross_compile : String? = nil
     property manifest_name : String?
