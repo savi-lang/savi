@@ -143,6 +143,23 @@
     assert: array_b == [2, 1, 0]
     assert: array_a == [1, 1, 0]
 
+  :it "won't violate memory safety when the buffer is mutated during iteration"
+    seen Array(Bool) = []
+    bits = BitArray.new << 0 << 1 << 1
+    bits.each_with_index -> (bit, index |
+      bits.clear
+      seen << bit
+    )
+    assert: seen == [0]
+
+    seen.clear
+    bits = BitArray.new << 0 << 1 << 1
+    bits.reverse_each_with_index -> (bit, index |
+      bits.clear
+      seen << bit
+    )
+    assert: seen == [1]
+
   :it "swaps the bits in the array if both indices are in range"
     bits = BitArray.new << 0 << 1 << 0
 

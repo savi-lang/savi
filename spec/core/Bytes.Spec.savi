@@ -317,6 +317,23 @@
     assert: bytes == ['o', 'l', 'l', 'e', 'h']
     assert: indices == [4, 3, 2, 1, 0]
 
+  :it "won't violate memory safety when the buffer is mutated during iteration"
+    seen Array(U8) = []
+    bytes Bytes'ref = b"123".clone
+    bytes.each_with_index -> (byte, index |
+      bytes.clear
+      seen << byte
+    )
+    assert: seen == ['1']
+
+    seen.clear
+    bytes = b"123".clone
+    bytes.reverse_each_with_index -> (byte, index |
+      bytes.clear
+      seen << byte
+    )
+    assert: seen == ['3']
+
   :it "copies bytes from the given buffer onto the end of the byte string"
     assert: (Bytes.new << b"foo" << b"" << b"bar") == b"foobar"
 

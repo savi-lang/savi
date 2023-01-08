@@ -147,11 +147,7 @@
   )
     to = @_size.at_most(to)
     index = from
-    while (index < to) (
-      // TODO: it should be possible to do fewer underlying pointer loads
-      // by batching with an inner loop when the stride is less than 64
-      // However, it's unclear how much of a performance boost that would be,
-      // so it needs to be tested to see if that's worth the extra complexity.
+    while (index < to.at_most(@_size)) (
       yield (@_ptr_get_at(index), index)
       index += stride
     )
@@ -163,14 +159,10 @@
     stride USize = 1
   )
     try (
-      index USize = @_size.at_most(from) -! 1
+      index USize = from.at_most(@_size) -! 1
       while (index >= to) (
-        // TODO: it should be possible to do fewer underlying pointer loads
-        // by batching with an inner loop when the stride is less than 64
-        // However, it's unclear how much of a performance boost that would be,
-        // so it needs to be tested to see if that's worth the extra complexity.
         yield (@_ptr_get_at(index), index)
-        index = index -! stride
+        index = index.at_most(@_size) -! stride
       )
     )
     None
