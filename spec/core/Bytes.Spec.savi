@@ -205,6 +205,12 @@
     assert: b"example"[3]! == 'm'
     assert error: b"example"[7]!
 
+  :it "assigns a new byte at the given byte offset"
+    bytes Bytes'ref = b"example".clone
+    assert: (bytes[3]! = 'M') == 'M'
+    assert error: bytes[7]! = '?'
+    assert: bytes == b"exaMple"
+
   :it "trims bytes off the start and end of the byte string"
     assert: b"example".trim(2)      == b"ample"
     assert: b"example".trim(3,  -2) == b"mp"

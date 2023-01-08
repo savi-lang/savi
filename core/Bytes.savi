@@ -270,9 +270,15 @@
 
   :fun "[]!"(index): @byte_at!(index)
 
+  :fun ref "[]=!"(index, value): @set_byte_at!(index, value)
+
   :fun byte_at!(index USize)
     if (@size <= index) error!
     @_ptr._get_at(index)
+
+  :fun ref set_byte_at!(index USize, byte U8)
+    if (@size <= index) error!
+    @_ptr._assign_at(index, byte)
 
   :fun _offset_to_index(offset ISize) USize
     if (offset < 0) (offset.usize + @size | offset.usize)
