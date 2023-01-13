@@ -280,9 +280,6 @@
     if (@size <= index) error!
     @_ptr._assign_at(index, byte)
 
-  :fun _offset_to_index(offset ISize) USize
-    if (offset < 0) (offset.usize + @size | offset.usize)
-
   :: Return a shared portion of this string, covering `from` until `to`,
   :: with negative values in `from` and `to` representing indexes counting
   :: backward from the end of the string.
@@ -290,9 +287,9 @@
   :: Both the original and the new string are immutable, as they share memory.
   :: The operation does not allocate a new string pointer nor copy elements.
 
-  :fun val trim(from ISize = 0, to = ISize.max_value)
-    start = @_offset_to_index(from)
-    finish = @_offset_to_index(to).at_most(@size)
+  :fun val trim(from USize = 0, to = USize.max_value)
+    start = from
+    finish = to.at_most(@size)
 
     if (start < @_size && start < finish) (
       size = finish - start
@@ -305,9 +302,9 @@
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
 
-  :fun ref trim_in_place(from ISize = 0, to = ISize.max_value)
-    start = @_offset_to_index(from)
-    finish = @_offset_to_index(to).at_most(@size)
+  :fun ref trim_in_place(from USize = 0, to = USize.max_value)
+    start = from
+    finish = to.at_most(@size)
 
     if (start < @_size && start < finish) (
       @_size = finish - start
@@ -369,11 +366,11 @@
 
   :fun ref concat_byte_slice(
     other Bytes'box
-    from ISize = 0
-    to = ISize.max_value
+    from USize = 0
+    to = USize.max_value
   )
-    start = other._offset_to_index(from)
-    finish = other._offset_to_index(to).at_most(other.size)
+    start = from
+    finish = to.at_most(other.size)
 
     if (start < other._size && start < finish) (
       size = finish - start

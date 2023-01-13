@@ -7,16 +7,16 @@
   :new (@id, @left, @top, @width, @height)
   :fun non parse!(line String)
     halves      = line.split('@')
-    id          = halves[0]!.trim(1, -1)
+    id          = halves[0]!.trim(1, halves[0]!.size - 1)
     words       = halves[1]!.split(' ')
     coordinates = words[1]!.split(',')
     dimensions  = words[2]!.split('x')
     @new(
       id
-      coordinates[0]!            .parse_i64!.usize
-      coordinates[1]!.trim(0, -1).parse_i64!.usize
-      dimensions[0]!             .parse_i64!.usize
-      dimensions[1]!             .parse_i64!.usize
+      coordinates[0]!                                  .parse_i64!.usize
+      coordinates[1]!.trim(0, coordinates[1]!.size - 1).parse_i64!.usize
+      dimensions[0]!                                   .parse_i64!.usize
+      dimensions[1]!                                   .parse_i64!.usize
     )
 
 :module Day3
