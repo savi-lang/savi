@@ -48,6 +48,14 @@
   :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_space)
   :fun val as_bytes: Bytes.from_string(@)
 
+  :: Take the underlying buffer and return a new isolated `String`,
+  :: leaving this original `String` instance empty.
+  :fun ref take_buffer String'iso
+    new = @iso_from_cpointer(@_ptr, @_size, @_space)
+    @_size = 0
+    @_ptr_set_null
+    --new
+
   :fun into_string_space: @space
 
   :fun into_string(out String'iso) String'iso

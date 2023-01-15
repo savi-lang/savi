@@ -47,6 +47,14 @@
   :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_space)
   :fun val as_string: String.from_bytes(@)
 
+  :: Take the underlying buffer and return a new isolated `Bytes`,
+  :: leaving this original `Bytes` instance empty.
+  :fun ref take_buffer Bytes'iso
+    new = @iso_from_cpointer(@_ptr, @_size, @_space)
+    @_size = 0
+    @_ptr_set_null
+    --new
+
   :fun "=="(other Bytes'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
 
