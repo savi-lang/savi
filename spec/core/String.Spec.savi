@@ -75,6 +75,17 @@
     assert: "string".as_bytes == b"string"
     assert: String.from_bytes(b"string") == "string"
 
+  :it "has its underlying buffer taken and lifted to iso, leaving it empty"
+    giver ref = "example".clone
+    cpointer = giver.cpointer
+    taker iso = giver.take_buffer
+
+    assert: giver.cpointer.is_null
+    assert: taker.cpointer.is_not_null
+    assert: taker.cpointer.address == cpointer.address
+    assert: giver.size == 0, assert: giver.space == 0
+    assert: taker.size == 7, assert: taker.space >= 7
+
   :it "compares bytewise equality with another string"
     assert: ("string" == "string")
     assert: ("string" == "other").is_false
