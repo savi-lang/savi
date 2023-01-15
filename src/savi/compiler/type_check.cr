@@ -54,7 +54,7 @@ class Savi::Compiler::TypeCheck
         f_link = f.make_link(rt.link)
         f_cap_value = f.cap.value
         f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.each do |f_cap|
+        MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
           for_rf(ctx, rt, f_link, MetaType.cap(f_cap)).run(ctx)
         end
       end
@@ -93,7 +93,7 @@ class Savi::Compiler::TypeCheck
     @map[rf] ||= (
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
-      completeness = ctx.completeness[f]
+      completeness = ctx.completeness[f.type]
       pre_infer = ctx.pre_infer[f]
       infer = ctx.infer[f]
       subtyping = ctx.subtyping.for_rf(rf)
@@ -291,10 +291,12 @@ class Savi::Compiler::TypeCheck
     end
 
     if autorecover_needed \
-    && required_cap.value != Cap::REF && required_cap.value != Cap::BOX
+    && required_cap.value != Cap::REF \
+    && required_cap.value != Cap::BOX \
+    && required_cap.value != Infer::MetaType::Capability::READ.value
       problems << {call_func.cap.pos,
         "the function's required receiver capability is `#{required_cap}` " \
-        "but only a `ref` or `box` function can be auto-recovered"}
+        "but only a `ref`, `box`, or `read` function can be auto-recovered"}
 
       problems << {call.lhs.pos,
         "auto-recovery was attempted because the receiver's type is " \
@@ -436,8 +438,7 @@ class Savi::Compiler::TypeCheck
     # Check completeness of self references inside a constructor.
     def type_check_pre(ctx : Context, info : Infer::Self, mt : MetaType) : Bool
       # If this is a complete self, no additional checks are required.
-      unseen_fields = completeness.unseen_fields_for(info)
-      return true unless unseen_fields
+      return true unless completeness.is_incomplete?(info)
 
       # This represents the self type as opaque, with no field access.
       # We'll use this to guarantee that no usage of the current self object
@@ -457,14 +458,15 @@ class Savi::Compiler::TypeCheck
         next if tag_self.within_constraints?(ctx, [constraint])
 
         # Otherwise, we must raise an error.
+        incomplete_constructors = completeness.incomplete_constructors_for(info)
         ctx.error_at info.pos,
           "This usage of `@` shares field access to the object" \
           " from a constructor before all fields are initialized", [
             {pos,
               "if this constraint were specified as `tag` or lower" \
               " it would not grant field access"}
-          ] + unseen_fields.map { |ident|
-            {ident.pos, "this field didn't get initialized"}
+          ] + incomplete_constructors.map { |ident|
+            {ident.pos, "this constructor was incomplete"}
           }
       end
       false
@@ -717,6 +719,18 @@ class Savi::Compiler::TypeCheck
           "but the type of the #{info.described_kind} was #{meta_type.show_type}"}
         this_would_be_possible_if = info.this_would_be_possible_if
         extra << this_would_be_possible_if if this_would_be_possible_if
+
+        if info.is_a?(Infer::Self) && completeness.is_incomplete?(info)
+          extra << {
+            info.pos,
+            "this can be reached while in an incomplete constructor " \
+            "(that is, before all fields are initialized) " \
+            "so it's not safe to share publicly here"
+          }
+          completeness.incomplete_constructors_for(info).each {|c|
+            extra << {c.pos, "it can be reached from this constructor"}
+          }
+        end
 
         ctx.error_at info.downstream_use_pos, "The type of this expression " \
           "doesn't meet the constraints imposed on it",

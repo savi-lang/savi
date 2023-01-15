@@ -772,6 +772,23 @@ module Savi::Compiler::XTypes
       Union.from(@members.map(&.viewed_from(origin)))
     end
 
+    def trace_as_assignment(cursor : Cursor)
+      cursor.add_fact_at_current_pos(self)
+    end
+
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      any_is_changed = false
+      new_members = @members.map { |member|
+        new_member, is_changed = member.bind_variables(mapping)
+        any_is_changed ||= is_changed
+        new_member.as(AlgebraicType)
+      }
+      {
+        any_is_changed ? Union.from(new_members) : self,
+        any_is_changed
+      }
+    end
+
     def observe_assignment_reciprocals(
       pos : Source::Pos,
       supertype : AlgebraicType,

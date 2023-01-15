@@ -14,7 +14,7 @@ It complains when not all fields get initialized in a constructor:
 ```
 ```error
 This constructor doesn't initialize all of its fields:
-  :new
+  :new ref
    ^~~
 
 - this field didn't get initialized:
@@ -52,7 +52,7 @@ It complains when a field is only conditionally initialized:
 ```
 ```error
 This constructor doesn't initialize all of its fields:
-  :new
+  :new ref
    ^~~
 
 - this field didn't get initialized:
@@ -104,7 +104,7 @@ It won't blow its stack on mutually recursive branching paths:
 ```
 ```error
 This constructor doesn't initialize all of its fields:
-  :new
+  :new ref
    ^~~
 
 - this field didn't get initialized:

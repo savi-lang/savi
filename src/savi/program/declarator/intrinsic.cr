@@ -269,7 +269,7 @@ module Savi::Program::Intrinsic
         end
 
         scope.current_function = function = Program::Function.new(
-          terms["cap"]?.as(AST::Identifier?) || type.cap.dup,
+          terms["cap"].as(AST::Identifier),
           name,
           params,
           AST::Identifier.new("@").from(name),
@@ -331,7 +331,7 @@ module Savi::Program::Intrinsic
         ident = terms["name"].as(AST::Identifier)
         ret = terms["type"]?.as(AST::Term?)
 
-        field_cap = AST::Identifier.new("box").from(keyword)
+        field_cap = AST::Identifier.new("read").from(keyword)
         field_params = AST::Group.new("(").from(ident)
         field_func = Program::Function.new(field_cap, ident.dup, field_params, ret.dup)
         field_func.add_tag(:hygienic)
@@ -341,7 +341,7 @@ module Savi::Program::Intrinsic
 
         scope.on_body { |body| field_func.body = body }
 
-        getter_cap = AST::Identifier.new("box").from(keyword)
+        getter_cap = AST::Identifier.new("read").from(keyword)
         if ret
           getter_ret = AST::Relate.new(
             AST::Identifier.new("@").from(getter_cap),
@@ -756,7 +756,7 @@ module Savi::Program::Intrinsic
 
     # Finally, create a function with that body.
     member_name_func = Program::Function.new(
-      AST::Identifier.new("box").from(type.ident),
+      AST::Identifier.new("read").from(type.ident),
       AST::Identifier.new("member_name").from(type.ident),
       nil,
       AST::Identifier.new("String").from(type.ident),

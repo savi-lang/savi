@@ -21,6 +21,7 @@ class Savi::Compiler::Context
   getter paint = Paint.new
   getter populate = Populate.new
   getter populate_types = PopulateTypes.new
+  getter pre_completeness = PreCompleteness::Pass.new
   getter pre_infer = PreInfer::Pass.new
   getter pre_subtyping = PreSubtyping::Pass.new
   getter pre_t_infer = PreTInfer::Pass.new

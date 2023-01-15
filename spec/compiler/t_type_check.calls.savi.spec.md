@@ -309,13 +309,13 @@ TODO: It complains when calling a `non` function with no body on a `non` referen
   // t_non.no_body
 
 :trait TraitNon
-  :fun box not_non String
+  :fun not_non String
   :fun non with_body String: "with_body"
   :fun non no_body String
 
 :class TraitNonClass
   :is TraitNon
-  :fun box not_non String: "not_non"
+  :fun not_non String: "not_non"
   :fun non no_body String: "no_body"
 
 ```

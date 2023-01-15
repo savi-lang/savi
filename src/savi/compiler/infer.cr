@@ -291,6 +291,10 @@ module Savi::Compiler::Infer
             }.not_nil!.last
           arg_caps = args.map(&.cap_only_inner.value.as(Cap))
           type_partial_reification_sets[arg_caps]
+        rescue exc : Exception
+          raise Exception.new("Couldn't find #{call_cap}(#{
+            arg_caps.try {|arg_caps| arg_caps.join(", ") }
+          }) in #{func_partial_reification_sets.inspect}")
         end
 
         span = span.deciding_partial_reify_index(partial_reify_index)
@@ -752,6 +756,7 @@ module Savi::Compiler::Infer
     protected getter refer_type_parent
     protected getter classify
     protected getter pre_infer
+    protected getter completeness
 
     def initialize(
       @func : Program::Function,
@@ -763,6 +768,7 @@ module Savi::Compiler::Infer
       @classify : Classify::Analysis,
       @type_context : TypeContext::Analysis,
       @pre_infer : PreInfer::Analysis,
+      @completeness : Completeness::Analysis,
     )
     end
 
@@ -772,11 +778,8 @@ module Savi::Compiler::Infer
       @analysis.type_partial_reification_sets = @t_analysis.type_partial_reification_sets
 
       @analysis.func_partial_reification_sets = begin
-        f_cap_string = @func.cap.value
-        f_cap_string = "ref" if @func.has_tag?(:constructor)
-        f_cap_string = "read" if f_cap_string == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
         next_index: Int32 = 0
-        MetaType::Capability.new_maybe_generic(f_cap_string).each_cap.map { |f_cap|
+        MetaType::Capability.new_maybe_generic(@func.cap.value).each_cap.map { |f_cap|
           {
             f_cap,
             @analysis.type_partial_reification_sets.keys.map { |type_param_caps|
@@ -835,7 +838,10 @@ module Savi::Compiler::Infer
           "This#{kind} needs an explicit type; it could not be inferred"
       end
     rescue exc : Exception
-      raise Error.compiler_hole_at(info, exc)
+      raise Error.compiler_hole_at(
+        info,
+        Exception.new("Resolving this inference node: \n#{info.pos.show}", exc)
+      )
     end
 
     def apply_substs_for_layer(ctx : Context, info : Info, span : Span) : Span
@@ -1016,8 +1022,9 @@ module Savi::Compiler::Infer
       classify = ctx.classify[f_link]
       type_context = ctx.type_context[f_link]
       pre_infer = ctx.pre_infer[f_link]
+      completeness = ctx.completeness[f_link.type]
 
-      {refer_type, refer_type_parent, classify, type_context, pre_infer}
+      {refer_type, refer_type_parent, classify, type_context, pre_infer, completeness}
     end
   end
 
@@ -1048,8 +1055,9 @@ module Savi::Compiler::Infer
       classify = ctx.classify[f_link]
       type_context = ctx.type_context[f_link]
       pre_infer = ctx.pre_infer[f_link]
+      completeness = ctx.completeness[f_link.type]
 
-      {refer_type, refer_type_parent, classify, type_context, pre_infer}
+      {refer_type, refer_type_parent, classify, type_context, pre_infer, completeness}
     end
   end
 end

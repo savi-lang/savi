@@ -140,7 +140,7 @@ class Savi::SpecMarkdown
         code_blocks.each_with_index.flat_map { |(code, index)|
           [
             ":class #{generated_class_name}#{index}",
-            "  :new",
+            "  :new ref",
             code,
           ]
         }.to_a
@@ -217,6 +217,7 @@ class Savi::SpecMarkdown
             when "type"
               rt = Compiler::Infer::ReifiedType.new(t_link)
               cap = f_link.resolve(ctx).cap.value
+              cap = "box" if cap == "read"
               rf = Compiler::Infer::ReifiedFunction.new(rt, f_link,
                 Compiler::Infer::MetaType.new(rt, cap)
               )

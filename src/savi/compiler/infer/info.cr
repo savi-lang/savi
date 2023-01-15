@@ -441,6 +441,7 @@ module Savi::Compiler::Infer
 
   class Self < FixedInfo
     property stabilize : Bool
+    property receiver_of_call : FromCall? = nil
 
     def describe_kind : String; "receiver value" end
 
@@ -449,6 +450,15 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
+      if infer.completeness.is_incomplete?(self)
+        # TODO: don't use `ref` when in a `box` function
+        # TODO: don't use `ref` when in a `tag` function
+        # TODO: don't use `ref` when in a `non` function
+        # TODO: don't use `tag` when in a `non` function
+
+        return infer.self_with_specified_cap(ctx, @receiver_of_call ? "ref" : "tag")
+      end
+
       infer.self_type_expr_span(ctx)
       .transform_mt { |mt| stabilize ? mt.stabilized : mt }
     end
@@ -461,7 +471,9 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.self_with_specified_cap(ctx, @cap)
+      # TODO: Infer which cap to use
+      cap = @cap == "read" ? "ref" : @cap
+      infer.self_with_specified_cap(ctx, cap)
     end
   end
 
@@ -1292,10 +1304,13 @@ module Savi::Compiler::Infer
             # If this is a constructor, we know what the result type will be
             # without needing to actually depend on the other analysis' span.
             if call_func.has_tag?(:constructor)
+              cap_value = call_func.cap.value
+              # TODO: infer instead of always using "ref" here
+              cap_value = "ref" if cap_value == "read"
               new_mt = call_mt
                 .intersect(lhs_mt)
                 .strip_cap
-                .intersect(MetaType.cap(call_func.cap.value))
+                .intersect(MetaType.cap(cap_value))
 
               next Span.simple(new_mt)
             end
@@ -1465,6 +1480,11 @@ module Savi::Compiler::Infer
         }
         Span.reduce_combine_mts(union_member_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
       }
+    rescue exc : Exception
+      raise Exception.new(
+        "At this call site: \n#{(@call.args || @call.lhs).pos.show}",
+        exc
+      )
     end
   end
 end

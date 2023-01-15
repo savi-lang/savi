@@ -752,6 +752,11 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
         end
       }
     }
+  rescue exc : Exception
+    raise Exception.new(
+      "#{exc.message}\n...while reaching function #{rf.show_full_name}",
+      exc
+    )
   end
 
   def signature_for(

@@ -239,7 +239,6 @@ class Savi::Compiler::TTypeCheck
     getter reified : ReifiedFunction
     private getter refer_type : ReferType::Analysis
     protected getter classify : Classify::Analysis # TODO: make private
-    # private getter completeness : Completeness::Analysis
     protected getter pre_infer : PreTInfer::Analysis # TODO: make private
     private getter infer : TInfer::FuncAnalysis
     private getter subtyping : TSubtypingCache::ForReifiedFunc
