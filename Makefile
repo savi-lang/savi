@@ -48,8 +48,6 @@ spec.core: PHONY SAVI
 # Update deps for the specs for the core package.
 spec.core.deps: PHONY SAVI
 	echo && $(SAVI) deps update --cd spec/core $(extra_args)
-	# TODO: Remove these temporary library patches:
-	sh -c 'cd spec/core/deps/github:savi-lang/Time/v0.20220513.0 && git apply ../../../../../../tmp-lib-patch-Time.patch'
 
 # Run the specs for the core package in lldb for debugging.
 spec.core.lldb: PHONY SAVI
@@ -96,8 +94,6 @@ example.compile: PHONY SAVI
 # Update deps for the specs for the given example directory.
 example.deps: PHONY SAVI
 	echo && $(SAVI) deps update --cd "$(dir)" $(extra_args)
-	# TODO: Remove these temporary library patches:
-	sh -c "cd $(dir)/deps/github:savi-lang/Time/v0.20220513.0 && git apply ../../../../../../../tmp-lib-patch-Time.patch"
 
 # Compile the vscode extension.
 vscode: PHONY SAVI
