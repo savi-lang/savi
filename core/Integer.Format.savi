@@ -31,11 +31,11 @@
     )
     @_bcd = U64.BCD.new(value.u64)
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     if @_is_negative (
       out.push_byte('-')
     )
-    @_bcd.into_string(--out)
+    @_bcd.into_string(out)
 
   :fun into_string_space USize
     @_bcd.into_string_space + if @_is_negative (1 | 0)
@@ -80,7 +80,7 @@
     // TODO: different strategy when `_has_leading_zeros` is False.
     @_prefix.size + if (T.bit_width == 1) (1 | T.bit_width.usize / 4)
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     zeros = @_has_leading_zeros
     out << @_prefix
     case T.bit_width == (
@@ -121,7 +121,6 @@
       digit = @_digit(4),  if (zeros || digit != '0') (zeros = True, out.push_byte(digit))
       digit = @_digit(0), out.push_byte(digit)
     )
-    --out
 
   :fun _digit(shr)
     u4 = @_value.bit_shr(shr).u8.bit_and(0xf)
@@ -158,7 +157,7 @@
     // TODO: different strategy when `_has_leading_zeros` is False.
     @_prefix.size + T.bit_width.usize
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     show_zeros = @_has_leading_zeros
     out << @_prefix
 
@@ -179,8 +178,6 @@
     // If we haven't seen any zeros or ones yet, show at least one zero
     if !show_zeros out.push_byte('0')
 
-    --out
-
 :: Format the given integer as a Unicode codepoint.
 :struct val Integer.Format.Unicode(T Integer(T)'val)
   :is IntoString
@@ -189,9 +186,8 @@
 
   :new val _new(@_value)
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     out.push_utf8(@_value.u32)
-    --out
 
   :fun into_string_space USize
     // This is only a rough guess
@@ -207,7 +203,7 @@
   :let _value U32
   :new val _new(value T): @_value = value.u32
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     case (
     | @_value < 127 && @_value >= 32 |
       case @_value == (
@@ -225,19 +221,18 @@
       | '\n' | out.push_byte('\\'), out.push_byte('n')
       |
         out.push_byte('\\'), out.push_byte('x')
-        out = @_value.u8.format.hex.bare.into_string(--out)
+        @_value.u8.format.hex.bare.into_string(out)
       )
     | @_value <= 0xff |
       out.push_byte('\\'), out.push_byte('x')
-      out = @_value.u8.format.hex.bare.into_string(--out)
+      @_value.u8.format.hex.bare.into_string(out)
     | @_value <= 0xffff |
       out.push_byte('\\'), out.push_byte('u')
-      out = @_value.u16.format.hex.bare.into_string(--out)
+      @_value.u16.format.hex.bare.into_string(out)
     |
       out.push_byte('\\'), out.push_byte('U')
-      out = @_value.format.hex.bare.into_string(--out)
+      @_value.format.hex.bare.into_string(out)
     )
-    --out
 
   :fun into_string_space USize
     case (

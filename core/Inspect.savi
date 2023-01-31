@@ -4,26 +4,27 @@
   :fun "[]!"(index USize) Any'box // TODO: use `box` instead of `Any'box`
 
 :trait box _InspectCustom
-  :fun inspect_into(output String'iso) String'iso
+  :fun inspect_into(output String'ref) None
 
 // TODO: Move this out of savi maybe? Does that make sense?
 // TODO: Make this into a trait with "implement for"/typeclass style polymorphism
 :module Inspect
   :fun "[]"(input Any'box) String'val // TODO: use `box` instead of `Any'box`
-    @into(String.new_iso, input)
+    output = String.new
+    @into(output, input)
+    output.take_buffer
 
   :fun out(input Any'box) // TODO: use `box` instead of `Any'box`
     _FFI.puts(@[input].cstring)
 
-  :fun into(output String'iso, input Any'box) String'iso // TODO: use `box` instead of `Any'box` // TODO: use something like Crystal IO instead of String?
+  :fun into(output String'ref, input Any'box) None // TODO: use `box` instead of `Any'box`
     case input <: (
-    | _InspectCustom | input.inspect_into(--output)
-    | Bytes'box | input.format.literal.into_string(--output)
+    | _InspectCustom | input.inspect_into(output)
+    | Bytes'box | input.format.literal.into_string(output)
     | String'box |
       output.push_byte('"')
       output << input.clone // TODO: show some characters as escaped.
       output.push_byte('"')
-      --output
     | _InspectEach |
       output.push_byte('[')
       index USize = 0
@@ -31,18 +32,16 @@
         if (index > 0) (output.push_byte(','), output.push_byte(' '))
         try (
           element = input[index]!
-          output = @into(--output, element)
+          @into(output, element)
         )
         index += 1
       )
       output.push_byte(']')
-      --output
     | IntoString |
       // If there's nothing more specific, then our last option is to print
       // the same representation that `into_string` gives for that value.
-      input.into_string(--output)
+      input.into_string(output)
     |
       // Otherwise, fall back to just printing the name of the type.
       output << reflection_of_runtime_type_name input
-      --output
     )

@@ -161,7 +161,7 @@
     FloatingPoint.Format(F64)._new(_FormattableF64.from_f64(@as_val.f64))
 
   :is IntoString
-  :fun into_string(out String'iso): @format.shortest.into_string(--out)
+  :fun into_string(out String'ref): @format.shortest.into_string(out)
   :fun into_string_space: @format.shortest.into_string_space
 
 :: This trait isn't meant to be used externally. It's just a base implementation

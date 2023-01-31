@@ -58,14 +58,13 @@
 
   :fun into_string_space: @space
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     if (@_size > 0) (
       new_size = out._size + @_size
       out.reserve(new_size)
       out._clone_from(@_ptr._unsafe_val, @_size, out._size)
       out._size = new_size
     )
-    --out
 
   :fun "=="(other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
