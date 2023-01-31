@@ -3,9 +3,11 @@
 :: These methods are used by string interpolation syntax, so ensuring that
 :: a type implements this trait will make it directly usable in interpolation.
 :trait box IntoString
-  :: Emit a representation of this value into the given String, preserving
-  :: its isolation and returning the String with the new content appended.
-  :fun box into_string(out String'iso) String'iso
+  :: Emit a representation of this value into the given `String`.
+  ::
+  :: This method is expected by convention to append some bytes into the
+  :: `String` but not to modify any earlier portion of the `String`.
+  :fun box into_string(out String'ref) None
 
   :: Return a conservative estimate for how much many bytes are required to hold
   :: the string representation of this value when emitted with `into_string`.

@@ -18,22 +18,21 @@
   :let _value Bytes'box
   :new box _new(@_value)
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     out.push_byte('b')
     out.push_byte('"')
     @_value.each -> (byte |
       case (
-      | byte >= 0x7f | out = byte.format.hex.with_prefix("\\x").into_string(--out)
+      | byte >= 0x7f | byte.format.hex.with_prefix("\\x").into_string(out)
       | byte == '"'  | out.push_byte('\\').push_byte('"')
       | byte >= 0x20 | out.push_byte(byte)
       | byte == '\n' | out.push_byte('\\').push_byte('n')
       | byte == '\r' | out.push_byte('\\').push_byte('r')
       | byte == '\t' | out.push_byte('\\').push_byte('t')
-      |                out = byte.format.hex.with_prefix("\\x").into_string(--out)
+      |                byte.format.hex.with_prefix("\\x").into_string(out)
       )
     )
     out.push_byte('"')
-    --out
 
   :fun into_string_space USize
     // Use a conservative estimate, assuming all bytes will be escaped hex.
@@ -60,45 +59,42 @@
     // It takes 68 bytes to show each row of the hex dump.
     @_row_count * 68
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     @_row_count.times -> (row_index |
       row_address = row_index * 16
 
       // Emit the address shown on the left.
-      out = row_address.u32.format.hex.bare.into_string(--out)
+      row_address.u32.format.hex.bare.into_string(out)
       out.push_byte(':')
 
       // Emit the hex view shown in the center.
       USize[8].times -> (pair_index |
         out.push_byte(' ')
-        out = @_emit_hex_pair(--out, row_address + pair_index * 2)
+        @_emit_hex_pair(out, row_address + pair_index * 2)
       )
       out.push_byte(' ')
 
       // Emit the ASCII view shown on the right.
       USize[16].times -> (byte_index |
-        out = @_emit_ascii(--out, row_address + byte_index)
+        @_emit_ascii(out, row_address + byte_index)
       )
 
       // Emit a final newline for this row.
       out.push_byte('\n')
     )
-    --out
 
-  :fun _emit_hex_pair(out String'iso, pair_address USize)
-    out = @_emit_hex(--out, pair_address)
-    out = @_emit_hex(--out, pair_address + 1)
-    --out
+  :fun _emit_hex_pair(out String'ref, pair_address USize) None
+    @_emit_hex(out, pair_address)
+    @_emit_hex(out, pair_address + 1)
 
-  :fun _emit_hex(out String'iso, byte_address USize)
+  :fun _emit_hex(out String'ref, byte_address USize) None
     try (
-      out = @_value[byte_address]!.format.hex.bare.into_string(--out)
+      @_value[byte_address]!.format.hex.bare.into_string(out)
     |
       out.push_byte(' ').push_byte(' ')
     )
-    --out
 
-  :fun _emit_ascii(out String'iso, byte_address USize)
+  :fun _emit_ascii(out String'ref, byte_address USize) None
     try (
       byte = @_value[byte_address]!
       if (byte > 0x20 && byte < 0x7f) (
@@ -109,4 +105,3 @@
     |
       out.push_byte(' ')
     )
-    --out

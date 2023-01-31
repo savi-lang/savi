@@ -305,28 +305,43 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       ).from(node)
     }
 
-    # Call each part's `into_string` method, passing the result of the previous
-    # part as the argument. The argument for the first call is `String.new_iso`
-    # with the space expression as its argument to allocate the requested space.
-    # The hope is that if the correct amount of space was requested, we won't
-    # need to re-allocate the string as its size grows (if its `space >= size`).
-    string_expr = AST::Call.new(
+    # Allocate the new string to hold the specified amount of space, and assign
+    # it to a local variable with a hygienic name.
+    new_string_expr = AST::Call.new(
       AST::Identifier.new("String").from(node),
-      AST::Identifier.new("new_iso").from(node),
+      AST::Identifier.new("new").from(node),
       AST::Group.new("(", [space_expr] of AST::Node).from(node),
     ).from(node)
+
+    # Assign the string value to a new local variable (with a hygienic name).
+    # We'll use this name to pass it to the `into_string` method of each part,
+    # and then once at the end to refer to the final value of the built string.
+    local_name = next_local_name
+    local = AST::Identifier.new(local_name).from(node)
+    local_assign = AST::Relate.new(
+      local,
+      AST::Operator.new("=").from(new_string_expr),
+      new_string_expr,
+    ).from(node)
+    sequence.terms << local_assign
+
+    # Call each part's `into_string` method.
     parts.each { |part|
-      string_expr = AST::Call.new(
+      sequence.terms << AST::Call.new(
         part,
         AST::Identifier.new("into_string").from(part),
-        AST::Group.new("(", [string_expr] of AST::Node).from(part),
+        AST::Group.new("(", [local] of AST::Node).from(part),
       ).from(part)
     }
 
-    # Add the string expression to the sequence of terms.
-    # This is the final expression in the sequence, so it will
-    # be the result of the sequence when we return the sequence.
-    sequence.terms << string_expr
+    # Take the underlying buffer from the local variable holding the string,
+    # to obtain an isolated string. This is is the final expression in the
+    # sequence, so it will be the result of the sequence when it executes.
+    sequence.terms << AST::Call.new(
+      local,
+      AST::Identifier.new("take_buffer").from(local),
+    ).from(local)
+
     sequence
 
   rescue exc : Exception

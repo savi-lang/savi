@@ -1,5 +1,5 @@
 :: Binary Coded Decimal (BCD) representation of an U64 integer.
-:: 
+::
 :: Each digit is represented by a nibble (4 bits), requiring
 :: a total of 80 bits for up to 20 digits of the U64.
 :: Digits are stored in reverse order, so the the decimal `123`
@@ -20,7 +20,7 @@
   :let _low U64
 
   :new (u64 U64)
-    high U64 = 0 
+    high U64 = 0
     low U64 = 0xF
     ndigits U64 = 0
     while True (
@@ -69,7 +69,7 @@
     )
 
   :fun box each_digit
-    :yields U8 for None 
+    :yields U8 for None
     high = @_high
     low = @_low
     while (low.bit_and(0xF) != 0xF) (
@@ -81,10 +81,7 @@
   :fun box into_string_space USize
     @ndigits
 
-  :fun box into_string(out String'iso) String'iso
+  :fun box into_string(out String'ref) None
     @each_digit -> (digit |
       out.push_byte('0'.u8 + digit)
     )
-
-    --out
-

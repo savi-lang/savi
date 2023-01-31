@@ -293,7 +293,7 @@
   :fun format: Integer.Format(T)._new(@as_val)
 
   :is IntoString
-  :fun into_string(out String'iso): @format.decimal.into_string(--out)
+  :fun into_string(out String'ref): @format.decimal.into_string(out)
   :fun into_string_space: @format.decimal.into_string_space
 
 :: This trait isn't meant to be used externally. It's just a base implementation
@@ -423,5 +423,5 @@
   :fun member_name String
 
   :is IntoString
-  :fun into_string(out String'iso): @member_name.into_string(--out)
+  :fun into_string(out String'ref): @member_name.into_string(out)
   :fun into_string_space: @member_name.into_string_space

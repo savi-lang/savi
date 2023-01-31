@@ -2,8 +2,8 @@
   :is IntoString
   // TODO: These shouldn't need to be `:fun box` - `:fun non` should be okay.
   :: When emitting into a string, emit nothing (i.e. an empty string).
-  :fun box into_string(out String'iso): --out
+  :fun box into_string(out String'ref): None
   :fun box into_string_space USize: 0
 
   :: When inspecting, print explicitly using the name `None`.
-  :fun box inspect_into(out String'iso): out << "None", --out
+  :fun box inspect_into(out String'ref) None: out << "None"

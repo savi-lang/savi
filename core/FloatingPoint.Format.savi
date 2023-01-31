@@ -64,27 +64,6 @@
     @is_zero = False
     @is_nan = False
 
-  :: Emit the represented value into the string, in the event that it is one
-  :: of the "special cases" (i.e. that it is not a finite non-zero value).
-  ::
-  :: If the value `is_finite_non_zero`, it will be yielded back to the caller,
-  :: who has a responsibility to emit as desired into the string and return it.
-  :fun _into_string_unless_finite_non_zero(out String'iso) String'iso
-    :yields String'iso for String'iso
-    case (
-    | @is_finite_non_zero |
-      out = yield --out
-    | @is_zero |
-      if @is_negative out.push_byte('-')
-      out << "0.0"
-    | @is_nan |
-      out << "NaN"
-    |
-      if @is_negative out.push_byte('-')
-      out << "Infinity"
-    )
-    --out
-
   :: Return the maxmium number of bytes that may be needed to emit the
   :: stored value into a string buffer, in the event that it is one
   :: of the "special cases" (i.e. that it is not a finite non-zero value).
@@ -185,11 +164,11 @@
       FloatingPoint.Format.WithoutExponent(T)._new(@_value).into_string_space
     )
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     if (@_value.power_of_10 > 2 || @_value.scientific_exponent < -3) (
-      FloatingPoint.Format.Scientific(T)._new(@_value).into_string(--out)
+      FloatingPoint.Format.Scientific(T)._new(@_value).into_string(out)
     |
-      FloatingPoint.Format.WithoutExponent(T)._new(@_value).into_string(--out)
+      FloatingPoint.Format.WithoutExponent(T)._new(@_value).into_string(out)
     )
 
 :: Format the given floating-point with an exponent (i.e. scientific notation).
@@ -222,10 +201,10 @@
     + 1
     + @_value.scientific_exponent.format.decimal.into_string_space
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     // First, deal with any special cases (zero or non-finite numbers).
     // We print these in a special (hard-coded) way and return early.
-    try (out << @_value._special_case_as_string!, return --out)
+    try (out << @_value._special_case_as_string!, return)
 
     significand = @_value.significand
     digit_count = @_value.digit_count
@@ -246,10 +225,8 @@
     // Print the base-10 exponent suffix.
     if exponent.is_nonzero (
       out.push_byte('e')
-      out = exponent.into_string(--out)
+      exponent.into_string(out)
     )
-
-    --out
 
 :: Format the given floating-point with no exponent (no scientific notation).
 :struct val FloatingPoint.Format.WithoutExponent(T FloatingPoint(T)'val)
@@ -282,10 +259,10 @@
 
     byte_count
 
-  :fun into_string(out String'iso) String'iso
+  :fun into_string(out String'ref) None
     // First, deal with any special cases (zero or non-finite numbers).
     // We print these in a special (hard-coded) way and return early.
-    try (out << @_value._special_case_as_string!, return --out)
+    try (out << @_value._special_case_as_string!, return)
 
     significand = @_value.significand
     digit_count = @_value.digit_count
@@ -320,5 +297,3 @@
       out.push_byte('.')
       out.push_byte('0')
     )
-
-    --out
