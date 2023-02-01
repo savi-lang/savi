@@ -101,6 +101,8 @@
   :fun is_empty:     @size == 0
   :fun is_not_empty: @size != 0
 
+  :fun format: String.Format._new(@)
+
   :fun clone @'iso
     copy = @new_iso(@size)
     _ptr_tag CPointer(U8)'tag = @_ptr // TODO: this indirection shouldn't be needed

@@ -21,10 +21,7 @@
     case input <: (
     | _InspectCustom | input.inspect_into(output)
     | Bytes'box | input.format.literal.into_string(output)
-    | String'box |
-      output.push_byte('"')
-      output << input.clone // TODO: show some characters as escaped.
-      output.push_byte('"')
+    | String'box | input.format.literal.into_string(output)
     | _InspectEach |
       output.push_byte('[')
       index USize = 0

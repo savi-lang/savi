@@ -51,6 +51,9 @@
   :it "inspects strings"
     assert: Inspect["example"] == "\"example\""
     assert: Inspect[String.new] == "\"\""
+    assert: Inspect["\x00\x08\x1a ABC123\"\n\r\t\x7f\x80\xff"] == <<<
+      "\x00\x08\x1a ABC123\"\n\r\t\x7f\x80\xff"
+    >>>
 
   :it "inspects bytes"
     assert: Inspect[b"example"] == "b\"example\""

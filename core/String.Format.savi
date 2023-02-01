@@ -1,0 +1,38 @@
+:: Format the given `String` value using one of the available format types.
+:: Call one of the methods of this struct to choose which format type to use.
+:struct box String.Format
+  :let _value String'box
+  :new box _new(@_value)
+
+  :fun literal: String.Format.Literal._new(@_value)
+
+  :fun lit: @literal
+
+:: Format the given `String` as it could appear in Savi source code. That is,
+:: as a string literal with non-printable or non-ASCII bytes escaped.
+:struct box String.Format.Literal
+  :is IntoString
+
+  :let _value String'box
+  :new box _new(@_value)
+
+  :fun into_string(out String'ref) None
+    out.push_byte('"')
+    @_value.each_byte -> (byte |
+      case (
+      | byte >= 0x7f | byte.format.hex.with_prefix("\\x").into_string(out)
+      | byte == '"'  | out.push_byte('\\').push_byte('"')
+      | byte >= 0x20 | out.push_byte(byte)
+      | byte == '\n' | out.push_byte('\\').push_byte('n')
+      | byte == '\r' | out.push_byte('\\').push_byte('r')
+      | byte == '\t' | out.push_byte('\\').push_byte('t')
+      |                byte.format.hex.with_prefix("\\x").into_string(out)
+      )
+    )
+    out.push_byte('"')
+
+  :fun into_string_space USize
+    // Use a conservative estimate, assuming all bytes will be escaped hex.
+    // Each escaped hex byte takes 4 bytes to display, and there are 2 bytes
+    // of overhead involved in displaying the leading `"` and final `"`.
+    @_value.size * 4 + 2
