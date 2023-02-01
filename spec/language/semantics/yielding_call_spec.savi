@@ -8,6 +8,19 @@
     array << "."
     count_remaining
 
+  // This function has the same behavior as the above one, but is implemented
+  // in a recursive way. We test this separately because recursive yielding
+  // calls must take a separate approach during LLVM IR generation -
+  // they must heap-allocate the nested continuation due to allow recursion.
+  :fun recursive_call(count_remaining U64, array Array(String)) U64
+    :yields U64 for String
+    if count_remaining.is_zero (
+      array << "."
+      return 0
+    )
+    array << yield count_remaining
+    @recursive_call(count_remaining - 1, array) -> (n | yield n)
+
 :module YieldingCallSpec
   :fun run(test MicroTest)
     array Array(String) = []
@@ -19,9 +32,21 @@
       == 0 && total == 0 && array == ["."]
     )
 
+    test["recursive yielding call; yielding zero times"].pass = (
+      total = 0, array = []
+      Yielding.recursive_call(0, array) -> (n | total += n, "never")
+      == 0 && total == 0 && array == ["."]
+    )
+
     test["yielding call; yielding three times"].pass = (
       total = 0, array = []
       Yielding.call(3, array) -> (n | total += n, "yo")
+      == 0 && total == 6 && array == ["yo", "yo", "yo", "."]
+    )
+
+    test["recursive yielding call; yielding three times"].pass = (
+      total = 0, array = []
+      Yielding.recursive_call(3, array) -> (n | total += n, "yo")
       == 0 && total == 6 && array == ["yo", "yo", "yo", "."]
     )
 
@@ -35,9 +60,25 @@
       == 33 && total == 5 && array == ["yo", "yo"]
     )
 
+    test["recursive yielding call; yielding twice, then disrupted by error"].pass = (
+      total = 0, array = []
+      try (
+        Yielding.recursive_call(3, array) -> (n | if (n == 1) error!, total += n, "yo")
+      |
+        U64[33]
+      )
+      == 33 && total == 5 && array == ["yo", "yo"]
+    )
+
     test["yielding call; yielding twice, then disrupted by break"].pass = (
       total = 0, array = []
       Yielding.call(3, array) -> (n | if (n == 1) (break 33), total += n, "yo")
+      == 33 && total == 5 && array == ["yo", "yo"]
+    )
+
+    test["recursive yielding call; yielding twice, then disrupted by break"].pass = (
+      total = 0, array = []
+      Yielding.recursive_call(3, array) -> (n | if (n == 1) (break 33), total += n, "yo")
       == 33 && total == 5 && array == ["yo", "yo"]
     )
 
@@ -47,8 +88,20 @@
       == 0 && total == 6 && array == ["yo", "yo", "yo", "."]
     )
 
+    test["recursive yielding call; yielding three times, not disrupted by break"].pass = (
+      total = 0, array = []
+      Yielding.recursive_call(3, array) -> (n | if (n == 0) (break 33), total += n, "yo")
+      == 0 && total == 6 && array == ["yo", "yo", "yo", "."]
+    )
+
     test["yielding call; yielding three times, sometimes with next"].pass = (
       total = 0, array = []
       Yielding.call(3, array) -> (n | if (n != 3) (next "ho"), total += n, "yo")
+      == 0 && total == 3 && array == ["yo", "ho", "ho", "."]
+    )
+
+    test["recursive yielding call; yielding three times, sometimes with next"].pass = (
+      total = 0, array = []
+      Yielding.recursive_call(3, array) -> (n | if (n != 3) (next "ho"), total += n, "yo")
       == 0 && total == 3 && array == ["yo", "ho", "ho", "."]
     )

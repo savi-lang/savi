@@ -91,6 +91,7 @@ class Savi::Compiler::CodeGen
   getter di
   getter gtypes
   getter bitwidth
+  getter ptr
   getter isize
 
   def initialize(

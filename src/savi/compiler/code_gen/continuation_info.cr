@@ -176,9 +176,10 @@ class Savi::Compiler::CodeGen
       index = struct_index_for_yielding_call_cont(call)
       gep = builder.struct_gep(struct_type, cont, index, "CONT.#{call.ident.value}.NESTED.CONT.GEP")
 
+      # If this is a recursive-yielding call with a heap allocation indirection
+      # we need an extra load indirection here.
       if struct_type.struct_element_types[index].kind == LLVM::Type::Kind::Pointer
-        nested_cont_struct_type = nested_cont_struct_types[call_index_for_yielding_call_cont(call)]
-        gep = builder.load(nested_cont_struct_type, gep, gep.name)
+        gep = builder.load(g.ptr, gep, gep.name)
       end
 
       gep
