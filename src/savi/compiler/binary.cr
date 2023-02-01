@@ -299,6 +299,7 @@ class Savi::Compiler::Binary
       else
         if target.x86_64?
           yield "/lib/gcc/x86_64-linux-gnu/*", nil
+          yield "/lib/gcc/x86_64-pc-linux-gnu/*", nil
           yield "/lib/x86_64-linux-gnu", nil
           yield "/usr/lib/gcc/x86_64-linux-gnu/*", nil
           yield "/usr/lib/gcc/x86_64-pc-linux-gnu/*", nil
