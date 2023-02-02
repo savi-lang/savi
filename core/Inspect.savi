@@ -34,6 +34,9 @@
         index += 1
       )
       output.push_byte(']')
+    | TraceData |
+      // If it's traceable as a data structure, trace it and print each part.
+      input.trace_data(Inspect.TraceData.Printer.new(output))
     | IntoString |
       // If there's nothing more specific, then our last option is to print
       // the same representation that `into_string` gives for that value.
@@ -42,3 +45,78 @@
       // Otherwise, fall back to just printing the name of the type.
       output << reflection_of_runtime_type_name input
     )
+
+:class Inspect.TraceData.Printer
+  :let _out String'ref
+  :var _index USize: 0
+  :var _depth USize: 0
+  :var _recurse_stack Array(USize): []
+
+  :new (@_out = String.new)
+
+  :fun ref take_buffer: @_out.take_buffer
+
+  :is TraceData.Observer
+
+  :fun ref object(recurse_id USize) None
+    :yields None for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    orig_index = @_index <<= 0
+    @_depth += 1
+
+    @_out.push_byte('#')
+    if recurse_id.is_zero (
+      yield None
+    |
+      recurse_id.format.hex.into_string(@_out)
+
+      if @_recurse_stack.includes(recurse_id) (
+        @_out << "..."
+      |
+        @_out.push_byte(':')
+        @_recurse_stack << recurse_id
+        yield None
+        try @_recurse_stack.pop!
+      )
+    )
+
+    @_index = orig_index
+    @_depth -= 1
+    @
+
+  :fun ref property(name String, value TraceData) None
+    @_out.push_byte('\n')
+    @_depth.times -> (@_out << "  ")
+    @_out << name
+    @_out << ": "
+
+    value.trace_data(@)
+
+  :fun ref array(recurse_id USize) None
+    :yields None for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @object(recurse_id) -> (yield None) // (we happen to print arrays the same as objects)
+
+  :fun ref array_element(value TraceData) None
+    @_out.push_byte('\n')
+    @_depth.times -> (@_out << "  ")
+    @_index.into_string(@_out)
+    @_out << ": "
+
+    value.trace_data(@)
+
+    @_index += 1
+
+  :fun ref primitive_none None: @_out << "None"
+  :fun ref primitive_bool(value Bool) None: @_out << if value ("True" | "False")
+  :fun ref primitive_u64(value U64): value.into_string(@_out)
+  :fun ref primitive_u32(value U32): value.into_string(@_out)
+  :fun ref primitive_u16(value U16): value.into_string(@_out)
+  :fun ref primitive_u8(value U8): value.into_string(@_out)
+  :fun ref primitive_i64(value I64): value.into_string(@_out)
+  :fun ref primitive_i32(value I32): value.into_string(@_out)
+  :fun ref primitive_i16(value I16): value.into_string(@_out)
+  :fun ref primitive_i8(value I8): value.into_string(@_out)
+  :fun ref primitive_f64(value F64): value.into_string(@_out)
+  :fun ref primitive_f32(value F32): value.into_string(@_out)
+  :fun ref primitive_name(value String'box): value.into_string(@_out)
+  :fun ref primitive_string(value String'box): value.format.literal.into_string(@_out)
+  :fun ref primitive_bytes(value Bytes'box): value.format.literal.into_string(@_out)

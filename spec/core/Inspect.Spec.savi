@@ -1,5 +1,3 @@
-:module _InspectableTestModule
-
 :class Savi.Inspect.Spec
   :is Spec
   :const describes: "Inspect"
@@ -48,6 +46,11 @@
   :it "inspects a module with its type name"
     assert: Inspect[_InspectableTestModule] == "_InspectableTestModule"
 
+  :it "inspects an enum value with its member name"
+    assert: Inspect[_InspectableTestEnum.Foo] == "_InspectableTestEnum.Foo"
+    assert: Inspect[_InspectableTestEnum.Bar] == "_InspectableTestEnum.Bar"
+    assert: Inspect[_InspectableTestEnum.Baz] == "_InspectableTestEnum.Baz"
+
   :it "inspects strings"
     assert: Inspect["example"] == "\"example\""
     assert: Inspect[String.new] == "\"\""
@@ -64,3 +67,64 @@
   :it "inspects arrays"
     assert: Inspect[["foo", "bar", "baz"]] == "[\"foo\", \"bar\", \"baz\"]"
     assert: Inspect[[U8[10], U8[5], U8[6], U8[5]]] == "[10, 5, 6, 5]"
+
+  :it "inspects an object that is traceable as data"
+    data = _InspectableTestData.new
+    assert: Inspect[data] == "#\((identity_digest_of data).format.hex)\(<<<
+      :
+        example_none: None
+        example_pair: #
+          first: True
+          second: False
+        example_u64: 36
+        example_u32: 36
+        example_u16: 36
+        example_u8: 36
+        example_i64: 36
+        example_i32: 36
+        example_i16: 36
+        example_i8: 36
+        example_f64: 36.0
+        example_f32: 36.0
+        example_foo: _InspectableTestEnum.Foo
+        example_bar: _InspectableTestEnum.Bar
+        example_baz: _InspectableTestEnum.Baz
+        example_bytes: b"foo\x00bar\x00baz"
+        example_strings: #
+    >>>)\((identity_digest_of data.example_strings).format.hex)\(<<<
+      :
+          0: "foo"
+          1: "bar"
+          2: "baz"
+    >>>)"
+
+:module _InspectableTestModule
+
+:enum _InspectableTestEnum
+  :member Foo 0
+  :member Bar 1
+  :member Baz 2
+
+:class _InspectableTestData
+  :let example_strings: ["foo", "bar", "baz"]
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(identity_digest_of @) -> (
+      trace.property("example_none", None)
+      trace.property("example_pair", Pair(Bool).new(True, False))
+      trace.property("example_u64", U64[36])
+      trace.property("example_u32", U32[36])
+      trace.property("example_u16", U16[36])
+      trace.property("example_u8", U8[36])
+      trace.property("example_i64", I64[36])
+      trace.property("example_i32", I32[36])
+      trace.property("example_i16", I16[36])
+      trace.property("example_i8", I8[36])
+      trace.property("example_f64", F64[36])
+      trace.property("example_f32", F32[36])
+      trace.property("example_foo", _InspectableTestEnum.Foo)
+      trace.property("example_bar", _InspectableTestEnum.Bar)
+      trace.property("example_baz", _InspectableTestEnum.Baz)
+      trace.property("example_bytes", b"foo\x00bar\x00baz")
+      trace.property("example_strings", @example_strings)
+    )

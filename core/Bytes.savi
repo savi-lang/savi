@@ -55,6 +55,10 @@
     @_ptr_set_null
     --new
 
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.primitive_bytes(@)
+
   :fun "=="(other Bytes'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
 

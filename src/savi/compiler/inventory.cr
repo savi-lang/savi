@@ -53,15 +53,18 @@ module Savi::Compiler::Inventory
 
   struct Analysis
     def initialize
+      @declared_yields = [] of Bool
       @locals = [] of Refer::Local
       @yields = [] of AST::Yield
       @yielding_calls = [] of AST::Call
     end
 
+    protected def observe_declared_yield; @declared_yields << true; end
     protected def observe_local(x); @locals << x; end
     protected def observe_yield(x); @yields << x; end
     protected def observe_yielding_call(x); @yielding_calls << x; end
 
+    def can_yield?; yield_count > 0 || @declared_yields.any? end
     def has_local?(x); @locals.includes?(x); end
 
     def local_count; @locals.size; end
@@ -133,6 +136,10 @@ module Savi::Compiler::Inventory
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
         visitor = Visitor.new(Analysis.new, refer)
+
+        if f.yield_in || f.yield_out
+          visitor.analysis.observe_declared_yield
+        end
 
         f.params.try(&.accept(ctx, visitor))
         f.body.try(&.accept(ctx, visitor))

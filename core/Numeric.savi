@@ -36,6 +36,7 @@
   :is Numeric.Bounded(T)
   :is Numeric.Arithmetic(T)
   :is Numeric.Comparable(T)
+  :is TraceData
 
 :: A type which conveys information about the machine-level representation
 :: of a numeric type, including both the width and the kind of representation.

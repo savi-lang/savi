@@ -56,6 +56,10 @@
     @_ptr_set_null
     --new
 
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.primitive_string(@)
+
   :fun into_string_space: @space
 
   :fun into_string(out String'ref) None
