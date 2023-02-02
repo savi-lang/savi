@@ -300,6 +300,21 @@
     )
     is_found
 
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.array(identity_digest_of @) -> (
+      @each -> (item |
+        case A <: (
+        | TraceData'read |
+          trace.array_element(item)
+        | Any'read |
+          trace.array_element(TraceData.Untraceable.Maybe[item])
+        |
+          trace.array_element(TraceData.Untraceable)
+        )
+      )
+    )
+
   :: Return a copy of the array that has its elements sorted by value.
   :: If the element type is not aliasable, or not Comparable, it will be empty.
 

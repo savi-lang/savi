@@ -384,6 +384,24 @@
 
   :is Integer.Formattable(@'val)
 
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    if @is_signed (
+      case @bit_width == (
+      | 64 | trace.primitive_i64(@i64)
+      | 32 | trace.primitive_i32(@i32)
+      | 16 | trace.primitive_i16(@i16)
+      |  8 | trace.primitive_i8(@i8)
+      )
+    |
+      case @bit_width == (
+      | 64 | trace.primitive_u64(@u64)
+      | 32 | trace.primitive_u32(@u32)
+      | 16 | trace.primitive_u16(@u16)
+      |  8 | trace.primitive_u8(@u8)
+      )
+    )
+
   // TODO: explicit conformance to a particular trait for `hash`
   :fun hash USize
     if (USize.bit_width == 32) (
@@ -425,3 +443,7 @@
   :is IntoString
   :fun into_string(out String'ref): @member_name.into_string(out)
   :fun into_string_space: @member_name.into_string_space
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.primitive_name(@member_name)

@@ -5,3 +5,7 @@
   :fun val is_true: @
   :fun val is_false: @invert
   :fun val not: @invert
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.primitive_bool(@as_val)

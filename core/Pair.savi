@@ -19,3 +19,22 @@
   :fun low: @second
   :fun hi: @high
   :fun lo: @low
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(0) -> (
+      trace.property("first"
+        case A <: (
+        | TraceData'read | @first
+        | Any'read |       TraceData.Untraceable.Maybe[@first]
+        |                  TraceData.Untraceable
+        )
+      )
+      trace.property("second"
+        case A <: (
+        | TraceData'read | @second
+        | Any'read |       TraceData.Untraceable.Maybe[@second]
+        |                  TraceData.Untraceable
+        )
+      )
+    )

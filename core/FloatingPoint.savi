@@ -258,6 +258,10 @@
 
   :is FloatingPoint.Formattable(@)
 
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.primitive_f32(@f32)
+
 :: This trait isn't meant to be used externally. It's just a base implementation
 :: of methods to be copied into every new floating-point 64-bit `:numeric` type.
 :trait val FloatingPoint.BaseImplementation64 // TODO: don't use :trait for this... `common`?
@@ -354,3 +358,7 @@
     @bits.bit_and(0x7ff0_0000_0000_0000) != 0x7ff0_0000_0000_0000 // exponent
 
   :is FloatingPoint.Formattable(@)
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.primitive_f64(@f64)

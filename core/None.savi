@@ -7,3 +7,7 @@
 
   :: When inspecting, print explicitly using the name `None`.
   :fun box inspect_into(out String'ref) None: out << "None"
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.primitive_none

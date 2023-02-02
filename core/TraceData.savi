@@ -1,0 +1,136 @@
+:: A trait that defines a standard way to data structures inside of an object.
+::
+:: Implementing this trait makes it easy to integrate with various observers,
+:: such as those that print data, measure data, or serialize to various formats.
+:trait box TraceData
+  :fun box trace_data(trace TraceData.Observer) None
+
+:: A placeholder to be used while tracing a value that cannot be traced;
+:: that is, a value that cannot be represented by traceable data primitives.
+::
+:: This makes it possible to meanigfully implement tracing for a data structure
+:: that may sometimes contain an untraceable value.
+:module TraceData.Untraceable
+  :is TraceData
+  :fun box trace_data(trace TraceData.Observer)
+    trace.primitive_name("untraceable")
+
+:: A convenience type for handling a possibly untraceable value. See `[]`.
+:module TraceData.Untraceable.Maybe
+  :: A convenience function for handling a possibly untraceable value.
+  ::
+  :: If the given value is a `TraceData`, it will be returned as-is.
+  :: Otherwise, `TraceData.Untraceable` will be returned in its place.
+  :fun "[]"(value Any'box) TraceData
+    if (value <: TraceData) (value | TraceData.Untraceable)
+
+:: A trait that defines a standard for observing a data structure being traced.
+:: The data structure being traced is one that implements the `TraceData` trait.
+::
+:: The observer is mutable, as most useful observers are expected to accumulate
+:: some state (or produce side effects, but accumulated state is preferable).
+::
+:: The observer must implement all of the relevant methods, even if some of
+:: them are not meaningful to the purpose of the observer, or happen to be
+:: redundant with each other insofar as the particular observer is concerned.
+:trait ref TraceData.Observer
+  :: Trace an object - a data structure that may have some named properties.
+  ::
+  :: The call yields, and named properties should be traced inside the block.
+  ::
+  :: Do not interrupt the yield block, lest the observer be left in an
+  :: inconsistent state due to not getting to finish tracing the object.
+  ::
+  :: An id must be supplied as the argument for the purpose of breaking infinite
+  :: recursion - the observer is expected to observe the id and refuse to yield
+  :: for an id that has already been seen by it in the current "stack".
+  :: Most classes should use `identity_digest_of @` as the recursion id.
+  :: Where recursion is not possible (such as for a struct), use zero as the id.
+  :: The observer is expected to treat zero as a special case, indicating that
+  :: recursion should always be allowed without checking if it has been seen.
+  :fun ref object(recurse_id USize) None
+    :yields None for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+
+  :: Trace a named property of an object.
+  ::
+  :: This is expected to only be called from within the yield block of a call
+  :: to the `object` method - that is, only while tracing an object.
+  ::
+  :: The `name` is expected to be a unique string within the object.
+  ::
+  :: The `value` must be something that can be traced. If you need to trace a
+  :: property whose value cannot be traced, it is conventional to use the
+  :: special value `TraceData.Untraceable` as a placeholder traced value.
+  :fun ref property(name String, value TraceData) None
+
+  :: Trace an array-like sequence which may contain some elements.
+  ::
+  :: The call yields, and array elements should be traced inside the block.
+  ::
+  :: Do not interrupt the yield block, lest the observer be left in an
+  :: inconsistent state due to not getting to finish tracing the array.
+  ::
+  :: An id must be supplied as the argument for the purpose of breaking infinite
+  :: recursion - the observer is expected to observe the id and refuse to yield
+  :: for an id that has already been seen by it in the current "stack".
+  :: Most classes should use `identity_digest_of @` as the recursion id.
+  :: Where recursion is not possible (such as for a struct), use zero as the id.
+  :: The observer is expected to treat zero as a special case, indicating that
+  :: recursion should always be allowed without checking if it has been seen.
+  :fun ref array(recurse_id USize) None
+    :yields None for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+
+  :: Trace a sequential array element of an array.
+  ::
+  :: This is expected to only be called from within the yield block of a call
+  :: to the `array` method - that is, only while tracing an array.
+  ::
+  :: The `value` must be something that can be traced. If you need to trace an
+  :: element whose value cannot be traced, it is conventional to use the
+  :: special value `TraceData.Untraceable` as a placeholder traced value.
+  :fun ref array_element(value TraceData) None
+
+  :: Trace a primitive value indicating the absence of a value (i.e. `None`).
+  :fun ref primitive_none None
+
+  :: Trace a primitive value indicating truth or falsehood (i.e. `Bool`).
+  :fun ref primitive_bool(value Bool) None
+
+  :: Trace a primitive 64-bit unsigned integer value (i.e. `U64`).
+  :fun ref primitive_u64(value U64) None
+
+  :: Trace a primitive 32-bit unsigned integer value (i.e. `U32`).
+  :fun ref primitive_u32(value U32) None
+
+  :: Trace a primitive 16-bit unsigned integer value (i.e. `U16`).
+  :fun ref primitive_u16(value U16) None
+
+  :: Trace a primitive 8-bit unsigned integer value (i.e. `U8`).
+  :fun ref primitive_u8(value U8) None
+
+  :: Trace a primitive 64-bit signed integer value (i.e. `I64`).
+  :fun ref primitive_i64(value I64) None
+
+  :: Trace a primitive 32-bit signed integer value (i.e. `I32`).
+  :fun ref primitive_i32(value I32) None
+
+  :: Trace a primitive 16-bit signed integer value (i.e. `I16`).
+  :fun ref primitive_i16(value I16) None
+
+  :: Trace a primitive 8-bit signed integer value (i.e. `I8`).
+  :fun ref primitive_i8(value I8) None
+
+  :: Trace a primitive 64-bit floating-point value (i.e. `F64`).
+  :fun ref primitive_f64(value F64) None
+
+  :: Trace a primitive 32-bit floating-point value (i.e. `F32`).
+  :fun ref primitive_f32(value F32) None
+
+  :: Trace a primitive named value (such as a member of an enum).
+  :fun ref primitive_name(value String'box) None
+
+  :: Trace a primitive UTF-8 string value (i.e. `String`).
+  :fun ref primitive_string(value String'box) None
+
+  :: Trace a primitive sequence of arbitrary bytes (i.e. `Bytes`).
+  :fun ref primitive_bytes(value Bytes'box) None
