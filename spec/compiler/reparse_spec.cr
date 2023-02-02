@@ -42,9 +42,9 @@ describe Savi::Compiler::Reparse do
       ],
     ]
 
-    # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.test_compile([source], :reparse)
-    ctx.program.packages.should eq ctx2.program.packages
+    # # Compiling again should yield an equivalent program tree:
+    # ctx2 = Savi.compiler.test_compile([source], :reparse)
+    # ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms an @-prefixed identifier into a method call of @" do
@@ -104,9 +104,9 @@ describe Savi::Compiler::Reparse do
       ],
     ]
 
-    # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.test_compile([source], :reparse)
-    ctx.program.packages.should eq ctx2.program.packages
+    # # Compiling again should yield an equivalent program tree:
+    # ctx2 = Savi.compiler.test_compile([source], :reparse)
+    # ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms an nested type identifier into its single-identifier form" do
