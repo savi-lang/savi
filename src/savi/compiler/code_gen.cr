@@ -598,7 +598,7 @@ class Savi::Compiler::CodeGen
 
     # Add implicit continuation parameter and/or receiver parameter if needed.
     if gfunc.needs_continuation?
-      param_types.unshift(gfunc.continuation_info.struct_type.pointer)
+      param_types.unshift(@ptr)
     end
     if gfunc.needs_receiver?
       receiver_type =
@@ -788,6 +788,9 @@ class Savi::Compiler::CodeGen
           end
         end
     end
+
+  rescue exc : Exception
+    raise Error.compiler_hole_at(gfunc.func.ast, exc)
   end
 
   def gen_func_impl(gtype, gfunc, llvm_func)
@@ -854,6 +857,9 @@ class Savi::Compiler::CodeGen
       unless body && func_frame.flow.jumps_away?(body)
 
     gen_func_end(gfunc)
+
+  rescue exc : Exception
+    raise Error.compiler_hole_at(gfunc.func.ast, exc)
   end
 
   def gen_ffi_decl(gfunc)
@@ -1671,7 +1677,7 @@ class Savi::Compiler::CodeGen
     {lhs_gtype, call_gfunc}
   end
 
-  def resolve_yielding_call_cont_type(call : AST::Call, in_gfunc : GenFunc? = nil) : LLVM::Type
+  def resolve_yielding_call_cont_type(call : AST::Call, call_gfunc : GenFunc, in_gfunc : GenFunc? = nil) : LLVM::Type
     member_ast = call.ident
     lhs_type = type_of(call.receiver, in_gfunc)
     member = member_ast.value
@@ -1679,7 +1685,9 @@ class Savi::Compiler::CodeGen
     lhs_call_defs = lhs_type.all_callable_concrete_defs_for(ctx, member)
     concrete_gfuncs = lhs_call_defs.map { |reach_def| @gtypes[reach_def.llvm_name][member] }
 
-    if concrete_gfuncs.size <= 1
+    if concrete_gfuncs.empty?
+      call_gfunc.continuation_info.struct_type
+    elsif concrete_gfuncs.size == 1
       concrete_gfuncs.first.not_nil!.continuation_info.struct_type
     else
       ContinuationInfo.virtual_struct_type(self, concrete_gfuncs)
@@ -1777,7 +1785,7 @@ class Savi::Compiler::CodeGen
     # Prepend the continuation to the args list if necessary.
     cont = nil
     if gfunc.needs_continuation?
-      cont = gen_yielding_call_cont_gep(call, "#{gfunc.llvm_name}.CONT")
+      cont = gen_yielding_call_cont_gep(call, gfunc, "#{gfunc.llvm_name}.CONT")
 
       args.unshift(cont.not_nil!)
       arg_exprs.unshift(nil)
@@ -4060,7 +4068,7 @@ class Savi::Compiler::CodeGen
     end
   end
 
-  def gen_yielding_call_cont_gep(call, name)
+  def gen_yielding_call_cont_gep(call, call_gfunc, name)
     gfunc = func_frame.gfunc.not_nil!
 
     # If this is a yielding function, we store nested conts in our own cont.
@@ -4068,7 +4076,7 @@ class Savi::Compiler::CodeGen
     if gfunc.not_nil!.needs_continuation?
       func_frame.yielding_call_conts[call]
     else
-      gen_alloca(resolve_yielding_call_cont_type(call), name)
+      gen_alloca(resolve_yielding_call_cont_type(call, call_gfunc), name)
     end
   end
 

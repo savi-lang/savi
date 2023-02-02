@@ -108,7 +108,7 @@ class Savi::Compiler::CodeGen
         list = [] of LLVM::Type
 
         ctx.inventory[gfunc.link].each_yielding_call.each do |call|
-          list << g.resolve_yielding_call_cont_type(call, gfunc)
+          list << g.resolve_yielding_call_cont_type(call, gfunc, gfunc)
         end
 
         list
