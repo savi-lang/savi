@@ -34,7 +34,7 @@ class Savi::Compiler::CodeGen
       list = [] of CallingConvention
       list << Constructor::INSTANCE if func.has_tag?(:constructor)
       list << Errorable::INSTANCE if ctx.jumps[link].any_error?(func.ident)
-      list << Yielding::INSTANCE if ctx.inventory[link].yield_count > 0
+      list << Yielding::INSTANCE if ctx.inventory[link].can_yield?
 
       return Simple::INSTANCE if list.empty?
       return list.first if list.size == 1

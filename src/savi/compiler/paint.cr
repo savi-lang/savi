@@ -68,7 +68,7 @@ class Savi::Compiler::Paint
     set.add(reach_def)
 
     # If this function yields, paint another selector for its continue function.
-    if ctx.inventory[reach_func.reified.link].yield_count > 0
+    if ctx.inventory[reach_func.reified.link].can_yield?
       name = "#{name}.CONTINUE"
       set = @defs_by_sig_compat[name] ||= Set(Reach::Def).new
       set.add(reach_def)
