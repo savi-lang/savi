@@ -98,6 +98,34 @@
           2: "baz"
     >>>)"
 
+  :it "inspects deterministically an object that is traceable as data"
+    data = _InspectableTestData.new
+    assert: Inspect.TraceData.Printer.Deterministic.print(data) == <<<
+      #1:
+        example_none: None
+        example_pair: #
+          first: True
+          second: False
+        example_u64: 36
+        example_u32: 36
+        example_u16: 36
+        example_u8: 36
+        example_i64: 36
+        example_i32: 36
+        example_i16: 36
+        example_i8: 36
+        example_f64: 36.0
+        example_f32: 36.0
+        example_foo: _InspectableTestEnum.Foo
+        example_bar: _InspectableTestEnum.Bar
+        example_baz: _InspectableTestEnum.Baz
+        example_bytes: b"foo\x00bar\x00baz"
+        example_strings: #2:
+          0: "foo"
+          1: "bar"
+          2: "baz"
+    >>>
+
 :module _InspectableTestModule
 
 :enum _InspectableTestEnum
