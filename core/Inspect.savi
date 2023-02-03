@@ -54,9 +54,17 @@
 
   :new (@_out = String.new)
 
+  :fun non print(input TraceData) String
+    output = String.new
+    input.trace_data(@new(output))
+    output.take_buffer
+
   :fun ref take_buffer: @_out.take_buffer
 
   :is TraceData.Observer
+
+  :fun ref _show_recurse_id(recurse_id USize) None
+    recurse_id.format.hex.into_string(@_out)
 
   :fun ref object(recurse_id USize) None
     :yields None for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
@@ -67,7 +75,7 @@
     if recurse_id.is_zero (
       yield None
     |
-      recurse_id.format.hex.into_string(@_out)
+      @_show_recurse_id(recurse_id)
 
       if @_recurse_stack.includes(recurse_id) (
         @_out << "..."
@@ -120,3 +128,18 @@
   :fun ref primitive_name(value String'box): value.into_string(@_out)
   :fun ref primitive_string(value String'box): value.format.literal.into_string(@_out)
   :fun ref primitive_bytes(value Bytes'box): value.format.literal.into_string(@_out)
+
+:class Inspect.TraceData.Printer.Deterministic
+  :copies Inspect.TraceData.Printer
+  :var _seen_ids Array(USize): []
+
+  :fun ref _show_recurse_id(recurse_id USize) None
+    number = try (
+      @_seen_ids.find_index! -> (id | id == recurse_id)
+      + 1
+    |
+      @_seen_ids << recurse_id
+      @_seen_ids.size
+    )
+
+    number.into_string(@_out)
