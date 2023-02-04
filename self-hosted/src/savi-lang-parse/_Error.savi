@@ -1,0 +1,23 @@
+:enum _Error
+  :member BugNoTokens 0
+  :member BugInitialTokenIsNotDocument 1
+  :member BugFixedSizeListIsTooSmall 2
+  :member BugASTListNeedsLargerInitSize 3
+  :member BugUnexpectedGrammarToken 4
+  :member BugInvalidGroupStyleByte 5
+  :member ToDoAnnotations 100
+  :member ToDoComposeString 101
+
+:struct _Error.Info
+  :let at PEG.Token(_Token)
+  :let code _Error
+  :new (@at, @code)
+
+:struct _Error.List
+  :let _list Array(_Error.Info)
+  :new (@_list = [])
+
+  :fun ref at(at, code): @_list << _Error.Info.new(at, code)
+
+  :fun has_any: @_list.is_not_empty
+  :fun each: @_list.each -> (e | yield e)

@@ -1,0 +1,46 @@
+:struct val _TreePrinter.Data
+  :let tokens Array(PEG.Token(_Token))'val
+  :new (@tokens)
+
+  :fun "[]!"(index USize): @tokens[index]!
+
+  :fun each_child_with_index_of(parent_index USize)
+    parent_token = try (@[parent_index]! | return 0)
+    sep = parent_token.start
+    @tokens.each_with_index(parent_index + 1) -> (token, index |
+      break if (token.start >= parent_token.end)
+      next unless (token.start >= sep)
+      sep = token.end
+      yield (token, index)
+    )
+
+  :fun count_children_of(parent_index USize) USize
+    count USize = 0
+    @each_child_with_index_of(parent_index) -> (token, index |
+      count += 1
+    )
+    count
+
+:class _TreePrinter
+  :is PEG.Parser.Builder(_Token, String)
+  :var out: String.new_iso
+
+  :fun ref build(tokens Array(PEG.Token(_Token))'val) String
+    @_emit_counts(_TreePrinter.Data.new(tokens), 0, 0)
+    @out <<= String.new_iso
+
+  :fun ref _emit_counts(data _TreePrinter.Data, index USize, indent USize)
+    token = try (data[index]! | return)
+
+    children_count = data.count_children_of(index)
+
+    indent.times -> (@out << "  ")
+    if (children_count > 0) (
+      @out << "\(token.kind)(\(children_count)):\n"
+    |
+      @out << "\(token.kind)\n"
+    )
+
+    data.each_child_with_index_of(index) -> (child_token, child_index |
+      @_emit_counts(data, child_index, indent + 1)
+    )

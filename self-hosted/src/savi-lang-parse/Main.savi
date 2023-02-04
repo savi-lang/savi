@@ -1,0 +1,50 @@
+:actor Main
+  :is StdIn.Actor
+  :let env Env
+  :let io StdIn.Engine
+  :let _reader: CapnProto.Segments.Reader.new
+  :new (@env)
+    @io = StdIn.Engine.new(@)
+    StdIn.Ticket.get(@env.root.ticket_issuer, @)
+
+  :fun ref io_react(action IO.Action)
+    case action == (
+    | IO.Action.Closed |
+      @handle_code(@io.read_stream.extract_all.as_string)
+    )
+    @
+
+  :fun handle_code(code String)
+    nanos = Time.Measure.nanoseconds -> (
+      // printer = PEG.Parser(_Token, String).new(_Grammar.new, _TreePrinter.new)
+
+      builder = _TreeBuilder.new
+      builder.code = code
+      parser = PEG.Parser(
+        _Token
+        CapnProto.Message.Builder(SaviProto.AST.Document.Builder)
+      ).new(_Grammar.new, builder)
+
+      try (
+        // @env.err.print(printer.parse!(code))
+
+        message = parser.parse!(code)
+
+        if builder.error.has_any (
+          builder.error.each -> (info |
+            @env.err.print("\(info.code) at \(info.at.start)...\(info.at.end)")
+          )
+        |
+          @env.out.print(Inspect.TraceData.Printer.Deterministic.print(message.root))
+          // message.take_val_buffers.each -> (buffer |
+          //   @env.out.write(buffer.as_string)
+          // )
+        )
+      |
+        @env.err.print(
+          "Parse error at byte \(parser.last_parse_byte_size)"
+        )
+      )
+    )
+
+    @env.err.print("It took \(nanos) nanoseconds...")

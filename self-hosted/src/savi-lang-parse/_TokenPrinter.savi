@@ -1,0 +1,9 @@
+:class _TokenPrinter
+  :is PEG.Parser.Builder(_Token, String)
+
+  :fun ref build(tokens Array(PEG.Token(_Token))'val) String
+    out = String.new
+    tokens.each -> (token |
+      out << "\(token.start)-\(token.end): \(token.kind)\n"
+    )
+    out.take_buffer

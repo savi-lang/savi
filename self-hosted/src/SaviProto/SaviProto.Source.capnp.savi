@@ -1,0 +1,153 @@
+///
+// NOTE: This file was auto-generated from a Cap'n Proto file
+// using the `capnp` compiler with the `--output=savi` option.
+
+:struct box SaviProto.Source
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 2
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("absolute_file_path", @absolute_file_path_if_set!)
+      try trace.property("content_hash64", @content_hash64_if_set!)
+      try trace.property("package", @package_if_set!)
+    )
+
+  :fun absolute_file_path: @_p.text(0)
+  :fun absolute_file_path_if_set!: @_p.text_if_set!(0)
+
+  :fun content_hash64: @_p.u64(0x0)
+  :fun content_hash64_if_set!: @_p.u64_if_set!(0x0)
+
+  :fun package: SaviProto.Source.Package.read_from_pointer(@_p.struct(1))
+  :fun package_if_set!: SaviProto.Source.Package.read_from_pointer(@_p.struct_if_set!(1))
+
+:struct box SaviProto.Source.Pos
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+
+  :const capn_proto_data_word_count U16: 2
+  :const capn_proto_pointer_count U16: 1
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("source", @source_if_set!)
+      try trace.property("offset", @offset_if_set!)
+      try trace.property("size", @size_if_set!)
+      try trace.property("row", @row_if_set!)
+      try trace.property("col", @col_if_set!)
+    )
+
+  :fun source: SaviProto.Source.read_from_pointer(@_p.struct(0))
+  :fun source_if_set!: SaviProto.Source.read_from_pointer(@_p.struct_if_set!(0))
+
+  :fun offset: @_p.u32(0x0)
+  :fun offset_if_set!: @_p.u32_if_set!(0x0)
+
+  :fun size: @_p.u32(0x4)
+  :fun size_if_set!: @_p.u32_if_set!(0x4)
+
+  :fun row: @_p.u32(0x8)
+  :fun row_if_set!: @_p.u32_if_set!(0x8)
+
+  :fun col: @_p.u32(0xc)
+  :fun col_if_set!: @_p.u32_if_set!(0xc)
+
+:struct box SaviProto.Source.Package
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 2
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("absolute_manifest_directory_path", @absolute_manifest_directory_path_if_set!)
+      try trace.property("name", @name_if_set!)
+    )
+
+  :fun absolute_manifest_directory_path: @_p.text(0)
+  :fun absolute_manifest_directory_path_if_set!: @_p.text_if_set!(0)
+
+  :fun name: @_p.text(1)
+  :fun name_if_set!: @_p.text_if_set!(1)
+
+:struct SaviProto.Source.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Source.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 2
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref absolute_file_path: @_p.text(0)
+  :fun ref absolute_file_path_if_set!: @_p.text_if_set!(0)
+  :fun ref "absolute_file_path="(new_value): @_p.set_text(0, new_value, "")
+
+  :fun content_hash64: @_p.u64(0x0)
+  :fun content_hash64_if_set!: @_p.u64_if_set!(0x0)
+  :fun ref "content_hash64="(new_value): @_p.set_u64(0x0, new_value, 0)
+
+  :fun ref package: SaviProto.Source.Package.Builder.from_pointer(@_p.struct(1, 0, 2))
+  :fun ref package_if_set!: SaviProto.Source.Package.Builder.from_pointer(@_p.struct_if_set!(1, 0, 2))
+
+:struct SaviProto.Source.Pos.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Source.Pos.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 2
+  :const capn_proto_pointer_count U16: 1
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref source: SaviProto.Source.Builder.from_pointer(@_p.struct(0, 1, 2))
+  :fun ref source_if_set!: SaviProto.Source.Builder.from_pointer(@_p.struct_if_set!(0, 1, 2))
+
+  :fun offset: @_p.u32(0x0)
+  :fun offset_if_set!: @_p.u32_if_set!(0x0)
+  :fun ref "offset="(new_value): @_p.set_u32(0x0, new_value, 0)
+
+  :fun size: @_p.u32(0x4)
+  :fun size_if_set!: @_p.u32_if_set!(0x4)
+  :fun ref "size="(new_value): @_p.set_u32(0x4, new_value, 0)
+
+  :fun row: @_p.u32(0x8)
+  :fun row_if_set!: @_p.u32_if_set!(0x8)
+  :fun ref "row="(new_value): @_p.set_u32(0x8, new_value, 0)
+
+  :fun col: @_p.u32(0xc)
+  :fun col_if_set!: @_p.u32_if_set!(0xc)
+  :fun ref "col="(new_value): @_p.set_u32(0xc, new_value, 0)
+
+:struct SaviProto.Source.Package.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Source.Package.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 2
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref absolute_manifest_directory_path: @_p.text(0)
+  :fun ref absolute_manifest_directory_path_if_set!: @_p.text_if_set!(0)
+  :fun ref "absolute_manifest_directory_path="(new_value): @_p.set_text(0, new_value, "")
+
+  :fun ref name: @_p.text(1)
+  :fun ref name_if_set!: @_p.text_if_set!(1)
+  :fun ref "name="(new_value): @_p.set_text(1, new_value, "")
