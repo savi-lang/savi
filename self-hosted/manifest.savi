@@ -1,0 +1,30 @@
+:manifest bin "savi-lang-parse"
+  :sources "src/savi-lang-parse/*.savi"
+  :sources "src/SaviProto/*.savi"
+
+  :dependency PEG v0
+    :from "github:savi-lang/PEG"
+
+  :dependency CapnProto v0
+    :from "github:jemc-savi/CapnProto"
+    :depends on ByteStream
+
+  :transitive dependency ByteStream v0
+    :from "github:savi-lang/ByteStream"
+
+  :dependency Time v0
+    :from "github:savi-lang/Time"
+
+  :dependency StdIn v0
+    :from "github:savi-lang/StdIn"
+    :depends on ByteStream
+    :depends on IO
+    :depends on OSError
+
+  :dependency IO v0
+    :from "github:savi-lang/IO"
+    :depends on ByteStream
+    :depends on OSError
+
+  :transitive dependency OSError v0
+    :from "github:savi-lang/OSError"

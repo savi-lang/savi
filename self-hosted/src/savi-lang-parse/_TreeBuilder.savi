@@ -1,0 +1,277 @@
+:struct val _TreeBuilder.Data
+  :let code String
+  :let tokens Array(PEG.Token(_Token))'val
+  :new (@code, @tokens)
+
+  :fun "[]!"(index USize): @tokens[index]!
+
+  :fun each_child_with_index_of(parent_index USize)
+    parent_token = try (@[parent_index]! | return 0)
+    sep = parent_token.start
+    @tokens.each_with_index(parent_index + 1) -> (token, index |
+      break if (token.start >= parent_token.end)
+      next unless (token.start >= sep)
+      sep = token.end
+      yield (token, index)
+    )
+
+  :fun nth_child_with_index_of!(
+    parent_index USize
+    child_number USize
+  ) Pair(PEG.Token(_Token), USize)
+    seen_count USize = 0
+    @each_child_with_index_of(parent_index) -> (token, index |
+      return Pair(PEG.Token(_Token), USize).new(token, index) if (
+        child_number == seen_count
+      )
+      seen_count += 1
+    )
+    error!
+
+  :fun count_children_of(parent_index USize) USize
+    count USize = 0
+    @each_child_with_index_of(parent_index) -> (token, index |
+      count += 1
+    )
+    count
+
+  :fun get_string(token PEG.Token(_Token)): @code.trim(token.start, token.end)
+  :fun get_first_byte(token PEG.Token(_Token)): try (@code[token.start]! | 0)
+  :fun get_last_byte(token PEG.Token(_Token)): try (@code[token.end - 1]! | 0)
+
+:class _TreeBuilder
+  :is PEG.Parser.Builder(
+    _Token
+    CapnProto.Message.Builder(SaviProto.AST.Document.Builder)
+  )
+  :var code: "" // TODO: remove this field and add it as an arg to build fn?
+  :var error: _Error.List.new
+
+  :fun ref build(tokens Array(PEG.Token(_Token))'val)
+    message =
+      CapnProto.Message.Builder(SaviProto.AST.Document.Builder).new(0x4000)
+    @_build_all(message.root, _TreeBuilder.Data.new(@code, tokens))
+    message
+
+  :fun ref _build_all(
+    doc SaviProto.AST.Document.Builder
+    data _TreeBuilder.Data
+  )
+    // Get the first token.
+    // If there aren't any tokens in the stream, return early.
+    index = 0
+    token = try (data[index]! | return)
+
+    // Confirm the initial token type.
+    if (token.kind != _Token.Document) (
+      @error.at(token, _Error.BugInitialTokenIsNotDocument)
+      return
+    )
+
+    // Build the top-level document.
+    @_build_doc(doc, data, token, index)
+
+  :fun ref _build_pos(
+    pos SaviProto.Source.Pos.Builder
+    token PEG.Token(_Token)
+  )
+    None // TODO: Fill in the source position information.
+
+  :fun ref _build_doc(
+    doc SaviProto.AST.Document.Builder
+    data _TreeBuilder.Data
+    token PEG.Token(_Token)
+    index USize
+  )
+    // Allocate enough space for as many declares as it has token children.
+    // (Not all of them will actually become declares, though, as some of
+    // them may be body terms to be put inside of declare bodies).
+    children_count = data.count_children_of(index)
+    declares = doc.init_declares(children_count)
+
+    // Get the first declare.
+    // If there aren't any declares in the document, return early.
+    declare = try (declares[0]! | return)
+
+    // Collect the declares and declare body terms into a list of declares.
+    declare_count USize = 0
+    body_term_count USize = 0
+    data.each_child_with_index_of(index) -> (child_token, child_index |
+      if (child_token.kind == _Token.Declare) (
+        // TODO: Truncate declare.body.terms size to match body_term_count.
+        body_term_count = 0
+
+        declare = try (declares[declare_count]! | next)
+        declare_count += 1
+
+        @_build_declare(declare, data, child_token, child_index)
+      |
+        declare.body.style = SaviProto.AST.Group.Style.Root
+
+        // Allocate space for as many body terms as it has token children.
+        // (Not all of them will actually become bod terms, though, as some of
+        // them may be other declares, or body terms of those other declares).
+        body_terms = declare.body.init_terms(children_count)
+        body_term = try (body_terms[body_term_count]! | next)
+        body_term_count += 1
+
+        @_build_ast(body_term, data, child_token, child_index)
+      )
+    )
+
+    // TODO: Set body pos for each declare with a body.
+
+    // TODO: Truncate doc.declares size to match declare_count.
+    @
+
+  :fun ref _build_declare(
+    declare SaviProto.AST.Declare.Builder
+    data _TreeBuilder.Data
+    token PEG.Token(_Token)
+    index USize
+  )
+    // @_build_pos(declare.pos, token)
+    @_build_ast_list(
+      declare.init_terms(data.count_children_of(index))
+      data, token, index
+    )
+
+  :fun ref _build_operator(
+    op SaviProto.AST.Operator.Builder
+    data _TreeBuilder.Data
+    token PEG.Token(_Token)
+    index USize
+  )
+    // @_build_pos(op.pos, token)
+    op.value = data.get_string(token)
+
+  :fun ref _build_group(
+    group SaviProto.AST.Group.Builder
+    data _TreeBuilder.Data
+    token PEG.Token(_Token)
+    index USize
+  )
+    // @_build_pos(group.pos, token)
+
+    first_byte = data.get_first_byte(token)
+    last_byte = data.get_last_byte(token)
+    group.has_exclamation = last_byte == '!'
+    group.style = if (token.kind == _Token.GroupWhitespace) (
+      SaviProto.AST.Group.Style.Space
+    |
+      case first_byte == (
+      | '(' | SaviProto.AST.Group.Style.Paren
+      | '[' | SaviProto.AST.Group.Style.Square
+      | '{' | SaviProto.AST.Group.Style.Curly
+      | @error.at(token, _Error.BugInvalidGroupStyleByte), return
+      )
+    )
+
+    // TODO: Handle `|` operator token to create a pipe-partitioned group.
+
+    @_build_ast_list(
+      group.init_terms(data.count_children_of(index))
+      data, token, index
+    )
+
+  :fun ref _build_ast_list(
+    list CapnProto.List.Builder(SaviProto.AST.Builder)
+    data _TreeBuilder.Data
+    token PEG.Token(_Token)
+    index USize
+  )
+    term_count USize = 0
+    data.each_child_with_index_of(index) -> (child_token, child_index |
+      try (
+        @_build_ast(list[term_count]!, data, child_token, child_index)
+      |
+        @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+      )
+      term_count += 1
+    )
+
+  :fun ref _build_ast(
+    ast SaviProto.AST.Builder
+    data _TreeBuilder.Data
+    token PEG.Token(_Token)
+    index USize
+  )
+    // @_build_pos(ast.pos, token)
+    children_count = data.count_children_of(index)
+
+    // Parsing operator precedeence without too much nested backtracking
+    // requires us to generate a lot of false positive relates in the grammar
+    // (child-carrying tokens that end up with only one child).
+    // When that happens, the outer token disappears and we keep only the child.
+    if (children_count == 1 && (
+      token.kind == _Token.Relate ||
+      token.kind == _Token.RelateRight
+    )) (
+      data.each_child_with_index_of(index) -> (child_token, child_index |
+        @_build_ast(ast, data, child_token, child_index)
+      )
+      return
+    )
+
+    case token.kind == (
+    | _Token.Identifier |
+      ast.init_name(data.get_string(token))
+
+    | _Token.String |
+      if (children_count == 0) (
+        ast.init_string(data.get_string(token))
+      |
+        @error.at(token, _Error.ToDoComposeString)
+      )
+
+    | _Token.Group |
+      @_build_group(ast.init_group, data, token, index)
+
+    | _Token.GroupWhitespace |
+      @_build_group(ast.init_group, data, token, index)
+
+    | _Token.Compound |
+      child_number = children_count
+      while (child_number > 0) (
+        child_number -= 1
+        child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
+        child_token = child_info.head, child_index = child_info.tail
+
+        case (
+        | child_token.kind == _Token.Annotation |
+          @error.at(child_token, _Error.ToDoAnnotations)
+          return
+
+        | child_token.kind == _Token.Group && child_number > 0 |
+          qualify = ast.init_qualify
+          @_build_group(qualify.group, data, child_token, child_index)
+
+          ast = qualify.term
+
+        | child_number > 1 |
+          relate = ast.init_relate
+          @_build_ast(relate.terms.right, data, child_token, child_index)
+
+          child_number -= 1
+          child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
+          child_token = child_info.head, child_index = child_info.tail
+          if (child_token.kind != _Token.Operator) (
+            @error.at(child_token, _Error.BugUnexpectedGrammarToken)
+            next
+          )
+          @_build_operator(relate.op, data, child_token, child_index)
+
+          ast = relate.terms.left
+
+        | child_number == 0 |
+          @_build_ast(ast, data, child_token, child_index)
+
+        |
+          @error.at(child_token, _Error.BugUnexpectedGrammarToken)
+        )
+      )
+      // |
+      //   Inspect.out("_build_ast with \(token.kind) at \(index)")
+    )
+
+    @
