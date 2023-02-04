@@ -1,0 +1,3 @@
+:actor Main
+  :new (env Env)
+    env.out.print("Hello, World!")
