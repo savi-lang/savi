@@ -317,6 +317,7 @@ class Savi::Compiler::Binary
     yield "/usr/lib64", nil
     yield "/lib", nil
     yield "/usr/lib", nil
+    yield "/usr/local/lib", nil
 
     if target.dragonfly?
       yield "/usr/lib/gcc80", nil
