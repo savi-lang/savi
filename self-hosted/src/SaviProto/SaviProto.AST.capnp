@@ -84,6 +84,11 @@ struct AST {
     }
   }
 
+  struct Annotation {
+    pos   @0 :Source.Pos;
+    value @1 :Text;
+  }
+
   struct Operator {
     pos   @0 :Source.Pos;
     value @1 :Text;
@@ -154,7 +159,8 @@ struct AST {
   struct Declare {
     pos   @0 :Source.Pos;
     terms @1 :List(AST);
-    body  @2 :AST.Group;
+    docs  @2 :List(AST.Annotation);
+    body  @3 :AST.Group;
   }
 
   struct Document {

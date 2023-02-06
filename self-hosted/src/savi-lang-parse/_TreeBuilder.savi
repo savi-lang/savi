@@ -1,44 +1,3 @@
-:struct val _TreeBuilder.Data
-  :let code String
-  :let tokens Array(PEG.Token(_Token))'val
-  :new (@code, @tokens)
-
-  :fun "[]!"(index USize): @tokens[index]!
-
-  :fun each_child_with_index_of(parent_index USize)
-    parent_token = try (@[parent_index]! | return 0)
-    sep = parent_token.start
-    @tokens.each_with_index(parent_index + 1) -> (token, index |
-      break if (token.start >= parent_token.end)
-      next unless (token.start >= sep)
-      sep = token.end
-      yield (token, index)
-    )
-
-  :fun nth_child_with_index_of!(
-    parent_index USize
-    child_number USize
-  ) Pair(PEG.Token(_Token), USize)
-    seen_count USize = 0
-    @each_child_with_index_of(parent_index) -> (token, index |
-      return Pair(PEG.Token(_Token), USize).new(token, index) if (
-        child_number == seen_count
-      )
-      seen_count += 1
-    )
-    error!
-
-  :fun count_children_of(parent_index USize) USize
-    count USize = 0
-    @each_child_with_index_of(parent_index) -> (token, index |
-      count += 1
-    )
-    count
-
-  :fun get_string(token PEG.Token(_Token)): @code.trim(token.start, token.end)
-  :fun get_first_byte(token PEG.Token(_Token)): try (@code[token.start]! | 0)
-  :fun get_last_byte(token PEG.Token(_Token)): try (@code[token.end - 1]! | 0)
-
 :class _TreeBuilder
   :is PEG.Parser.Builder(
     _Token
@@ -83,6 +42,8 @@
     token PEG.Token(_Token)
     index USize
   )
+    pending_annotations Array(PEG.Token(_Token)) = []
+
     // Allocate enough space for as many declares as it has token children.
     // (Not all of them will actually become declares, though, as some of
     // them may be body terms to be put inside of declare bodies).
@@ -92,28 +53,60 @@
     // Get the first declare.
     // If there aren't any declares in the document, return early.
     declare = try (declares[0]! | return)
+    body_terms = declare.body.init_terms(children_count)
 
     // Collect the declares and declare body terms into a list of declares.
     declare_count USize = 0
     body_term_count USize = 0
     data.each_child_with_index_of(index) -> (child_token, child_index |
-      if (child_token.kind == _Token.Declare) (
-        // TODO: Truncate declare.body.terms size to match body_term_count.
+      case child_token.kind == (
+      | _Token.Annotation |
+        pending_annotations << child_token
+
+      | _Token.Declare |
+        // Trim the body terms list to the count and reset the count.
+        // That's all the body terms we have for the prior declare,
+        // and any future body terms will go into this new declare.
+        declare.body.trim_terms(0, body_term_count)
         body_term_count = 0
 
-        declare = try (declares[declare_count]! | next)
+        // Create the new declare, grab the terms list to put terms into,
+        // and update the count of how many declares we've seen so far.
+        declare = try (declares[declare_count]! |
+          @error.at(child_token, _Error.BugFixedSizeListIsTooSmall)
+          return
+        )
+        body_terms = declare.body.init_terms(children_count)
         declare_count += 1
+
+        // Add any pending annotations to the declare node.
+        if pending_annotations.is_not_empty (
+          docs = declare.init_docs(pending_annotations.size)
+          pending_annotations.each_with_index -> (annotation_token, annotation_index |
+            try @_build_annotation(docs[annotation_index]!, data, annotation_token)
+          )
+          pending_annotations.clear
+        )
 
         @_build_declare(declare, data, child_token, child_index)
       |
         declare.body.style = SaviProto.AST.Group.Style.Root
 
         // Allocate space for as many body terms as it has token children.
-        // (Not all of them will actually become bod terms, though, as some of
+        // (Not all of them will actually become body terms, though, as some of
         // them may be other declares, or body terms of those other declares).
-        body_terms = declare.body.init_terms(children_count)
-        body_term = try (body_terms[body_term_count]! | next)
+        body_term = try (body_terms[body_term_count]! |
+          @error.at(child_token, _Error.BugFixedSizeListIsTooSmall)
+          return
+        )
         body_term_count += 1
+
+        // TODO: Add any pending annotations to the term node.
+        if pending_annotations.is_not_empty (
+          pending_annotations.each -> (annotation_token |
+            @error.at(annotation_token, _Error.ToDoAnnotations)
+          )
+        )
 
         @_build_ast(body_term, data, child_token, child_index)
       )
@@ -121,7 +114,11 @@
 
     // TODO: Set body pos for each declare with a body.
 
-    // TODO: Truncate doc.declares size to match declare_count.
+    // Trim the final declare, and also the list of declares, to the right size.
+    // This is the last step; we won't see any other content in the document.
+    declare.body.trim_terms(0, body_term_count)
+    doc.trim_declares(0, declare_count)
+
     @
 
   :fun ref _build_declare(
@@ -135,6 +132,14 @@
       declare.init_terms(data.count_children_of(index))
       data, token, index
     )
+
+  :fun ref _build_annotation(
+    annotation SaviProto.AST.Annotation.Builder
+    data _TreeBuilder.Data
+    token PEG.Token(_Token)
+  )
+    // @_build_pos(annotation.pos, token)
+    annotation.value = data.get_string(token)
 
   :fun ref _build_operator(
     op SaviProto.AST.Operator.Builder
@@ -205,7 +210,8 @@
     // When that happens, the outer token disappears and we keep only the child.
     if (children_count == 1 && (
       token.kind == _Token.Relate ||
-      token.kind == _Token.RelateRight
+      token.kind == _Token.RelateRight ||
+      token.kind == _Token.Compound
     )) (
       data.each_child_with_index_of(index) -> (child_token, child_index |
         @_build_ast(ast, data, child_token, child_index)
@@ -214,6 +220,9 @@
     )
 
     case token.kind == (
+    | _Token.Annotation |
+      @error.at(token, _Error.ToDoTokenKind)
+
     | _Token.Identifier |
       ast.init_name(data.get_string(token))
 
@@ -224,11 +233,97 @@
         @error.at(token, _Error.ToDoComposeString)
       )
 
+    | _Token.PrefixedString |
+      try (
+        error! if (children_count != 2)
+
+        string_with_prefix = ast.init_string_with_prefix
+
+        child_info = try (data.nth_child_with_index_of!(index, 0) | return)
+        child_token = child_info.head, child_index = child_info.tail
+        string_with_prefix.string = data.get_string(child_token)
+
+        child_info = try (data.nth_child_with_index_of!(index, 1) | return)
+        child_token = child_info.head, child_index = child_info.tail
+        @_build_operator(string_with_prefix.prefix, data, child_token, child_index)
+      |
+        @error.at(token, _Error.ToDoComposeString)
+      )
+
+    | _Token.BinaryInteger |
+      try (
+        ast.init_positive_integer(data.get_parsed_binary_u64!(token))
+      |
+        @error.at(token, _Error.IntegerTooBig)
+      )
+
+    | _Token.HexadecimalInteger |
+      try (
+        ast.init_positive_integer(data.get_parsed_hexadecimal_u64!(token))
+      |
+        @error.at(token, _Error.IntegerTooBig)
+      )
+
+    | _Token.DecimalInteger |
+      try (
+        pair = data.get_parsed_decimal_u64!(token)
+        is_positive = pair.first, u64_value = pair.second
+        if is_positive (
+          ast.init_positive_integer(u64_value)
+        |
+          ast.init_negative_integer(u64_value)
+        )
+      |
+        @error.at(token, _Error.IntegerTooBig)
+      )
+
+    | _Token.FloatingPoint |
+      try (
+        ast.init_floating_point(data.get_parsed_f64!(token))
+      |
+        @error.at(token, _Error.FloatingPointInvalid)
+      )
+
     | _Token.Group |
       @_build_group(ast.init_group, data, token, index)
 
     | _Token.GroupWhitespace |
       @_build_group(ast.init_group, data, token, index)
+
+    | _Token.Relate |
+      child_number = children_count
+      while (child_number > 0) (
+        child_number -= 1
+        child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
+        child_token = child_info.head, child_index = child_info.tail
+
+        case (
+        | child_token.kind == _Token.Annotation |
+          @error.at(child_token, _Error.ToDoTokenKind)
+          return
+
+        | child_number > 1 |
+          relate = ast.init_relate
+          @_build_ast(relate.terms.right, data, child_token, child_index)
+
+          child_number -= 1
+          child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
+          child_token = child_info.head, child_index = child_info.tail
+          if (child_token.kind != _Token.Operator) (
+            @error.at(child_token, _Error.BugUnexpectedGrammarToken)
+            next
+          )
+          @_build_operator(relate.op, data, child_token, child_index)
+
+          ast = relate.terms.left
+
+        | child_number == 0 |
+          @_build_ast(ast, data, child_token, child_index)
+
+        |
+          @error.at(child_token, _Error.BugUnexpectedGrammarToken)
+        )
+      )
 
     | _Token.Compound |
       child_number = children_count
@@ -239,7 +334,7 @@
 
         case (
         | child_token.kind == _Token.Annotation |
-          @error.at(child_token, _Error.ToDoAnnotations)
+          @error.at(child_token, _Error.ToDoTokenKind)
           return
 
         | child_token.kind == _Token.Group && child_number > 0 |
@@ -270,8 +365,8 @@
           @error.at(child_token, _Error.BugUnexpectedGrammarToken)
         )
       )
-      // |
-      //   Inspect.out("_build_ast with \(token.kind) at \(index)")
+    |
+      @error.at(token, _Error.ToDoTokenKind)
     )
 
     @

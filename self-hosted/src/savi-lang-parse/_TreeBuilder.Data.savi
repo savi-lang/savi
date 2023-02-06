@@ -1,0 +1,90 @@
+:struct val _TreeBuilder.Data
+  :let code String
+  :let tokens Array(PEG.Token(_Token))'val
+  :new (@code, @tokens)
+
+  :fun "[]!"(index USize): @tokens[index]!
+
+  :fun each_child_with_index_of(parent_index USize)
+    parent_token = try (@[parent_index]! | return 0)
+    sep = parent_token.start
+    @tokens.each_with_index(parent_index + 1) -> (token, index |
+      break if (token.start >= parent_token.end)
+      next unless (token.start >= sep)
+      sep = token.end
+      yield (token, index)
+    )
+
+  :fun nth_child_with_index_of!(
+    parent_index USize
+    child_number USize
+  ) Pair(PEG.Token(_Token), USize)
+    seen_count USize = 0
+    @each_child_with_index_of(parent_index) -> (token, index |
+      return Pair(PEG.Token(_Token), USize).new(token, index) if (
+        child_number == seen_count
+      )
+      seen_count += 1
+    )
+    error!
+
+  :fun count_children_of(parent_index USize) USize
+    count USize = 0
+    @each_child_with_index_of(parent_index) -> (token, index |
+      count += 1
+    )
+    count
+
+  :fun get_string(token PEG.Token(_Token)): @code.trim(token.start, token.end)
+  :fun get_first_byte(token PEG.Token(_Token)): try (@code[token.start]! | 0)
+  :fun get_last_byte(token PEG.Token(_Token)): try (@code[token.end - 1]! | 0)
+
+  :fun get_parsed_binary_u64!(token PEG.Token(_Token))
+    value U64 = 0
+
+    @code.each_byte_with_index(token.start + 2, token.end) -> (byte, index |
+      next if (byte == '_')
+      byte_value = byte - '0'
+      value = value *! 2 +! byte_value.u64
+    )
+
+    value
+
+  :fun get_parsed_hexadecimal_u64!(token PEG.Token(_Token))
+    value U64 = 0
+
+    @code.each_byte_with_index(token.start + 2, token.end) -> (byte, index |
+      next if (byte == '_')
+      byte_value = case byte >= (
+      | 'a' | byte - 'a' + 10
+      | 'A' | byte - 'A' + 10
+      |       byte - '0'
+      )
+      value = value *! 16 +! byte_value.u64
+    )
+
+    value
+
+  :fun get_parsed_decimal_u64!(token PEG.Token(_Token))
+    is_positive = True
+    value U64 = 0
+
+    @code.each_byte_with_index(token.start, token.end) -> (byte, index |
+      next if (byte == '_')
+      if (byte == '-' && index == token.start) (
+        is_positive = False
+        next
+      )
+      byte_value = byte - '0'
+      value = value *! 10 +! byte_value.u64
+    )
+
+    Pair(Bool, U64).new(is_positive, value)
+
+  :fun get_parsed_f64!(token PEG.Token(_Token))
+    // TODO: Avoid FFI and use a pure Savi `strtod` implementation.
+    start_pointer = @code.cstring.offset(token.start)
+    end_pointer = CPointer(U8).null
+    value = _FFI.strtod(start_pointer, stack_address_of_variable end_pointer)
+    error! if (value == 0 && end_pointer.address == start_pointer.address)
+    value
