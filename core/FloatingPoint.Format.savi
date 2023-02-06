@@ -178,9 +178,6 @@
   :let _value _FormattableF64
   :new val _new(@_value)
 
-  // We will use some functions of `Integer.Format.Decimal` as a utility.
-  :fun non _util: Integer.Format.Decimal(U64)
-
   :fun into_string_space USize
     // First, deal with any special cases (zero or non-finite numbers).
     // We count these in a special (hard-coded) way and return early.
@@ -235,9 +232,6 @@
   :let _value _FormattableF64
   :new val _new(@_value)
 
-  // We will use some functions of `Integer.Format.Decimal` as a utility.
-  :fun non _util: Integer.Format.Decimal(U64)
-
   :fun into_string_space USize
     // First, deal with any special cases (zero or non-finite numbers).
     // We count these in a special (hard-coded) way and return early.
@@ -284,7 +278,7 @@
 
     // Print the digits of the significand, with decimal point if applicable.
     digit_count.times -> (digit_index |
-      if (digit_index.i16 - 1 == exponent) out.push_byte('.')
+      if (digit_index.i16 - 1 == exponent && digit_index > 0) out.push_byte('.')
       out.push_byte((significand / divisor % 10).u8 + '0')
       divisor = divisor / 10
     )
