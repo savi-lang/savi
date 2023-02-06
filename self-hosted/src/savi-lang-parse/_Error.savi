@@ -1,12 +1,17 @@
 :enum _Error
-  :member BugNoTokens 0
-  :member BugInitialTokenIsNotDocument 1
-  :member BugFixedSizeListIsTooSmall 2
-  :member BugASTListNeedsLargerInitSize 3
-  :member BugUnexpectedGrammarToken 4
-  :member BugInvalidGroupStyleByte 5
-  :member ToDoAnnotations 100
-  :member ToDoComposeString 101
+  :member IntegerTooBig 1
+  :member FloatingPointInvalid 2
+
+  :member BugNoTokens 100
+  :member BugInitialTokenIsNotDocument 101
+  :member BugFixedSizeListIsTooSmall 102
+  :member BugASTListNeedsLargerInitSize 103
+  :member BugUnexpectedGrammarToken 104
+  :member BugInvalidGroupStyleByte 105
+
+  :member ToDoTokenKind 200
+  :member ToDoAnnotations 201
+  :member ToDoComposeString 202
 
 :struct _Error.Info
   :let at PEG.Token(_Token)

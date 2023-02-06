@@ -6,49 +6,45 @@
           name: "actor"
         1: #6:
           name: "Main"
-    1: #7:
-      terms: #8:
-        0: #9:
+      body: #7:
+    1: #8:
+      terms: #9:
+        0: #10:
           name: "new"
-        1: #10:
-          group: #11:
+        1: #11:
+          group: #12:
             style: SaviProto.AST.Group.Style.Paren
-            terms: #12:
-              0: #13:
-                group: #14:
+            terms: #13:
+              0: #14:
+                group: #15:
                   style: SaviProto.AST.Group.Style.Space
-                  terms: #15:
-                    0: #16:
+                  terms: #16:
+                    0: #17:
                       name: "env"
-                    1: #17:
+                    1: #18:
                       name: "Env"
-      body: #18:
-        terms: #19:
-          0: #20:
+      body: #19:
+        terms: #20:
+          0: #21:
             qualify: #
-              term: #21:
+              term: #22:
                 relate: #
-                  op: #22:
+                  op: #23:
                     value: "."
-                  terms: #23:
-                    left: #24:
+                  terms: #24:
+                    left: #25:
                       relate: #
-                        op: #25:
+                        op: #26:
                           value: "."
-                        terms: #26:
-                          left: #27:
+                        terms: #27:
+                          left: #28:
                             name: "env"
-                          right: #28:
+                          right: #29:
                             name: "out"
-                    right: #29:
+                    right: #30:
                       name: "print"
-              group: #30:
+              group: #31:
                 style: SaviProto.AST.Group.Style.Paren
-                terms: #31:
-                  0: #32:
+                terms: #32:
+                  0: #33:
                     string: "Hello, World!"
-          1: #33:
-            none: None
-          2: #34:
-            none: None
-    2: #35:

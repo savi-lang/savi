@@ -16,7 +16,7 @@
 
   :fun handle_code(code String)
     nanos = Time.Measure.nanoseconds -> (
-      // printer = PEG.Parser(_Token, String).new(_Grammar.new, _TreePrinter.new)
+      printer = PEG.Parser(_Token, String).new(_Grammar.new, _TreePrinter.new)
 
       builder = _TreeBuilder.new
       builder.code = code
@@ -26,11 +26,11 @@
       ).new(_Grammar.new, builder)
 
       try (
-        // @env.err.print(printer.parse!(code))
-
         message = parser.parse!(code)
 
         if builder.error.has_any (
+          @env.err.print(printer.parse!(code))
+
           builder.error.each -> (info |
             @env.err.print("\(info.code) at \(info.at.start)...\(info.at.end)")
           )
@@ -47,4 +47,4 @@
       )
     )
 
-    @env.err.print("It took \(nanos) nanoseconds...")
+    @env.err.print("It took \(nanos.f64 / 1e6) milliseconds...")

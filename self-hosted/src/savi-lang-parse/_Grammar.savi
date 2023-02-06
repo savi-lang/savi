@@ -13,23 +13,32 @@
     sn = (whitespace / newline).repeat
 
     // Define what a number looks like (integer and float).
-    digit19 = @range('1', '9')
     digit = @range('0', '9')
-    digithex = digit / @range('a', 'f') / @range('A', 'F')
+    digit19 = @range('1', '9')
     digitbin = @range('0', '1')
+    digithex = digit / @range('a', 'f') / @range('A', 'F')
     numsep = @char('_')
-    digits = digit >> (digit / numsep).repeat
-    int =
-      (@str("0x") >> digithex >> (digithex / numsep).repeat) /
-      (@str("0b") >> digitbin >> (digitbin / numsep).repeat) /
+    intbin = @str("0b") >> digitbin >> (digitbin / numsep).repeat
+    inthex = @str("0x") >> digithex >> (digithex / numsep).repeat
+    intdec =
       (@char('-') >> digit19 >> (digit / numsep).repeat) /
       (@char('-') >> @char('0')) /
       (digit19 >> (digit / numsep).repeat) /
       @char('0')
-    frac = @char('.') >> digits
-    exp = (@char('e') / @char('E')) >> (@char('+') / @char('-')).maybe >> digits
-    integer = int.token(_Token.Integer)
-    float = (int >> ((frac >> exp.maybe) / exp)).token(_Token.Float)
+    frac = @char('.') >> digit.repeat(1)
+    exp =
+      (@char('e') / @char('E')) >>
+      (@char('+') / @char('-')).maybe >>
+      (@char('0') / (digit19 >> digit.repeat))
+    integer =
+      intbin.token(_Token.BinaryInteger) /
+      inthex.token(_Token.HexadecimalInteger) /
+      intdec.token(_Token.DecimalInteger)
+    float = (
+      @char('-').maybe >>
+      (@char('0') / (digit19 >> digit.repeat)) >>
+      ((frac >> exp.maybe) / exp)
+    ).token(_Token.FloatingPoint)
 
     // Define what an identifier looks like.
     ident_letter =
@@ -116,7 +125,7 @@
     // Operators in the same group have the same level of precedence.
     opw = (@char(' ') / @char('\t'))
     op1 = (@str("*!") / @char('*') / @char('/') / @char('%')).token(_Token.Operator)
-    op2 = (@str("+!") / @str("-!") / @char('+') / @char('-')).token(_Token.Operator)
+    op2 = (@str("+!") / @str("-!") / @char('+') / (@char('-') >> digit.not)).token(_Token.Operator)
     op3 = (@str("</>") / @str("<~>") / @str("<<~") / @str("~>>") /
       @str("<<") / @str(">>") / @str("<~") / @str("~>") /
       @str("<:") / @str("!<:") /

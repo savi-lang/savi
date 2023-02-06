@@ -1,0 +1,7 @@
+
+:module _FFI
+  // TODO: Avoid FFI and use a pure Savi `strtod` implementation.
+  :ffi strtod(
+    start_pointer CPointer(U8)
+    end_pointer CPointer(CPointer(U8))
+  ) F64
