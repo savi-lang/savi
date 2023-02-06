@@ -16,7 +16,9 @@ CLANG?=clang
 # Run the full CI suite.
 ci: PHONY
 	${MAKE} format.check
+	${MAKE} gen.capnp.check
 	${MAKE} spec.core.deps extra_args="--backtrace $(extra_args)"
+	${MAKE} self-hosted.deps extra_args="--backtrace $(extra_args)"
 	${MAKE} spec.all extra_args="--backtrace $(extra_args)"
 	${MAKE} example.deps dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
 	${MAKE} example dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
@@ -27,7 +29,7 @@ clean: PHONY
 	rm -rf $(BUILD) $(MAKE_VAR_CACHE) lib/libsavi_runtime
 
 # Run the full test suite.
-spec.all: PHONY spec.compiler.all spec.language spec.core spec.unit.all spec.integration.all
+spec.all: PHONY spec.self-hosted.all spec.compiler.all spec.language spec.core spec.unit.all spec.integration.all
 
 # Run the specs that are written in markdown (mostly compiler pass tests).
 # Run the given compiler-spec target (or all targets).
@@ -95,6 +97,33 @@ example.compile: PHONY SAVI
 example.deps: PHONY SAVI
 	echo && $(SAVI) deps update --cd "$(dir)" $(extra_args)
 
+# Generate Savi source code from CapnProto definitions.
+gen.capnp: PHONY self-hosted.deps $(BUILD)/capnpc-savi
+	capnp compile \
+		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+		self-hosted/src/SaviProto/SaviProto.AST.capnp --output=- \
+		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.AST.capnp.savi
+	capnp compile \
+		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+		self-hosted/src/SaviProto/SaviProto.Source.capnp --output=- \
+		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.Source.capnp.savi
+gen.capnp.check: gen.capnp
+	git diff --exit-code self-hosted/src/SaviProto
+
+# Update deps for the Self-hosted Savi subprograms.
+self-hosted.deps: PHONY SAVI
+	echo && $(SAVI) deps update --cd self-hosted --for savi-lang-parse
+
+# Create the self-hosted Savi parse subprogram.
+self-hosted/bin/savi-lang-parse: $(SAVI) $(shell find self-hosted/src/savi-lang-parse self-hosted/src/SaviProto -name '*.savi')
+	echo && $(SAVI) --cd self-hosted savi-lang-parse --print-perf --backtrace
+
+# Run spec scripts for self-hosted Savi subprograms.
+spec.self-hosted: PHONY self-hosted/bin/$(name)
+	self-hosted/spec/$(name).sh
+spec.self-hosted.all: PHONY
+	make spec.self-hosted name=savi-lang-parse
+
 # Compile the vscode extension.
 vscode: PHONY SAVI
 	cd tooling/vscode && npm run-script compile || npm install
@@ -142,6 +171,11 @@ $(eval $(call MAKE_VAR_CACHE_FOR,LLVM_STATIC_RELEASE_URL))
 # This needs to get bumped explicitly here when we do a new runtime build.
 RUNTIME_BITCODE_RELEASE_URL?=https://github.com/savi-lang/runtime-bitcode/releases/download/v0.20220929.0
 $(eval $(call MAKE_VAR_CACHE_FOR,RUNTIME_BITCODE_RELEASE_URL))
+
+# Specify where to download the CapnProto compiler plugin for Savi code gen.
+# This needs to get bumped explicitly here when we do a new CapnProto release.
+CAPNPC_SAVI_DOWNLOAD_URL?=https://github.com/jemc-savi/CapnProto/releases/download/v0.20230202.0/capnpc-savi-v0.20230202.0-$(TARGET_PLATFORM).tar.gz
+$(eval $(call MAKE_VAR_CACHE_FOR,CAPNPC_SAVI_DOWNLOAD_URL))
 
 # This is the path where we look for the LLVM pre-built static libraries to be,
 # including the llvm-config utility used to print information about them.
@@ -228,6 +262,14 @@ $(BUILD)/llvm-static: $(MAKE_VAR_CACHE)/LLVM_STATIC_RELEASE_URL
 	| tar -xzvf -
 	rm -rf $@
 	mv $@-tmp $@
+	touch $@
+
+# Download the CapnProto compiler plugin for Savi code gen.
+# See github.com/jemc-savi/CapnProto for more info.
+$(BUILD)/capnpc-savi: $(MAKE_VAR_CACHE)/CAPNPC_SAVI_DOWNLOAD_URL
+	rm -f $@-tmp
+	curl -L --fail -sS "${CAPNPC_SAVI_DOWNLOAD_URL}" | tar -C $(BUILD) -xzvf -
+	chmod a+x $@
 	touch $@
 
 # Build the Crystal LLVM C bindings extensions as LLVM bitcode.
