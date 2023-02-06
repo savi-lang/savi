@@ -4,8 +4,10 @@
 
   :it "prints the decimal digits of the floating-point value into a string"
     assert: "\(0.0)" == "0.0"
+    assert: "\(0.5)" == "0.5"
     assert: "\(1.0)" == "1.0"
     assert: "\(9.543)" == "9.543"
+    assert: "\(-0.0625)" == "-0.0625"
     assert: "\(1.2345678)" == "1.2345678"
     assert: "\(9.543e20)" == "9.543e20"
     assert: "\(9.543e80)" == "9.543e80"
