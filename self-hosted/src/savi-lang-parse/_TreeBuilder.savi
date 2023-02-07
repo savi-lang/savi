@@ -221,7 +221,7 @@
 
     case token.kind == (
     | _Token.Annotation |
-      @error.at(token, _Error.ToDoTokenKind)
+      @error.at(token, _Error.ToDoAnnotations)
 
     | _Token.Identifier |
       ast.init_name(data.get_string(token))
@@ -290,6 +290,54 @@
     | _Token.GroupWhitespace |
       @_build_group(ast.init_group, data, token, index)
 
+    | _Token.Prefix |
+      prefix = ast.init_prefix
+
+      child_info = try (data.nth_child_with_index_of!(index, 0) | return)
+      child_token = child_info.head, child_index = child_info.tail
+      @_build_operator(prefix.op, data, child_token, child_index)
+
+      child_info = try (data.nth_child_with_index_of!(index, 1) | return)
+      child_token = child_info.head, child_index = child_info.tail
+      @_build_ast(prefix.term, data, child_token, child_index)
+
+    | _Token.RelateRight |
+      child_number USize = 0
+      while (child_number < children_count) (
+        child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
+        child_token = child_info.head, child_index = child_info.tail
+
+        remaining_children_count = children_count - child_number
+        case (
+        | child_token.kind == _Token.Annotation |
+          @error.at(child_token, _Error.ToDoAnnotations)
+          return
+
+        | remaining_children_count > 2 |
+          relate = ast.init_relate
+          @_build_ast(relate.terms.left, data, child_token, child_index)
+
+          child_number += 1
+          child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
+          child_token = child_info.head, child_index = child_info.tail
+          if (child_token.kind != _Token.Operator) (
+            @error.at(child_token, _Error.BugUnexpectedGrammarToken)
+            next
+          )
+          @_build_operator(relate.op, data, child_token, child_index)
+
+          ast = relate.terms.right
+
+        | remaining_children_count == 1 |
+          @_build_ast(ast, data, child_token, child_index)
+
+        |
+          @error.at(child_token, _Error.BugUnexpectedGrammarToken)
+        )
+
+        child_number += 1
+      )
+
     | _Token.Relate |
       child_number = children_count
       while (child_number > 0) (
@@ -299,7 +347,7 @@
 
         case (
         | child_token.kind == _Token.Annotation |
-          @error.at(child_token, _Error.ToDoTokenKind)
+          @error.at(child_token, _Error.ToDoAnnotations)
           return
 
         | child_number > 1 |
@@ -334,7 +382,7 @@
 
         case (
         | child_token.kind == _Token.Annotation |
-          @error.at(child_token, _Error.ToDoTokenKind)
+          @error.at(child_token, _Error.ToDoAnnotations)
           return
 
         | child_token.kind == _Token.Group && child_number > 0 |
@@ -366,7 +414,7 @@
         )
       )
     |
-      @error.at(token, _Error.ToDoTokenKind)
+      @error.at(token, _Error.ToDoAnnotations)
     )
 
     @

@@ -126,13 +126,13 @@
     opw = (@char(' ') / @char('\t'))
     op1 = (@str("*!") / @char('*') / @char('/') / @char('%')).token(_Token.Operator)
     op2 = (@str("+!") / @str("-!") / @char('+') / (@char('-') >> digit.not)).token(_Token.Operator)
-    op3 = (@str("</>") / @str("<~>") / @str("<<~") / @str("~>>") /
+    op3 = (@str("<|>") / @str("<~>") / @str("<<~") / @str("~>>") /
       @str("<<") / @str(">>") / @str("<~") / @str("~>") /
       @str("<:") / @str("!<:") /
       @str(">=") / @str("<=") / @char('<') / @char('>') /
       @str("===") / @str("==") / @str("!==") / @str("!=") /
       @str("=~")).token(_Token.Operator)
-    op4 = (@str("&&") / @str("//")).token(_Token.Operator)
+    op4 = (@str("&&") / @str("||")).token(_Token.Operator)
     ope = (@str("+=") / @str("-=") / @str("<<=") / @char('=')).token(_Token.Operator)
     ope_colon = @char(':').token(_Token.Operator)
 
