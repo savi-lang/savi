@@ -66,10 +66,13 @@ module Savi::Program::Intrinsic
         when "actor"
           type.add_tag(:actor)
           type.add_tag(:allocated)
+          type.add_tag(:constructed)
         when "class"
           type.add_tag(:allocated)
+          type.add_tag(:constructed) if type.ident.value != "CPointer" # TODO: less hacky and special-cased for this
           type.add_tag(:simple_value) if type.ident.value == "CPointer" # TODO: less hacky and special-cased for this
         when "struct"
+          type.add_tag(:constructed)
           type.add_tag(:pass_by_value)
           type.add_tag(:no_field_reassign)
         when "trait"

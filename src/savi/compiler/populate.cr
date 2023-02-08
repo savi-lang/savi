@@ -49,7 +49,7 @@ class Savi::Compiler::Populate
       end
 
       # If the type doesn't have a constructor and needs one, then add one.
-      if dest.has_tag?(:allocated) && !dest.has_tag?(:abstract) \
+      if dest.has_tag?(:constructed) \
       && !dest.functions.any? { |f| f.has_tag?(:constructor) }
         # Create the default constructor function, unless we have one cached.
         f = ctx.prev_ctx.try(&.populate.default_constructors[dest.ident.pos.hash]?) || begin

@@ -209,6 +209,7 @@ class Savi::Program
       :abstract,
       :actor,
       :allocated,
+      :constructed,
       :enum,
       :hygienic,
       :ignores_cap,
