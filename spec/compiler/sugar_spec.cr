@@ -427,11 +427,11 @@ describe Savi::Compiler::Sugar do
     # ctx.program.packages.should eq ctx2.program.packages
   end
 
-  it "transforms non-identifier parameters into assignment expressions" do
+  it "transforms field-like parameters into assignment expressions" do
     source = Savi::Source.new_example <<-SOURCE
     :class Example
-      :fun param_assigns(@x, @y.z)
-        @y.after
+      :fun param_assigns(@x)
+        @x.after
     SOURCE
 
     ctx = Savi.compiler.test_compile([source], :sugar)
@@ -441,12 +441,9 @@ describe Savi::Compiler::Sugar do
       [:declare, [:ident, "class"], [:ident, "Example"],
         [:declare, [:ident, "fun"],
           [:qualify, [:ident, "param_assigns"],
-            [:group, "(",
-              [:ident, "@x"],
-              [:relate, [:ident, "@y"], [:op, "."], [:ident, "z"]]
-            ],
+            [:group, "(", [:ident, "@x"], ],
           ],
-          [:group, ":", [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]]],
+          [:group, ":", [:relate, [:ident, "@x"], [:op, "."], [:ident, "after"]]],
         ],
       ],
     ]
@@ -461,14 +458,7 @@ describe Savi::Compiler::Sugar do
         ],
       ],
       [:call,
-        [:call, [:ident, "@"], [:ident, "y"]],
-        [:ident, "z="],
-        [:group, "(",
-          [:prefix, [:op, "--"], [:ident, "ASSIGNPARAM.2"]],
-        ],
-      ],
-      [:call,
-        [:call, [:ident, "@"], [:ident, "y"]],
+        [:call, [:ident, "@"], [:ident, "x"]],
         [:ident, "after"]
       ],
     ]

@@ -87,6 +87,24 @@ abstract class Savi::Program::Declarator::TermAcceptor
             AST::Identifier.new("#{lhs.value}.#{rhs.value}").from(term)
           end
         end
+      when "Param"
+        return term if term.is_a?(AST::Identifier)
+
+        if term.is_a?(AST::Relate) && term.op.value == "="
+          lhs = try_accept(term.lhs, "Param")
+          return unless lhs
+          rhs = term.rhs
+          op = AST::Operator.new("DEFAULTPARAM").from(term.op)
+          return AST::Relate.new(lhs, op, rhs).from(term)
+        end
+
+        if term.is_a?(AST::Group) && term.style == " " && term.terms.size == 2
+          lhs = term.terms[0]
+          return unless lhs.is_a?(AST::Identifier)
+          rhs = term.terms[1]
+          op = AST::Operator.new("EXPLICITTYPE").from(term)
+          return AST::Relate.new(lhs, op, rhs).from(term)
+        end
       when "Type"
         case term
         when AST::Identifier
@@ -145,7 +163,7 @@ abstract class Savi::Program::Declarator::TermAcceptor
       when "NameList"
         if term.is_a?(AST::Group) && term.style == "("
           group = AST::Group.new("(").from(term)
-          list = term.terms.each { |term2|
+          term.terms.each { |term2|
             term2 = try_accept(term2, "Name")
             return unless term2
             group.terms << term2
@@ -156,7 +174,7 @@ abstract class Savi::Program::Declarator::TermAcceptor
         try_accept(term, "Type") || begin
           if term.is_a?(AST::Group) && term.style == "("
             group = AST::Group.new("(").from(term)
-            list = term.terms.each { |term2|
+            term.terms.each { |term2|
               term2 = try_accept(term2, "Type")
               return unless term2
               group.terms << term2
@@ -166,15 +184,20 @@ abstract class Savi::Program::Declarator::TermAcceptor
         end
       when "Params"
         if term.is_a?(AST::Group) && term.style == "("
-          # TODO: more specific requirements here
-          term
+          group = AST::Group.new("(").from(term)
+          term.terms.each { |term2|
+            term2 = try_accept(term2, "Param")
+            return unless term2
+            group.terms << term2
+          }
+          group
         end
       when "NameMaybeWithParams"
         try_accept(term, "Name") || begin
           if term.is_a?(AST::Qualify)
             AST::Qualify.new(
               try_accept(term.term, "Name") || return,
-              try_accept(term.group, "Params") || return,
+              try_accept(term.group, "Params").as(AST::Group?) || return,
             ).from(term)
           end
         end
@@ -204,9 +227,11 @@ abstract class Savi::Program::Declarator::TermAcceptor
       when "TypeOrTypeList"
         "an algebraic type or parenthesized group of algebraic types"
       when "Params"
-        "a parenthesized list of parameter specifiers"
+        "a parenthesized list of parameter specifiers " +
+        "(each parameter having at least a name and possibly a type and/or default argument)"
       when "NameMaybeWithParams"
-        "a name with an optional parenthesized list of parameter specifiers"
+        "a name with an optional parenthesized list of parameter specifiers " +
+        "(each parameter having at least a name and possibly a type and/or default argument)"
       else
         raise NotImplementedError.new(type)
       end
