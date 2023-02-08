@@ -68,6 +68,7 @@ class Savi::Compiler::CodeGen
       && type_def.is_pass_by_value?(ctx) \
       && (
         func.has_tag?(:constructor) \
+        || func.has_tag?(:field) \
         || (func.has_tag?(:let) && func.ident.value.ends_with?("=")) # TODO: less hacky as a special case somehow?
       )
     end

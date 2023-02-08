@@ -1,0 +1,8 @@
+:struct _StructWithFieldInitializer
+  :let array Array(String): []
+
+:module StructSpec
+  :fun run(test MicroTest)
+    s_w_f_i = _StructWithFieldInitializer.new
+    s_w_f_i.array << "example"
+    test["struct with field initializer"].pass = s_w_f_i.array == ["example"]
