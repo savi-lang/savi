@@ -72,7 +72,7 @@ This declaration didn't match any known declarator:
 
 ---
 
-It complains when the declaration's terms are not accepted by the declarators.
+It complains when a `TypeOrTypeList` term is not accepted by the declarator.
 
 ```savi
 :module Example
@@ -119,6 +119,52 @@ These declaration terms didn't match any known declarator:
 - an algebraic type or parenthesized group of algebraic types would be accepted:
   :term out TypeOrTypeList
   ^~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+---
+
+It complains when a `NameMaybeWithParams` term is not accepted by the declarator.
+
+```savi
+:module Example
+  :fun call(Array(U8)) U64
+```
+```error
+These declaration terms didn't match any known declarator:
+  :fun call(Array(U8)) U64
+  ^~~~~~~~~~~~~~~~~~~~~~~~
+
+- This declarator didn't match:
+:declarator fun
+            ^~~
+
+- this term was not acceptable:
+  :fun call(Array(U8)) U64
+       ^~~~~~~~~~~~~~~
+
+- any of these would be accepted: `non`:
+  :term cap enum (non)
+  ^~~~~~~~~~~~~~~~~~~~
+
+- a name with an optional parenthesized list of parameter specifiers (each parameter having at least a name and possibly a type and/or default argument) would be accepted:
+  :term name_and_params NameMaybeWithParams
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- This declarator didn't match:
+:declarator fun
+            ^~~
+
+- this term was not acceptable:
+  :fun call(Array(U8)) U64
+       ^~~~~~~~~~~~~~~
+
+- any of these would be accepted: `iso`, `val`, `ref`, `box`, `tag`, `non`:
+  :term cap enum (iso, val, ref, box, tag, non)
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- a name with an optional parenthesized list of parameter specifiers (each parameter having at least a name and possibly a type and/or default argument) would be accepted:
+  :term name_and_params NameMaybeWithParams
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```
 
 ---
