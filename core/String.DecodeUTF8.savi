@@ -1,0 +1,440 @@
+// The state table in this file has been taken from a third-party source,
+// The copyright statement and MIT license for it being reproduced below.
+// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
+//
+// However here we will more fully explain what's going on, and also use
+// what we learned to generate another state table for parsing in reverse.
+//
+// Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the "Software")
+// to deal in the Software without restriction, including without limitation
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and/or sell copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+// OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+// TODO: Remove this legacy compatibility shim.
+:: DEPRECATED: Use `String.DecodeUTF8` instead.
+:module UTF8Decoding
+  :: DEPRECATED: Use `String.DecodeUTF8.read_byte!` instead.
+  :fun read_byte_into_codepoint(byte U8, state_current U8, codepoint U32) U32
+    state = String.DecodeUTF8.State._new(codepoint, state_current)
+    try (
+      String.DecodeUTF8.read_byte!(byte, state).codepoint
+    |
+      codepoint
+    )
+
+  :: DEPRECATED: Use `String.DecodeUTF8.read_byte!` instead.
+  :fun next_state(byte U8, state_current U8) U8
+    state = String.DecodeUTF8.State._new(0, state_current)
+    try (
+      String.DecodeUTF8.read_byte!(byte, state)._current / 12
+    |
+      1
+    )
+
+:: A mostly opaque state structure used while decoding UTF-8 bytes.
+:: See `String.DecodeUTF8.read_byte!` for a usage example.
+:struct String.DecodeUTF8.State
+  :let codepoint U32
+  :let _current U8
+  :new: @codepoint = 0, @_current = 0
+  :new _new(@codepoint, @_current)
+  :fun is_done: @_current == 0
+  :fun number_of_bytes_remaining_in_codepoint: @_current / 36
+
+:: A mostly opaque state structure used while decoding UTF-8 bytes in reverse.
+:: See `String.DecodeUTF8.reverse_read_byte!` for a usage example.
+:struct String.DecodeUTF8.ReverseState
+  :let codepoint U32
+  :let _current U8
+  :let _shift_amount U8
+  :new: @codepoint = 0, @_current = 0, @_shift_amount = 0
+  :new _new(@codepoint, @_current, @_shift_amount)
+  :fun is_done: @_current == 0
+  :fun number_of_bytes_for_codepoint_in_progress: @_current / 24
+
+:: This module can be used collaboratively with the caller to decode UTF-8.
+:: Though it is in the `String` namespace, it is agnostic to how the bytes are
+:: stored, giving the caller the duty of supplying each byte as needed via
+:: a series of calls, holding the current state of decoding on the caller side.
+::
+:: This module provides both forward decoding (see `read_byte!`) and
+:: reverse decoding (see `reverse_read_byte!`).
+:module String.DecodeUTF8
+
+  // The syntax of UTF-8 byte sequences is explained in ABNF form in RFC3629:
+  // <https://www.rfc-editor.org/rfc/rfc3629>
+  //
+  // The ABNF grammar below has been expanded somewhat from the original RFC,
+  // in that it assigns names to more of the intermediate expressions.
+  // These extra names will make it easier to explain the byte classes.
+  //
+  // UTF8-octets = *( UTF8-char )
+  // UTF8-char = UTF8-1 / UTF8-2 / UTF8-3 / UTF8-4
+  //
+  // UTF8-1  = %x00-7F
+  //
+  // UTF8-2  = %xC2-DF UTF8-tail
+  //
+  // UTF8-3  = UTF8-3a / UTF8-3b / UTF8-3ac / UTF8-3d
+  // UTF8-3a = %xE0 %xA0-BF UTF8-tail
+  // UTF8-3b = %xE1-EC 2( UTF8-tail ) / %xEE-EF 2( UTF8-tail )
+  // UTF8-3c = %xED %x80-9F UTF8-tail
+  //
+  // UTF8-4  = UTF8-4a / UTF8-4b / UTF8-4c
+  // UTF8-4a = %xF0 %x90-BF 2( UTF8-tail )
+  // UTF8-4b = %xF1-F3 3( UTF8-tail )
+  // UTF8-4c = %xF4 %x80-8F 2( UTF8-tail )
+  //
+  // UTF8-tail = %x80-BF
+  //
+  // Now, based on the different byte kinds in the ABNF grammar we can identify
+  // each group of bytes that are treated the same as a "byte class".
+  //
+  // The byte class numbers given described below are the same as given in
+  // <http://bjoern.hoehrmann.de/utf-8/decoder/dfa/>.
+  // However, that page doesn't explain them in depth as we will below.
+  //
+  // - byte class 0: (00..7f)
+  //   - only byte of `UTF8-1`
+  //   - (byte class 0 causes none of the bits to be discarded)
+  //
+  // - byte class 2: (c2..df)
+  //   - 1st byte of `UTF8-2`
+  //   - (byte class 2 causes 2 leading bits to be discarded,
+  //      which are the only "1" bits in the 3 leading marker bits)
+  //
+  // - byte class 10: (e0)
+  //   - 1st byte of `UTF8-3a`
+  //   - (byte class 10 being greater than 8 causes all bits to be discarded,
+  //      but all of the non-marker bits were zero anyway, so it's no problem)
+  //
+  // - byte class 3: (e1..ec, ee..ef)
+  //   - 1st byte of `UTF8-3b`
+  //   - (byte class 3 causes 3 leading bits to be discarded,
+  //      which are the only "1" bits in the 4 leading marker bits)
+  //
+  // - byte class 4: (ed)
+  //   - 1st byte of `UTF8-3c`
+  //   - (byte class 4 causes 4 leading bits to be discarded,
+  //      which are the entirety of the 4 leading marker bits)
+  //
+  // - byte class 11: (f0)
+  //   - 1st byte of `UTF8-4a`
+  //   - (byte class 11 being greater than 8 causes all bits to be discarded,
+  //      but all of the non-marker bits were zero anyway, so it's no problem)
+  //
+  // - byte class 6: (f1..f3)
+  //   - 1st byte of `UTF8-4b`
+  //   - (byte class 2 causes 6 leading bits to be discarded, which is more than
+  //      the 5 marker bits, but it's no problem because the 6th bit is zero)
+  //
+  // - byte class 5: (f4)
+  //   - 1st byte of `UTF8-4c`
+  //   - (byte class 2 causes 5 leading bits to be discarded)
+  //
+  // - byte class 8: (c0..c1, f5..ff)
+  //   - never a valid byte in UTF-8 - always leads to the error state
+  //   - (the byte class number is irrelevant - bits from here aren't valid)
+  //
+  // - byte class 1: (80..8f)
+  //   - `UTF8-tail`
+  //   - 2nd byte of `UTF8-3c`
+  //   - 2nd byte of `UTF8-4c`
+  //   - (the byte class number is irrelevant - for a valid tail byte position
+  //      we use a static mask rather than using a byte class to derive it)
+  //
+  // - byte class 7: (a0..bf)
+  //   - `UTF8-tail`
+  //   - 2nd byte of `UTF8-3a`
+  //   - 2nd byte of `UTF8-4a`
+  //   - (the byte class number is irrelevant - for a valid tail byte position
+  //      we use a static mask rather than using a byte class to derive it)
+  //
+  // - byte class 9: (90..9f)
+  //   - `UTF8-tail`
+  //   - 2nd byte of `UTF8-4a`
+  //   - 2nd byte of `UTF8-4c`
+  //   - (the byte class number is irrelevant - for a valid tail byte position
+  //      we use a static mask rather than using a byte class to derive it)
+  //
+  // The table below is a lookup table for mapping a raw byte to the
+  // byte class it belongs to in the above designations.
+  // Using the byte value as the table index, the byte class is returned.
+  //
+  :const _byte_class_table_data Array(U8)'val: [
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 00..0f
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 10..1f
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 20..2f
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 30..3f
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 40..4f
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 50..5f
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 60..6f
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 70..7f
+    1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 // 80..8f
+    9,  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9 // 90..9f
+    7,  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7 // a0..af
+    7,  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7 // b0..bf
+    8,  8, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 // c0..cf
+    2,  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 // d0..df
+    10, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 3, 3 // e0..ef
+    11, 6, 6, 6, 5, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8 // f0..ff
+  ]
+  // The next state is looked up by reaching into the state table as if it
+  // were a two-dimensional table of 11 columns, with the state being the
+  // row index and the byte class being the column index.
+  // The value stored in the table is the next state, pre-multiplied by 12
+  // so that it is ready to be used as a row-addressing additive term
+  // when calculating the index to use for the next access into the table.
+  //
+  :const _state_table_data Array(U8)'val: [
+    // Understanding the above byte classes in the context of the ABNF
+    // grammar we can define the different states, with a state transition
+    // happening each time the byte class of the next byte is observed.
+    //
+    // Again, our states are multiples by 12 for the reason mentioned above.
+    // 0 is the initial state, and 12 is left to designate an error state.
+    // Any transition not mentioned is invalid and go to error state 12.
+    //
+    // The state numbers are carefully chosen so that integer division by 36
+    // will tell you how many bytes are left to parse in the sequence.
+    //
+    //  0 ----0---> 0  (`UTF8-1` finished)
+    //  0 ----2---> 24 (one seen of `UTF8-2`)
+    // 24 --1,7,9-> 0  (`UTF8-2`, `UTF8-3`, or `UTF8-4` finished)
+    //  0 ---10---> 48 (one seen of `UTF8-3a`)
+    //  0 ----3---> 36 (one seen of `UTF8-3b`)
+    //  0 ----4---> 60 (one seen of `UTF8-3c`)
+    // 48 ----7---> 24 (two seen of `UTF8-3a`)
+    // 36 --1,7,9-> 24 (two seen of `UTF8-3b`)
+    // 60 ---1,9--> 24 (two seen of `UTF8-3c`)
+    //  0 ---11---> 72 (one seen of `UTF8-4a`)
+    //  0 ----6---> 84 (one seen of `UTF8-4b`)
+    //  0 ----5---> 96 (one seen of `UTF8-4c`)
+    // 72 ---7,9--> 36 (two seen of `UTF8-4a`)
+    // 84 --1,7,9-> 36 (two seen of `UTF8-4a`)
+    // 96 ----1---> 36 (two seen of `UTF8-4a`)
+    //
+    // We can also show the states and possible transitions as a graph:
+    //
+    ///////////////////////////////////////////////////////////////////
+    //                                                               //
+    //             2                                                 //
+    //          .------------------------.                           //
+    //         /                          \                          //
+    //        /    3                       \                         //
+    //       |   .--------------.           \                        //
+    //       |  /                \           \                       //
+    //       | /   5  .--. 1      \           |                      //
+    //   0   || .---->|96|------.  |          |                      //
+    //  .--. ||/      '--'       V V          V                      //
+    // |    \---.  6  .--. 1,7,9 .--. 1,7,9  .--. 1,7,9  .---.       //
+    //  '-->| 0 |---->|84|------>|36|------->|24|------->| 0 | . . . //
+    //      '---'     '--'       '--'        '--'        '---'       //
+    //       ||\  11  .--. 7,9    A          A A                     //
+    //       || '---->|72|--------'          | |                     //
+    //       | \      '--'                  /  |                     //
+    //       |  \ 10  .--. 7               /   |                     //
+    //       |   '--->|48|----------------'   /                      //
+    //        \       '--'                   /                       //
+    //         \   4  .--. 1,9              /                        //
+    //          '---->|60|-----------------'                         //
+    //                '--'                                           //
+    //                .--.                                           //
+    //      Note that |12| is the error state, which we will         //
+    //                '--'                                           //
+    //      reach if we encounter any edge not on this diagram.      //
+    //                                                               //
+    ///////////////////////////////////////////////////////////////////
+    //0  1   2   3   4   5   6   7   8   9  10  11 // byte classes
+    0,  12, 24, 36, 60, 96, 84, 12, 12, 12, 48, 72 // state 0
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12 // state 12
+    12,  0, 12, 12, 12, 12, 12,  0, 12,  0, 12, 12 // state 24
+    12, 24, 12, 12, 12, 12, 12, 24, 12, 24, 12, 12 // state 36
+    12, 12, 12, 12, 12, 12, 12, 24, 12, 12, 12, 12 // state 48
+    12, 24, 12, 12, 12, 12, 12, 12, 12, 24, 12, 12 // state 60
+    12, 12, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12 // state 72
+    12, 36, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12 // state 84
+    12, 36, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12 // state 96
+    // That's 108 entries above, so we add 20 bytes of padding to reach 128.
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12
+
+    // Now what will we do with the other 128 bytes of this 256-byte table?
+    // We'll add another state machine! This one will parse UTF-8 *in reverse*.
+    //
+    // Using the same approach we used above we can reference the ABNF grammar
+    // and determine the valid transitions when iterating bytes in reverse.
+    //
+    // In reverse we can't tell how many bytes are left ahead of time, so
+    // instead of choosing state numbers to tell how many bytes remain, we'll
+    // choose state numbers so that integer division by 24 will tell how many
+    // bytes have already been seen in the currently open multi-byte sequence.
+    // When the sequence is finished, we'll be back in state 0.
+    // In pursuance of this, we skip state 36 entirely to make that math work.
+    //
+    //  0 ----0---> 0  (`UTF8-1` finished)
+    //  0 --1,7,9-> 24 (one `UTF8-tail` seen)
+    // 24 ----2---> 0  (`UTF8-2` finished)
+    // 24 ----7---> 48 (two seen of `UTF8-3a`, `UTF8-3b`, or `UTF8-4`)
+    // 48 --10,3--> 0  (`UTF8-3a` or `UTF8-3b` finished)
+    // 24 ---1,9--> 60 (two seen of `UTF8-3b`, `UTF8-3c`, or `UTF8-4`)
+    // 60 ---3,4--> 0  (`UTF8-3b` or `UTF8-3c` finished)
+    // 48 ---7,9--> 72 (three seen of `UTF8-4a` or `UTF8-4b`)
+    // 48 ----1---> 84 (three seen of `UTF8-4b` or `UTF8-4c`)
+    // 60 ---7,9--> 72 (three seen of `UTF8-4a` or `UTF8-4b`)
+    // 60 ----1---> 84 (three seen of `UTF8-4b` or `UTF8-4c`)
+    // 72 --11,6--> 0  (`UTF8-4a` or `UTF8-4b` finished)
+    // 84 ---5,6--> 0  (`UTF8-4b` or `UTF8-4c` finished)
+    //
+    ////////////////////////////////////////////////////////////////
+    //                                                            //
+    //                                          10,3              //
+    //                              .----------------.            //
+    //                             /                  \           //
+    //                            /   7,9  .--. 11,6   \          //
+    //                           |  .----->|72|------.  \         //
+    //                           | /       '--'       \  |        //
+    //                       7  .--.    7,9  A         | |        //
+    //   0                .---->|48|   .-----'         | |        //
+    //  .--.             /      '--'  |                V V        //
+    // |    \---.1,7,9.--.          \ |            2  .---.       //
+    //  '-->| 0 |---->|24|---------- \| ------------->| 0 | . . . //
+    //      '---'     '--'           /\               '---'       //
+    //                   \  1,9 .--./  \  1            A A        //
+    //                    '---->|60|'   '---.          | |        //
+    //                          '--'         V         | |        //
+    //                           | \    1  .--.  5,6  /  |        //
+    //                           |  '----->|84|------'  /         //
+    //                            \        '--'        /          //
+    //                             \             3,4  /           //
+    //                              '----------------'            //
+    //                .--.                                        //
+    //      Note that |12| is the error state, which we will      //
+    //                '--'                                        //
+    //      reach if we encounter any edge not on this diagram.   //
+    //                .--.                                        //
+    //      The state |36| is not used at all in this DFA.        //
+    //                '--'                                        //
+    //      We skip it to make it so that dividing by 24          //
+    //      always gives the number of bytes so far used in       //
+    //      the current codepoint-in-progress if not yet final.   //
+    ////////////////////////////////////////////////////////////////
+    //0  1   2   3   4   5   6   7   8   9  10  11 // byte classes
+    0,  24, 12, 12, 12, 12, 12, 24, 12, 24, 12, 12 // state 0
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12 // state 12
+    12, 60,  0, 12, 12, 12, 12, 48, 12, 60, 12, 12 // state 24
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12 // state 36
+    12, 84, 12,  0, 12, 12, 12, 72, 12, 72,  0, 12 // state 48
+    12, 84, 12,  0,  0, 12, 12, 72, 12, 72, 12, 12 // state 60
+    12, 12, 12, 12, 12, 12,  0, 12, 12, 12, 12,  0 // state 72
+    12, 12, 12, 12, 12,  0,  0, 12, 12, 12, 12, 12 // state 84
+    // That's 96 entries above, so we add 32 bytes of padding to reach 128.
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12
+  ]
+
+  // Since we're in the core Savi package, we can cheat a bit here and do
+  // direct pointer indexing for a performance improvement, knowing that
+  // both tables have a size of 256, so direct indexing with a U8 index
+  // will not be able to cause any memory safety issues.
+  :fun _byte_class_table(byte U8) U8
+    @_byte_class_table_data._ptr._get_at(byte.usize)
+  :fun _state_table(type U8, state U8) U8
+    @_state_table_data._ptr._get_at((type + state).usize)
+  :fun _reverse_state_table(type U8, state U8) U8
+    @_state_table_data._ptr._get_at((type + state).bit_or(0x80).usize)
+
+  :: Return state with a codepoint (or partial codepoint in progress)
+  :: based on the given incoming byte, and current state struct value.
+  :: This function is for reading bytes in the forward direction.
+  :: See `reverse_read_byte!` for reading in reverse.
+  ::
+  :: The caller is expected to hold state on the call side, as in this example:
+  ::
+  :: ```savi
+  :: state = String.DecodeUTF8.State.new
+  :: bytes.each -> (byte |
+  ::   state = String.DecodeUTF8.read_byte!(byte, state)
+  ::   if state.is_done (yield codepoint)
+  :: )
+  :: ```
+  :fun read_byte!(
+    byte U8
+    state = String.DecodeUTF8.State.new
+  ) String.DecodeUTF8.State
+    byte_class = @_byte_class_table(byte)
+
+    codepoint = if (state._current == 0) (
+      // When state is zero, this is considered to be an initial byte,
+      // so we need to determine its type and mask it appropriately.
+      // The UTF-8 encoding specification defines different data mask sizes
+      // for leading bytes, which we correlate to byte types in the type table
+      // to know how many bits to mask.
+      mask = U8[0xff].bit_shr(byte_class)
+      byte.bit_and(mask).u32
+    |
+      // Otherwise this is a continuation byte, so we mask it as such
+      // and join it to the existing bits, shifted to make room for new bits.
+      byte.bit_and(0x3f).u32.bit_or(state.codepoint.bit_shl(6))
+    )
+
+    // Errors are indicated by the value 12 in the state table.
+    state_next = @_state_table(byte_class, state._current)
+    error! if (state_next == 12)
+
+    String.DecodeUTF8.State._new(codepoint, state_next)
+
+  :: Return state with a codepoint (or partial codepoint in progress)
+  :: based on the given incoming byte, and current state struct value.
+  :: This function is for reading bytes in reverse.
+  :: See `read_byte!` for reading in the forward direction.
+  ::
+  :: The caller is expected to hold state on the call side, as in this example:
+  ::
+  :: ```savi
+  :: state = String.DecodeUTF8.State.new
+  :: bytes.each -> (byte |
+  ::   state = String.DecodeUTF8.read_byte!(byte, state)
+  ::   if state.is_done (yield codepoint)
+  :: )
+  :: ```
+  :fun reverse_read_byte!(
+    byte U8
+    state = String.DecodeUTF8.ReverseState.new
+  ) String.DecodeUTF8.ReverseState
+    byte_class = @_byte_class_table(byte)
+
+    // Errors are indicated by the value 12 in the state table.
+    state_next = @_reverse_state_table(byte_class, state._current)
+    error! if (state_next == 12)
+
+    codepoint = state.codepoint
+    shift_amount = state._shift_amount
+    if state._current.is_zero (
+      codepoint = 0
+      shift_amount = 0
+    )
+
+    if (state_next == 0) (
+      mask = U8[0xff].bit_shr(byte_class)
+      codepoint = byte.bit_and(mask).u32.bit_shl(shift_amount).bit_or(codepoint)
+    |
+      codepoint = byte.bit_and(0x3f).u32.bit_shl(shift_amount).bit_or(codepoint)
+    )
+
+    String.DecodeUTF8.ReverseState._new(codepoint, state_next, shift_amount + 6)

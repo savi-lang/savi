@@ -284,6 +284,19 @@
     assert: indices    == [0,    1,   4,   7,  10,  13,  16,  19,  20]
     assert: widths     == [1,    3,   3,   3,   3,   3,   3,   1,   1]
 
+  :it "reverse-iterates over unicode codepoints as well"
+    codepoints Array(U32) = []
+    indices Array(USize) = []
+    widths Array(USize) = []
+    "\"नमस्ते!\"".reverse_each_char_with_index_and_width -> (codepoint, index, width |
+      codepoints << codepoint
+      indices << index
+      widths << width
+    )
+    assert: codepoints == ['"', '!', 'े', 'त', '्', 'स', 'म', 'न', '"']
+    assert: indices    == [20,  19,  16,  13,  10,   7,   4,   1,   0]
+    assert: widths     == [1,    1,   3,   3,   3,   3,   3,   3,   1]
+
   :it "joins an array of strings"
     assert: String.join([
       "foo"

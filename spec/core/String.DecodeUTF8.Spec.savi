@@ -1,0 +1,119 @@
+:class Savi.String.DecodeUTF8.Spec
+  :is Spec
+  :const describes: "String.DecodeUTF8"
+
+  :fun check(string String) String
+    forward = @check_forward(string)
+    reverse = @check_reverse(string)
+    return forward if (forward == reverse)
+
+    "\(forward); reverse is \(reverse)"
+
+  :fun check_forward(string String) String
+    string.each_char_with_index_and_width -> (codepoint, index, width |
+      return "invalid at byte \(index + width - 1)" if (codepoint == 0xfffd)
+      return "non-zero start index: \(index)" if index.is_nonzero
+      return "\(codepoint.format.hex) (\(width) byte\(if (width != 1) "s"))"
+      None // TODO: this shouldn't be needed
+    )
+    "no codepoint?"
+
+  :fun check_reverse(string String) String
+    string.reverse_each_char_with_index_and_width -> (codepoint, index, width |
+      return "invalid at byte \(index)" if (codepoint == 0xfffd)
+      return "non-zero start index: \(index)" if index.is_nonzero
+      return "\(codepoint.format.hex) (\(width) byte\(if (width != 1) "s"))"
+      None // TODO: this shouldn't be needed
+    )
+    "no codepoint?"
+
+  :it "decodes one-byte codepoints"
+    assert: @check("\x00") == "0x00000000 (1 byte)"
+    assert: @check("\x7f") == "0x0000007f (1 byte)"
+
+  :it "rejects anything in 0x80..0xc1 as an initial byte"
+    assert: @check("\x80") == "invalid at byte 0"
+    assert: @check("\x8f") == "invalid at byte 0"
+    assert: @check("\x90") == "invalid at byte 0"
+    assert: @check("\x9f") == "invalid at byte 0"
+    assert: @check("\xa0") == "invalid at byte 0"
+    assert: @check("\xbf") == "invalid at byte 0"
+    assert: @check("\xc0") == "invalid at byte 0"
+    assert: @check("\xc1") == "invalid at byte 0"
+
+  :it "decodes two-byte codepoints"
+    assert: @check("\xc2\x80") == "0x00000080 (2 bytes)"
+    assert: @check("\xc2\x8f") == "0x0000008f (2 bytes)"
+    assert: @check("\xc2\x90") == "0x00000090 (2 bytes)"
+    assert: @check("\xc2\x9f") == "0x0000009f (2 bytes)"
+    assert: @check("\xc2\xa0") == "0x000000a0 (2 bytes)"
+    assert: @check("\xc2\xbf") == "0x000000bf (2 bytes)"
+    assert: @check("\xdf\xbf") == "0x000007ff (2 bytes)"
+
+  :it "rejects invalid 2nd byte of a two-byte sequence"
+    assert: @check_forward("\xc2\x7f") == "invalid at byte 1"
+    assert: @check("\xc2\xc0") == "invalid at byte 1"
+    assert: @check_forward("\xdf\x7f") == "invalid at byte 1"
+    assert: @check("\xdf\xc0") == "invalid at byte 1"
+
+  :it "decodes three-byte codepoints"
+    assert: @check("\xe0\xa0\x80") == "0x00000800 (3 bytes)"
+    assert: @check("\xe0\xbf\xbf") == "0x00000fff (3 bytes)"
+    assert: @check("\xe1\x80\x80") == "0x00001000 (3 bytes)"
+    assert: @check("\xec\xbf\xbf") == "0x0000cfff (3 bytes)"
+    assert: @check("\xed\x80\x80") == "0x0000d000 (3 bytes)"
+    assert: @check("\xed\x9f\xbf") == "0x0000d7ff (3 bytes)"
+    assert: @check("\xee\x80\x80") == "0x0000e000 (3 bytes)"
+    assert: @check("\xef\xbf\xbf") == "0x0000ffff (3 bytes)"
+
+  :it "rejects invalid 2nd byte of a three-byte sequence"
+    assert: @check("\xe0\x9f\x80") == "invalid at byte 1; reverse is invalid at byte 0"
+    assert: @check("\xe0\xc0\xbf") == "invalid at byte 1"
+    assert: @check("\xe1\x7f\x80") == "invalid at byte 1"
+    assert: @check("\xec\xc0\xbf") == "invalid at byte 1"
+    assert: @check("\xed\x7f\x80") == "invalid at byte 1"
+    assert: @check("\xed\xa0\xbf") == "invalid at byte 1; reverse is invalid at byte 0"
+    assert: @check("\xee\x7f\x80") == "invalid at byte 1"
+    assert: @check("\xef\xc0\xbf") == "invalid at byte 1"
+
+  :it "rejects invalid 3rd byte of a three-byte sequence"
+    assert: @check_forward("\xe0\xa0\x7f") == "invalid at byte 2"
+    assert: @check("\xe0\xbf\xc0") == "invalid at byte 2"
+    assert: @check_forward("\xe1\x80\x7f") == "invalid at byte 2"
+    assert: @check("\xec\xbf\xc0") == "invalid at byte 2"
+    assert: @check_forward("\xed\x80\x7f") == "invalid at byte 2"
+    assert: @check("\xed\x9f\xc0") == "invalid at byte 2"
+    assert: @check_forward("\xee\x80\x7f") == "invalid at byte 2"
+    assert: @check("\xef\xbf\xc0") == "invalid at byte 2"
+
+  :it "decodes four-byte codepoints"
+    assert: @check("\xf0\x90\x80\x80") == "0x00010000 (4 bytes)"
+    assert: @check("\xf0\xbf\xbf\xbf") == "0x0003ffff (4 bytes)"
+    assert: @check("\xf1\x80\x80\x80") == "0x00040000 (4 bytes)"
+    assert: @check("\xf3\xbf\xbf\xbf") == "0x000fffff (4 bytes)"
+    assert: @check("\xf4\x80\x80\x80") == "0x00100000 (4 bytes)"
+    assert: @check("\xf4\x8f\xbf\xbf") == "0x0010ffff (4 bytes)"
+
+  :it "rejects invalid 2nd byte of a four-byte sequence"
+    assert: @check("\xf0\x8f\x80\x80") == "invalid at byte 1; reverse is invalid at byte 0"
+    assert: @check("\xf0\xc0\xbf\xbf") == "invalid at byte 1"
+    assert: @check("\xf1\x7f\x80\x80") == "invalid at byte 1"
+    assert: @check("\xf3\xc0\xbf\xbf") == "invalid at byte 1"
+    assert: @check("\xf4\x7f\x80\x80") == "invalid at byte 1"
+    assert: @check("\xf4\xc0\xbf\xbf") == "invalid at byte 1"
+
+  :it "rejects invalid 3rd byte of a four-byte sequence"
+    assert: @check("\xf0\x90\x7f\x80") == "invalid at byte 2"
+    assert: @check("\xf0\xbf\xc0\xbf") == "invalid at byte 2"
+    assert: @check("\xf1\x80\x7f\x80") == "invalid at byte 2"
+    assert: @check("\xf3\xbf\xc0\xbf") == "invalid at byte 2"
+    assert: @check("\xf4\x80\x7f\x80") == "invalid at byte 2"
+    assert: @check("\xf4\x8f\xc0\xbf") == "invalid at byte 2"
+
+  :it "rejects invalid 4th byte of a four-byte sequence"
+    assert: @check_forward("\xf0\x90\x80\x7f") == "invalid at byte 3"
+    assert: @check("\xf0\xbf\xbf\xc0") == "invalid at byte 3"
+    assert: @check_forward("\xf1\x80\x80\x7f") == "invalid at byte 3"
+    assert: @check("\xf3\xbf\xbf\xc0") == "invalid at byte 3"
+    assert: @check_forward("\xf4\x80\x80\x7f") == "invalid at byte 3"
+    assert: @check("\xf4\x8f\xbf\xc0") == "invalid at byte 3"
