@@ -179,18 +179,16 @@
   :fun char_at!(index USize) U32
     if (@size <= index) error!
 
-    codepoint U32 = 0
-    state U8 = 0
-
-    early_stop = @each_byte_until(index, index + 4) -> (byte |
-      codepoint = UTF8Decoding.read_byte_into_codepoint(byte, state, codepoint)
-      state = UTF8Decoding.next_state(byte, state)
-
-      // Stop iterating when we have accepted an entire codepoint.
-      state == 0
+    state = String.DecodeUTF8.State.new
+    try (
+      @each_byte(index, index + 4) -> (byte |
+        state = String.DecodeUTF8.read_byte!(byte, state)
+        return state.codepoint if state.is_done
+      )
+      0xfffd
+    |
+      0xfffd
     )
-
-    if early_stop (codepoint | 0xfffd)
 
   :: Return a shared portion of this string, covering `from` until `to`,
   :: with negative values in `from` and `to` representing indexes counting
@@ -265,26 +263,74 @@
   ::
   :: If no byte range parameters are given, the entire String will be read.
   :fun each_char_with_index_and_width(from USize = 0, to = USize.max_value)
-    codepoint U32 = 0
-    state U8 = 0
     index = from
     start_index = index
+    state = String.DecodeUTF8.State.new
 
     while (index < to.at_most(@_size)) (
       byte = @_ptr._get_at(index)
-      codepoint = UTF8Decoding.read_byte_into_codepoint(byte, state, codepoint)
-      state = UTF8Decoding.next_state(byte, state)
       index = index + 1
 
-      case (
-      | state == 0 |
-        yield (codepoint, start_index, index - start_index)
-        start_index = index
-      | UTF8Decoding.is_error_state(state) |
+      try (
+        state = String.DecodeUTF8.read_byte!(byte, state)
+
+        if state.is_done (
+          yield (state.codepoint, start_index, index - start_index)
+          start_index = index
+        )
+      |
         yield (U32[0xfffd], start_index, index - start_index)
         start_index = index
-        state = 0
+        state = String.DecodeUTF8.State.new
       )
+    )
+    if !state.is_done (
+      yield (U32[0xfffd], start_index, index - start_index)
+    )
+    @
+
+  :: Starting from the given byte index and going backwards to the given end,
+  :: yield each UTF8-encoded Unicode codepoint, its starting byte index,
+  :: and its byte width (the number of bytes that were used to encode it).
+  ::
+  :: When multibyte codepoints are observed, the yielded byte index will skip
+  :: some sequential numbers and the yielded byte width will be greater than 1.
+  ::
+  :: When invalid UTF8 encoded bytes are observed, (whether because the String
+  :: is invalid UTF8, or the starting byte index was pointing to the middle
+  :: of a multibyte codepoint rather than its start), the value 0xfffd,
+  :: known as a Unicode "Replacement character" will be yielded for those bytes.
+  ::
+  :: If the given byte range is outside of the bounds of the actual byte buffer,
+  :: then the start and/or end will be silently truncated to the nearest bound.
+  ::
+  :: If no byte range parameters are given, the entire String will be read.
+  :fun reverse_each_char_with_index_and_width(from USize = USize.max_value, to = 0)
+    index = from.at_most(@_size)
+    finish_index = index
+    state = String.DecodeUTF8.ReverseState.new
+
+    while (index > 0) (
+      index -= 1
+      byte = @_ptr._get_at(index)
+
+      try (
+        state = String.DecodeUTF8.reverse_read_byte!(byte, state)
+
+        if state.is_done (
+          yield (state.codepoint, index, finish_index - index)
+          index = index.at_most(@_size)
+          finish_index = index
+        )
+      |
+        yield (U32[0xfffd], index, finish_index - index)
+        index = index.at_most(@_size)
+        finish_index = index
+        state = String.DecodeUTF8.ReverseState.new
+      )
+    )
+    if !state.is_done (
+      yield (U32[0xfffd], index, finish_index - index)
     )
     @
 
