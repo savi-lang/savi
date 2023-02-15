@@ -25,27 +25,6 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-// TODO: Remove this legacy compatibility shim.
-:: DEPRECATED: Use `String.DecodeUTF8` instead.
-:module UTF8Decoding
-  :: DEPRECATED: Use `String.DecodeUTF8.read_byte!` instead.
-  :fun read_byte_into_codepoint(byte U8, state_current U8, codepoint U32) U32
-    state = String.DecodeUTF8.State._new(codepoint, state_current)
-    try (
-      String.DecodeUTF8.read_byte!(byte, state).codepoint
-    |
-      codepoint
-    )
-
-  :: DEPRECATED: Use `String.DecodeUTF8.read_byte!` instead.
-  :fun next_state(byte U8, state_current U8) U8
-    state = String.DecodeUTF8.State._new(0, state_current)
-    try (
-      String.DecodeUTF8.read_byte!(byte, state)._current / 12
-    |
-      1
-    )
-
 :: A mostly opaque state structure used while decoding UTF-8 bytes.
 :: See `String.DecodeUTF8.read_byte!` for a usage example.
 :struct String.DecodeUTF8.State
