@@ -39,7 +39,7 @@ module Savi::Packaging::RemoteService
       fetch_specified_versions_of_each(ctx, deps, versions, into_dirname)
     end
 
-    PROCESS_CONCURRENCY            = 2
+    PROCESS_CONCURRENCY            = 1
     COMMAND_GIT_REMOTE_SORTED_TAGS =
       %w{git -c versionsort.suffix=- ls-remote --tags --sort=-v:refname}
 
