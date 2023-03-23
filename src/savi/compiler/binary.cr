@@ -84,6 +84,9 @@ class Savi::Compiler::Binary
     sdk_version = (target.arm64? ? "11.0.0" : "10.9.0")
     link_args << "-platform_version" << "macos" << sdk_version << sdk_version
 
+    # Link the C++ runtime if needed.
+    link_args << "-lc++" if ctx.link_cpp_files.any?
+
     # Link any additional libraries indicated by user code.
     ctx.link_libraries.each { |name| link_args << "-l#{name}" }
 
@@ -184,6 +187,15 @@ class Savi::Compiler::Binary
     link_args << "-lc" << "-ldl" << "-lpthread" << "-lm"
     link_args << "-latomic" unless target.freebsd? || target.dragonfly?
     link_args << "-lexecinfo" if target.musl? || target.freebsd? || target.dragonfly?
+
+    # Link the C++ runtime if needed.
+    if ctx.link_cpp_files.any?
+      if target.freebsd? || target.dragonfly?
+        link_args << "-lc++"
+      else
+        link_args << "-lstdc++"
+      end
+    end
 
     # Link any additional libraries indicated by user code.
     ctx.link_libraries.each { |name| link_args << "-l#{name}" }

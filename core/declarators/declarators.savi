@@ -377,6 +377,18 @@
   :intrinsic
   :term filenames NameList
 
+:: Declare a link-time dependency on some files written in C++ code,
+:: which will be compiled and statically linked in the Savi program.
+::
+:: This can be used to write C++ code that will be compiled alongside your
+:: Savi code, which can contain `extern "C"` functions that will be
+:: callable via FFI bindings in the Savi code.
+::
+:: The filenames will be resolved relative to the current Savi source file.
+:declarator ffi_link_cpp_files
+  :intrinsic
+  :term filenames NameList
+
 :: Declare a binding to an unsafe foreign functions (FFI), such as a C function.
 ::
 :: It is common to define such bindings on a dedicated private module, which is
