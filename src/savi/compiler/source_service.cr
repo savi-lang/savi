@@ -257,7 +257,7 @@ class Savi::Compiler::SourceService
       }
 
       try_dirname = File.expand_path("..", dirname)
-      break unless try_dirname.starts_with?(Dir.current)
+      break unless try_dirname.starts_with?(File.expand_path("..", Dir.current))
     end
 
     Error.at Source::Pos.none,
