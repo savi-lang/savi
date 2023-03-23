@@ -173,7 +173,7 @@ class Savi::Compiler::SourceService
       # We will yield it later when yielding all the other overrides.
       if (dir_overrides = @source_overrides[File.dirname(name)]?) \
       && (override = dir_overrides[File.basename(name)]?)
-        yield ({name, override})
+        next
       else
         # Try to read the content from the file, or skip it if we fail for any
         # reason, such as filesystem issues or deletion race conditions.
