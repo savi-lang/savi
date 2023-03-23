@@ -16,7 +16,7 @@ jobs:
             deps: sudo apt-get install -y capnproto libgc-dev
           - crystal: "1.5.0"
             os: macos-12 # upgrade to macos-13 when available
-            deps: brew install capnp
+            deps: brew install libgc capnp
     runs-on: ${{matrix.os}}
     steps:
       - name: Checkout Repository
