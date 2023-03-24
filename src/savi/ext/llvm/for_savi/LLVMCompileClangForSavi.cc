@@ -6,19 +6,19 @@
 #include <clang/CodeGen/CodeGenAction.h>
 
 ///
-// LLVMCompileCForSavi uses `clang` as a static library to embed a C compiler
-// inside the Savi compiler, which we use to compile one or more accompanying
-// C files into LLVM modules, which will be linked into the program and
-// the functions defined in them will be callable from Savi via FFI.
+// LLVMCompileClangForSavi uses `clang` as a static library to embed a C/C++
+// compiler inside the Savi compiler, which we use to compile one or more
+// accompanying C/C++ files into LLVM modules, which will be linked into the
+// program and the functions defined in them will be callable from Savi via FFI.
 
 using namespace llvm;
 
 // A substitutable subclass of raw_ostream that captures its input to a string.
-class LLVMCompileCForSaviCaptureOStream : public llvm::raw_ostream {
+class LLVMCompileClangForSaviCaptureOStream : public llvm::raw_ostream {
 public:
   std::string Data;
 
-  LLVMCompileCForSaviCaptureOStream() : raw_ostream(/*unbuffered=*/true), Data() {}
+  LLVMCompileClangForSaviCaptureOStream() : raw_ostream(/*unbuffered=*/true), Data() {}
 
   void write_impl(const char *Ptr, size_t Size) override {
     Data.append(Ptr, Size);
@@ -29,7 +29,7 @@ public:
 
 extern "C" {
 
-LLVMModuleRef LLVMCompileCForSavi(
+LLVMModuleRef LLVMCompileClangForSavi(
   LLVMContextRef Context,
   bool IsDebug,
   int ArgC, const char **ArgV,
@@ -37,7 +37,7 @@ LLVMModuleRef LLVMCompileCForSavi(
 ) {
   std::vector<const char *> Args(ArgV, ArgV + ArgC);
 
-  LLVMCompileCForSaviCaptureOStream Output;
+  LLVMCompileClangForSaviCaptureOStream Output;
   clang::DiagnosticsEngine DiagEngine(
     IntrusiveRefCntPtr<clang::DiagnosticIDs>(new clang::DiagnosticIDs),
     new clang::DiagnosticOptions,

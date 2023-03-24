@@ -1,0 +1,12 @@
+
+:ffi_link_cpp_files (
+  "../vendor/mylib_wraps_cpp.cpp"
+)
+
+:module _FFI
+  :ffi mylib_wraps_cpp(value I32) I32
+
+:actor Main
+  :new (env)
+    env.out.print("7 returns \(_FFI.mylib_wraps_cpp(7))")
+    env.out.print("77 returns \(_FFI.mylib_wraps_cpp(77))")
