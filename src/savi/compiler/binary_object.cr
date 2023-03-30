@@ -96,10 +96,14 @@ class Savi::Compiler::BinaryObject
       mark_runtime_asserts_as_unreachable(runtime)
     end
 
-    # Compile any C code files that we use and link those as well.
+    # Compile any C/C++ code files that we use and link those as well.
     ctx.link_c_files.each { |c_file_path|
-      c_module = invoke_c_compiler(ctx, target, c_file_path)
+      c_module = invoke_clang_compiler(ctx, target, "c", c_file_path)
       LibLLVM.link_modules(mod.to_unsafe, c_module.to_unsafe)
+    }
+    ctx.link_cpp_files.each { |cpp_file_path|
+      cpp_module = invoke_clang_compiler(ctx, target, "c++", cpp_file_path)
+      LibLLVM.link_modules(mod.to_unsafe, cpp_module.to_unsafe)
     }
 
     # Link the runtime bitcode module into the generated application module.
@@ -196,9 +200,9 @@ class Savi::Compiler::BinaryObject
     }
   end
 
-  def self.get_default_c_flags(ctx)
-    LibLLVM.default_c_flags_for_savi(
-      ctx.code_gen.target_machine.triple,
+  def self.get_default_clang_flags(ctx, language)
+    LibLLVM.default_clang_flags_for_savi(
+      ctx.code_gen.target_machine.triple, language,
       out out_args_ptr, out out_args_count
     )
 
@@ -226,6 +230,16 @@ class Savi::Compiler::BinaryObject
       include_path = File.join(lib_path, "../../include")
       yield include_path if Dir.exists?(include_path)
 
+      substituted_include_path = lib_path.gsub(/\blib(64)?\b/, "include")
+      if Dir.exists?(substituted_include_path)
+
+        Dir.glob(File.join(substituted_include_path, "c++/*")) { |include_path|
+          yield include_path if Dir.exists?(include_path)
+        }
+
+        yield substituted_include_path
+      end
+
       if target.macos?
         include_path = File.join(lib_path, "../../System/Library/Frameworks/Kernel.framework/Headers")
         yield include_path if Dir.exists?(include_path)
@@ -233,18 +247,18 @@ class Savi::Compiler::BinaryObject
     }
   end
 
-  def self.invoke_c_compiler(ctx, target, c_file_path) : LLVM::Module
-    compile_args = get_default_c_flags(ctx)
+  def self.invoke_clang_compiler(ctx, target, language, c_file_path) : LLVM::Module
+    compile_args = get_default_clang_flags(ctx, language)
     compile_args << "-triple" << ctx.code_gen.target_machine.triple
     each_sysroot_include_path(ctx, target) { |include_path|
-      compile_args << "-isystem" << include_path
+      compile_args << "-I" << include_path
     }
     compile_args << "-fgnuc-version=4.2.1" if target.macos?
     compile_args << c_file_path
 
     is_debug = !ctx.options.no_debug
 
-    llvm_module = LibLLVM.compile_c_for_savi(
+    llvm_module = LibLLVM.compile_clang_for_savi(
       ctx.code_gen.llvm,
       is_debug,
       compile_args.size, compile_args.map(&.to_unsafe),
@@ -263,7 +277,7 @@ class Savi::Compiler::BinaryObject
     # Ensure the output data pointer, which was a fresh allocation, is freed.
     LibC.free(out_ptr)
 
-    raise "failed to compile C code" if llvm_module.null?
+    raise "failed to compile #{language} code" if llvm_module.null?
 
     c_module = LLVM::Module.new(llvm_module, ctx.code_gen.llvm)
     c_module.target = ctx.code_gen.target_machine.triple

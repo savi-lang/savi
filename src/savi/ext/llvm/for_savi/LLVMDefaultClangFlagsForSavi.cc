@@ -3,7 +3,7 @@
 #include <llvm/Support/VirtualFileSystem.h>
 
 ///
-// LLVMDefaultCFlagsForSavi uses `clang` as a static library to determine
+// LLVMDefaultClangFlagsForSavi uses `clang` as a static library to determine
 // the correct C flags to pass to the embedded `clang` compiler later,
 // including things like default header search paths, etc.
 
@@ -11,13 +11,13 @@ using namespace llvm;
 
 extern "C" {
 
-void LLVMDefaultCFlagsForSavi(
-  const char* Target,
+void LLVMDefaultClangFlagsForSavi(
+  const char* Target, const char* Language,
   char*** OutArgsPtr, int* OutArgsCount
 ) {
   std::vector<const char *> Args;
   Args.push_back("clang");
-  Args.push_back("-x"); Args.push_back("c"); // specify C as the language
+  Args.push_back("-x"); Args.push_back(Language);
   Args.push_back("-"); // use stdin, to avoid naming an input file
 
   clang::DiagnosticsEngine DiagEngine(
@@ -34,6 +34,13 @@ void LLVMDefaultCFlagsForSavi(
     Compilation->getArgs(),
     OutArgs
   );
+
+  if (0 == strcmp(Language, "c++")) {
+    OutArgs.push_back("-x");
+    OutArgs.push_back("c++");
+    OutArgs.push_back("-fexceptions");
+    OutArgs.push_back("-fcxx-exceptions");
+  }
 
   // Give the output args back to the caller, in a freshly allocated list,
   // containing a freshly allocated string for each output argument.

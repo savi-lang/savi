@@ -44,6 +44,7 @@ class Savi::Compiler::Context
   getter xtypes_graph = XTypes::Graph::Pass.new
 
   getter link_c_files = Set(String).new
+  getter link_cpp_files = Set(String).new
   getter link_libraries = Set(String).new
   getter link_libraries_by_foreign_function = Hash(String, String).new
 

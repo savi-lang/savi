@@ -96,7 +96,7 @@ module Savi::Program::Intrinsic
       when "ffi_link_lib"
         name = terms["name"].as(AST::Identifier)
         ctx.link_libraries.add(name.value)
-      when "ffi_link_c_files"
+      when "ffi_link_c_files", "ffi_link_cpp_files"
         terms["filenames"].as(AST::Group).terms.each { |term|
           c_file_path =
             File.join(term.pos.source.dirname, term.as(AST::Identifier).value)
@@ -105,7 +105,14 @@ module Savi::Program::Intrinsic
             Error.at term, "#{c_file_path} does not exist"
           end
 
-          ctx.link_c_files.add(c_file_path)
+          case declarator.name.value
+          when "ffi_link_c_files"
+            ctx.link_c_files.add(c_file_path)
+          when "ffi_link_cpp_files"
+            ctx.link_cpp_files.add(c_file_path)
+          else
+            nil
+          end
         }
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
