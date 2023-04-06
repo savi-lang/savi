@@ -85,6 +85,7 @@ task:
         # Set up the SDKROOT path specific to the present XCode version.
         SDKROOT: /Applications/Xcode-14.2.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
+        MACOSX_DEPLOYMENT_TARGET: "10.11" # set minimum MacOS version
       macos_instance:
         image: ghcr.io/cirruslabs/macos-ventura-xcode:14.2
       # Caching some homebrew directories helps save some of the otherwise huge
@@ -119,6 +120,7 @@ task:
         # Set up the SDKROOT path specific to the present XCode version.
         SDKROOT: /Applications/Xcode-14.2.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
+        MACOSX_DEPLOYMENT_TARGET: "10.11" # set minimum MacOS version
       macos_instance:
         image: ghcr.io/cirruslabs/macos-ventura-xcode:14.2
       # Caching some homebrew directories helps save some of the otherwise huge
