@@ -303,7 +303,7 @@ $(BUILD)/savi-release.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
-		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
+		crystal build -Duse_pcre $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
 			--release --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi compiler object file, based on the Crystal source code.
@@ -317,7 +317,7 @@ $(BUILD)/savi-debug.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
-		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
+		crystal build -Duse_pcre $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
 			--debug --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi specs object file, based on the Crystal source code.
@@ -331,7 +331,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
-		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
+		crystal build -Duse_pcre $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
 			--debug --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi compiler executable, by linking the above targets together.

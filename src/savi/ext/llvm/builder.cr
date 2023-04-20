@@ -74,4 +74,8 @@ class LLVM::Builder
   def call(func_type : LLVM::Type, func, args : Array(LLVM::Value), name : String = "", bundle : LLVM::OperandBundleDef = LLVM::OperandBundleDef.null)
     Value.new LibLLVMExt.build_call2(self, func_type, func, (args.to_unsafe.as(LibLLVM::ValueRef*)), args.size, bundle, name)
   end
+
+  def invoke(type : LLVM::Type, fn : LLVM::Function, args : Array(LLVM::Value), a_then, a_catch, bundle : LLVM::OperandBundleDef = LLVM::OperandBundleDef.null, name = "")
+    Value.new LibLLVMExt.build_invoke2(self, type, fn, (args.to_unsafe.as(LibLLVM::ValueRef*)), args.size, a_then, a_catch, bundle, name)
+  end
 end

@@ -775,7 +775,7 @@ module Savi::Compiler::Infer
         f_cap_string = @func.cap.value
         f_cap_string = "ref" if @func.has_tag?(:constructor)
         f_cap_string = "read" if f_cap_string == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-        next_index: Int32 = 0
+        next_index : Int32 = 0
         MetaType::Capability.new_maybe_generic(f_cap_string).each_cap.map { |f_cap|
           {
             f_cap,
