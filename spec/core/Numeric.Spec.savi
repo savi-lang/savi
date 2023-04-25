@@ -7,10 +7,12 @@
     assert: U16[-1]                   == 0xffff
     assert: U32[-1]                   == 0xffff_ffff
     assert: U64[-1]                   == 0xffff_ffff_ffff_ffff
+    assert: U128[-1]                  == 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff
     assert: I8[-128]                  == 128
     assert: I16[-32768]               == 32768
     assert: I32[-2147483648]          == 2147483648
     assert: I64[-9223372036854775808] == 9223372036854775808
+    assert: I128[-170141183460469231731687303715884105728] == 170141183460469231731687303715884105728
 
     if Platform.has_64bit_size (
       assert: USize[-1]                   == 0xffff_ffff_ffff_ffff
@@ -55,10 +57,13 @@
     assert: F64.from_bits(0x400c_cccc_cccc_cccd) == 3.6
 
   :it "knows the bit widths used in the representation of integer values"
-    assert: I32.mag_bit_width == 31
-    assert: U32.mag_bit_width == 32
-    assert: I64.mag_bit_width == 63
-    assert: U64.mag_bit_width == 64
+    assert: I32 .mag_bit_width == 31
+    assert: U32 .mag_bit_width == 32
+    assert: I64 .mag_bit_width == 63
+    assert: U64 .mag_bit_width == 64
+    assert: I128.mag_bit_width == 127
+    assert: U128.mag_bit_width == 128
+
 
   :it "knows the bit widths used in the representation of floating-point values"
     // We have significand bits, exponent bits, and 1 sign bit.

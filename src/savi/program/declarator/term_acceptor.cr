@@ -72,7 +72,7 @@ abstract class Savi::Program::Declarator::TermAcceptor
         when AST::LiteralInteger
           term
         when AST::LiteralCharacter
-          AST::LiteralInteger.new(term.value.to_u64).from(term)
+          AST::LiteralInteger.new(term.value.to_u128).from(term)
         end
       when "Name"
         case term

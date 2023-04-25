@@ -292,6 +292,7 @@ class Savi::Compiler::CodeGen
     when :i16 then @i16
     when :i32 then @i32
     when :i64 then @i64
+    when :i128 then @i128
     when :f32 then @f32
     when :f64 then @f64
     when :isize then @isize
@@ -311,6 +312,7 @@ class Savi::Compiler::CodeGen
     when :i16 then @i16
     when :i32 then @i32
     when :i64 then @i64
+    when :i128 then @i128
     when :f32 then @f32
     when :f64 then @f64
     when :isize then @isize
@@ -1133,12 +1135,14 @@ class Savi::Compiler::CodeGen
           raise NotImplementedError.new("float min_value compiler intrinsic")
         else
           if gtype.type_def.is_signed_numeric?(ctx)
+            # 2**(bit_width-1)
             case bit_width_of(gtype)
             when 1 then llvm_type_of(gtype).const_int(1)
             when 8 then llvm_type_of(gtype).const_int(0x80)
             when 16 then llvm_type_of(gtype).const_int(0x8000)
-            when 32 then llvm_type_of(gtype).const_int(0x80000000)
-            when 64 then llvm_type_of(gtype).const_int(0x8000000000000000)
+            when 32 then llvm_type_of(gtype).const_int(0x8000_0000)
+            when 64 then llvm_type_of(gtype).const_int(0x80000000_00000000)
+            when 128 then llvm_type_of(gtype).const_int(0x80000000000000000000000000000000u128)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           else
@@ -1150,21 +1154,25 @@ class Savi::Compiler::CodeGen
           raise NotImplementedError.new("float max_value compiler intrinsic")
         else
           if gtype.type_def.is_signed_numeric?(ctx)
+            # 2**(bit_width-1) - 1
             case bit_width_of(gtype)
             when 1 then llvm_type_of(gtype).const_int(0)
             when 8 then llvm_type_of(gtype).const_int(0x7f)
             when 16 then llvm_type_of(gtype).const_int(0x7fff)
             when 32 then llvm_type_of(gtype).const_int(0x7fffffff)
             when 64 then llvm_type_of(gtype).const_int(0x7fffffffffffffff)
+            when 128 then llvm_type_of(gtype).const_int(0x7fffffffffffffffffffffffffffffffu128)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           else
+            # 2**(bit_width) - 1
             case bit_width_of(gtype)
             when 1 then llvm_type_of(gtype).const_int(1)
             when 8 then llvm_type_of(gtype).const_int(0xff)
             when 16 then llvm_type_of(gtype).const_int(0xffff)
             when 32 then llvm_type_of(gtype).const_int(0xffffffff)
             when 64 then llvm_type_of(gtype).const_int(0xffffffffffffffff)
+            when 128 then llvm_type_of(gtype).const_int(0xffffffffffffffffffffffffffffffffu128)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           end
@@ -1177,6 +1185,8 @@ class Savi::Compiler::CodeGen
       when "u32!" then gen_numeric_conv(gtype, @gtypes["U32"], params[0], partial: true)
       when "u64" then gen_numeric_conv(gtype, @gtypes["U64"], params[0])
       when "u64!" then gen_numeric_conv(gtype, @gtypes["U64"], params[0], partial: true)
+      when "u128" then gen_numeric_conv(gtype, @gtypes["U128"], params[0])
+      when "u128!" then gen_numeric_conv(gtype, @gtypes["U128"], params[0], partial: true)
       when "usize" then gen_numeric_conv(gtype, @gtypes["USize"], params[0])
       when "usize!" then gen_numeric_conv(gtype, @gtypes["USize"], params[0], partial: true)
       when "i8" then gen_numeric_conv(gtype, @gtypes["I8"], params[0])
@@ -1187,6 +1197,8 @@ class Savi::Compiler::CodeGen
       when "i32!" then gen_numeric_conv(gtype, @gtypes["I32"], params[0], partial: true)
       when "i64" then gen_numeric_conv(gtype, @gtypes["I64"], params[0])
       when "i64!" then gen_numeric_conv(gtype, @gtypes["I64"], params[0], partial: true)
+      when "i128" then gen_numeric_conv(gtype, @gtypes["I128"], params[0])
+      when "i128!" then gen_numeric_conv(gtype, @gtypes["I128"], params[0], partial: true)
       when "isize" then gen_numeric_conv(gtype, @gtypes["ISize"], params[0])
       when "isize!" then gen_numeric_conv(gtype, @gtypes["ISize"], params[0], partial: true)
       when "f32" then gen_numeric_conv(gtype, @gtypes["F32"], params[0])
@@ -1381,6 +1393,8 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.bitreverse.i32", [@i32], @i32)
           when 64
             use_external_llvm_func("llvm.bitreverse.i64", [@i64], @i64)
+          when 128
+            use_external_llvm_func("llvm.bitreverse.i128", [@i128], @i128)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         @builder.call(op_func.function_type, op_func, [params[0]])
@@ -1401,6 +1415,10 @@ class Savi::Compiler::CodeGen
           op_func =
             use_external_llvm_func("llvm.bswap.i64", [@i64], @i64)
           @builder.call(op_func.function_type, op_func, [params[0]])
+        when 128
+          op_func =
+            use_external_llvm_func("llvm.bswap.i128", [@i128], @i128)
+          @builder.call(op_func.function_type, op_func, [params[0]])
         else raise NotImplementedError.new(bit_width_of(gtype))
         end
       when "leading_zero_bits"
@@ -1417,6 +1435,8 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.ctlz.i16", [@i16, @i1], @i16)
           when 64
             use_external_llvm_func("llvm.ctlz.i64", [@i64, @i1], @i64)
+          when 128
+            use_external_llvm_func("llvm.ctlz.i128", [@i128, @i1], @i128)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"],
@@ -1435,6 +1455,8 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.cttz.i32", [@i32, @i1], @i32)
           when 64
             use_external_llvm_func("llvm.cttz.i64", [@i64, @i1], @i64)
+          when 128
+            use_external_llvm_func("llvm.cttz.i128", [@i128, @i1], @i128)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"],
@@ -1453,6 +1475,8 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.ctpop.i32", [@i32], @i32)
           when 64
             use_external_llvm_func("llvm.ctpop.i64", [@i64], @i64)
+          when 128 
+            use_external_llvm_func("llvm.ctpop.i128", [@i128], @i128)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"], \
@@ -1484,6 +1508,9 @@ class Savi::Compiler::CodeGen
           when 64
             use_external_llvm_func("llvm.#{basename}.with.overflow.i64",
               [@i64, @i64], @llvm.struct([@i64, @i1]))
+          when 128
+            use_external_llvm_func("llvm.#{basename}.with.overflow.i128",
+              [@i128, @i128], @llvm.struct([@i128, @i1]))
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
 
@@ -1527,6 +1554,8 @@ class Savi::Compiler::CodeGen
             use_external_llvm_func("llvm.#{basename}.sat.i32", [@i32, @i32], @i32)
           when 64
             use_external_llvm_func("llvm.#{basename}.sat.i64", [@i64, @i64], @i64)
+          when 128
+            use_external_llvm_func("llvm.#{basename}.sat.i128", [@i128, @i128], @i128)
           else raise NotImplementedError.new(bit_width_of(gtype))
           end
 
@@ -2776,6 +2805,7 @@ class Savi::Compiler::CodeGen
     when :i16 then @i16.const_int(expr.value.to_i16!)
     when :i32 then @i32.const_int(expr.value.to_i32!)
     when :i64 then @i64.const_int(expr.value.to_i64!)
+    when :i128 then @i128.const_int(expr.value.to_i128!)
     when :f32 then @f32.const_float(expr.value.to_f32!)
     when :f64 then @f64.const_double(expr.value.to_f64!)
     when :isize then @isize.const_int(

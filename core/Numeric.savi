@@ -179,6 +179,34 @@
   :: Use `u64` instead if silently handling those edge cases is desired.
   :fun u64! U64
 
+  :: Convert this value to a corresponding `U128` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U128` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `u128!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U128` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U128`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `u128!` instead if raising an error for these cases is desired.
+  :fun u128 U128
+
+  :: Convert this value to a corresponding `U128` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U128` type, any out-of-range values will raise an error.
+  :: Use `u128` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U128` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U128`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `u128` instead if silently handling those edge cases is desired.
+  :fun u128! U128
+
   :: Convert this value to a corresponding `USize` value.
   ::
   :: If converting from an integer type with a range that extends beyond that
@@ -318,6 +346,34 @@
   :: floating-point value is NaN, an error will be raised.
   :: Use `i64` instead if silently handling those edge cases is desired.
   :fun i64! I64
+
+  :: Convert this value to a corresponding `I128` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I128` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `i128!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I128` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I128`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `i128!` instead if raising an error for these cases is desired.
+  :fun i128 I128
+
+  :: Convert this value to a corresponding `I128` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I128` type, any out-of-range values will raise an error.
+  :: Use `i128` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I128` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I128`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `i128` instead if silently handling those edge cases is desired.
+  :fun i128! I128
 
   :: Convert this value to a corresponding `ISize` value.
   ::
@@ -526,6 +582,8 @@
   :fun u32! U32: compiler intrinsic
   :fun u64 U64: compiler intrinsic
   :fun u64! U64: compiler intrinsic
+  :fun u128 U128: compiler intrinsic
+  :fun u128! U128: compiler intrinsic
   :fun usize USize: compiler intrinsic
   :fun usize! USize: compiler intrinsic
   :fun i8 I8: compiler intrinsic
@@ -536,6 +594,8 @@
   :fun i32! I32: compiler intrinsic
   :fun i64 I64: compiler intrinsic
   :fun i64! I64: compiler intrinsic
+  :fun i128 I128: compiler intrinsic
+  :fun i128! I128: compiler intrinsic
   :fun isize ISize: compiler intrinsic
   :fun isize! ISize: compiler intrinsic
   :fun f32 F32: compiler intrinsic
@@ -588,6 +648,10 @@
 :numeric U64
   :bit_width 64
 
+:: The standard 128-bit unsigned integer numeric type.
+:numeric U128
+  :bit_width 128
+
 :: The standard platform-specific unsigned "size" numeric type.
 :: This type is often used for counting and indexing collections.
 ::
@@ -625,6 +689,11 @@
 :numeric I64
   :signed
   :bit_width 64
+
+:: The standard 128-bit signed integer numeric type.
+:numeric I128
+  :signed
+  :bit_width 128
 
 :: The standard platform-specific signed "size" numeric type.
 :: This is the signed type corresponding to the unsigned type `USize`.

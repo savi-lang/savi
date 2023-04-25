@@ -86,7 +86,7 @@ module Savi::Parser::Builder
           "This character literal has more than one character in it"
       end
 
-      AST::LiteralCharacter.new(value.ord.to_i64).with_pos(state.pos(main))
+      AST::LiteralCharacter.new(value.ord.to_u64).with_pos(state.pos(main))
     when :heredoc
       value = state.slice(main)
       if (leading_space = value[/\A\r?\n[ \t]+/]?; leading_space)
@@ -97,12 +97,12 @@ module Savi::Parser::Builder
       string = state.slice(main)
       value =
         begin
-          string.to_u64(underscore: true)
+          string.to_u128(underscore: true)
         rescue
           begin
-            string.to_i64(underscore: true).to_i64
+            string.to_i128(underscore: true).to_i128
           rescue
-            string.to_u64(underscore: true, prefix: true)
+            string.to_u128(underscore: true, prefix: true)
           end
         end
       AST::LiteralInteger.new(value).with_pos(state.pos(main))
