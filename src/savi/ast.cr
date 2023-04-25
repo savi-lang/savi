@@ -1,7 +1,7 @@
 require "pegmatite"
 
 module Savi::AST
-  alias A = Nil | Symbol | String | UInt64 | Int64 | Float64 | Array(A)
+  alias A = Nil | Symbol | String | UInt128 | Int128 | Float64 | Array(A)
 
   class Visitor
     def visit_any?(ctx : Compiler::Context, node : Node)
@@ -331,10 +331,10 @@ module Savi::AST
   #                           ^    ^    ^    ^    ^    ^~
   class LiteralCharacter < Node
     property value
-    def initialize(@value : UInt64 | Int64)
+    def initialize(@value : UInt64)
     end
     def name; :char end
-    def to_a: Array(A); [name, value] of A end
+    def to_a: Array(A); [name, value.to_u128] of A end
   end
 
   # A LiteralInteger is an integer-appearing number in the source code,
@@ -352,7 +352,7 @@ module Savi::AST
   #                   ^~~
   class LiteralInteger < Node
     property value
-    def initialize(@value : UInt64 | Int64)
+    def initialize(@value : UInt128 | Int128)
     end
     def name; :integer end
     def to_a: Array(A); [name, value] of A end

@@ -11,6 +11,8 @@
     assert: U32[36].u32!   == 36
     assert: U32[36].u64    == 36
     assert: U32[36].u64!   == 36
+    assert: U32[36].u128   == 36
+    assert: U32[36].u128!  == 36
     assert: U32[36].usize  == 36
     assert: U32[36].usize! == 36
     assert: U32[36].i8     == 36
@@ -21,6 +23,8 @@
     assert: U32[36].i32!   == 36
     assert: U32[36].i64    == 36
     assert: U32[36].i64!   == 36
+    assert: U32[36].i128   == 36
+    assert: U32[36].i128!  == 36
     assert: U32[36].isize  == 36
     assert: U32[36].isize! == 36
     assert: U32[36].f32    == 36
@@ -37,6 +41,8 @@
     assert: I32[36].u32!   == 36
     assert: I32[36].u64    == 36
     assert: I32[36].u64!   == 36
+    assert: I32[36].u128   == 36
+    assert: I32[36].u128!  == 36
     assert: I32[36].usize  == 36
     assert: I32[36].usize! == 36
     assert: I32[36].i8     == 36
@@ -47,6 +53,8 @@
     assert: I32[36].i32!   == 36
     assert: I32[36].i64    == 36
     assert: I32[36].i64!   == 36
+    assert: I32[36].i128   == 36
+    assert: I32[36].i128!  == 36
     assert: I32[36].isize  == 36
     assert: I32[36].isize! == 36
     assert: I32[36].f32    == 36

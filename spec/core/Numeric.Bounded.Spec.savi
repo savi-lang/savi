@@ -7,11 +7,13 @@
     assert: U16  .zero == 0
     assert: U32  .zero == 0
     assert: U64  .zero == 0
+    assert: U128 .zero == 0
     assert: USize.zero == 0
     assert: I8   .zero == 0
     assert: I16  .zero == 0
     assert: I32  .zero == 0
     assert: I64  .zero == 0
+    assert: I128 .zero == 0
     assert: ISize.zero == 0
     assert: F32  .zero == 0
     assert: F64  .zero == 0
@@ -21,11 +23,13 @@
     assert: U16  .one == 1
     assert: U32  .one == 1
     assert: U64  .one == 1
+    assert: U128 .one == 1
     assert: USize.one == 1
     assert: I8   .one == 1
     assert: I16  .one == 1
     assert: I32  .one == 1
     assert: I64  .one == 1
+    assert: I128 .one == 1
     assert: ISize.one == 1
     assert: F32  .one == 1
     assert: F64  .one == 1
@@ -36,10 +40,12 @@
     assert: U16  .max_value == 0xffff
     assert: U32  .max_value == 0xffff_ffff
     assert: U64  .max_value == 0xffff_ffff_ffff_ffff
+    assert: U128 .max_value == 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff
     assert: I8   .max_value == 0x7f
     assert: I16  .max_value == 0x7fff
     assert: I32  .max_value == 0x7fff_ffff
     assert: I64  .max_value == 0x7fff_ffff_ffff_ffff
+    assert: U128 .max_value == 0x7fff_ffff_ffff_ffff_ffff_ffff_ffff_ffff
     if Platform.has_64bit_size (
       assert: USize.max_value == 0xffff_ffff_ffff_ffff
       assert: ISize.max_value == 0x7fff_ffff_ffff_ffff
@@ -53,10 +59,12 @@
     assert: U16  .min_value == 0
     assert: U32  .min_value == 0
     assert: U64  .min_value == 0
+    assert: U128 .min_value == 0
     assert: I8   .min_value == 0x80
     assert: I16  .min_value == 0x8000
     assert: I32  .min_value == 0x8000_0000
     assert: I64  .min_value == 0x8000_0000_0000_0000
+    assert: I128 .min_value == 0x8000_0000_0000_0000_0000_0000_0000_0000
     if Platform.has_64bit_size (
       assert: USize.min_value == 0
       assert: ISize.min_value == 0x8000_0000_0000_0000
