@@ -5,3 +5,4 @@ deps
 /build
 /build-in-docker
 /lib/libsavi_runtime*
+/.tool-versions
