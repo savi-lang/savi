@@ -905,13 +905,19 @@ class Savi::Compiler::CodeGen
         llvm_ffi_func,
         args,
       )
-      value = gen_none if llvm_ffi_func.return_type == @void
+      value = gen_none if llvm_ffi_func.ret_type == @void
       value
     when GenFunc::Errorable
       then_block = gen_block("invoke_then")
       else_block = gen_block("invoke_else")
-      value = @builder.invoke llvm_ffi_func, args, then_block, else_block
-      value = gen_none if llvm_ffi_func.return_type == @void
+      value = @builder.invoke(
+        llvm_ffi_func.function_type,
+        llvm_ffi_func,
+        args,
+        then_block,
+        else_block,
+      )
+      value = gen_none if llvm_ffi_func.ret_type == @void
 
       # In the else block, make a landing pad to catch the Pony-style error,
       # then raise the value "None" it as a Savi-style error.
@@ -1138,7 +1144,7 @@ class Savi::Compiler::CodeGen
             when 8 then llvm_type_of(gtype).const_int(0x80)
             when 16 then llvm_type_of(gtype).const_int(0x8000)
             when 32 then llvm_type_of(gtype).const_int(0x80000000)
-            when 64 then llvm_type_of(gtype).const_int(0x8000000000000000)
+            when 64 then llvm_type_of(gtype).const_int(0x8000000000000000u64)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           else
@@ -1155,7 +1161,7 @@ class Savi::Compiler::CodeGen
             when 8 then llvm_type_of(gtype).const_int(0x7f)
             when 16 then llvm_type_of(gtype).const_int(0x7fff)
             when 32 then llvm_type_of(gtype).const_int(0x7fffffff)
-            when 64 then llvm_type_of(gtype).const_int(0x7fffffffffffffff)
+            when 64 then llvm_type_of(gtype).const_int(0x7fffffffffffffffu64)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           else
@@ -1164,7 +1170,7 @@ class Savi::Compiler::CodeGen
             when 8 then llvm_type_of(gtype).const_int(0xff)
             when 16 then llvm_type_of(gtype).const_int(0xffff)
             when 32 then llvm_type_of(gtype).const_int(0xffffffff)
-            when 64 then llvm_type_of(gtype).const_int(0xffffffffffffffff)
+            when 64 then llvm_type_of(gtype).const_int(0xffffffffffffffffu64)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           end
@@ -1635,7 +1641,7 @@ class Savi::Compiler::CodeGen
         narrow_lsb = @builder.trunc(wide, narrow_type)
 
         # Return the two halves as a pair.
-        narrow_pair = gfunc.llvm_func.return_type.undef
+        narrow_pair = gfunc.llvm_func.ret_type.undef
         narrow_pair = @builder.insert_value(narrow_pair, narrow_msb, 0)
         narrow_pair = @builder.insert_value(narrow_pair, narrow_lsb, 1)
         narrow_pair

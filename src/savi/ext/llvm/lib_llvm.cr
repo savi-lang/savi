@@ -23,6 +23,7 @@ lib LibLLVM
   fun get_dll_storage_class = LLVMGetDLLStorageClass(global : ValueRef) : LLVM::DLLStorageClass
   fun set_dll_storage_class = LLVMSetDLLStorageClass(global : ValueRef, cls : LLVM::DLLStorageClass)
   fun remove_enum_attribute_at_index = LLVMRemoveEnumAttributeAtIndex(f : ValueRef, idx : AttributeIndex, kind : UInt32)
+  fun add_named_metadata_operand = LLVMAddNamedMetadataOperand(mod : ModuleRef, name : UInt8*, val : ValueRef)
 
   # Changes related to opaque pointers (LLVM 15).
   fun global_get_value_type = LLVMGlobalGetValueType(value : ValueRef) : TypeRef

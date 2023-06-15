@@ -21,7 +21,7 @@ class Savi::Compiler::Namespace
   end
 
   def main_type!(ctx); main_type?(ctx).not_nil! end
-  def main_type?(ctx): Program::Type::Link?
+  def main_type?(ctx) : Program::Type::Link?
     @types_by_package[ctx.root_package_link]["Main"]?.as(Program::Type::Link?)
   end
 

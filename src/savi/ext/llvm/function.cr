@@ -5,6 +5,10 @@ struct LLVM::Function
     Type.new LibLLVM.global_get_value_type self
   end
 
+  def ret_type
+    function_type.return_type
+  end
+
   def entry_block
     BasicBlock.new LibLLVM.get_entry_basic_block self
   end

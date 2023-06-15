@@ -30,10 +30,6 @@ class LLVM::Context
     if ret != 0 && msg
       raise LLVM.string_and_dispose(msg)
     end
-    {% if LibLLVM::IS_38 %}
-      Module.new(mod, "unknown", self)
-    {% else %} # LLVM >= 3.9
-      Module.new(mod, self)
-    {% end %}
+    Module.new(mod, self)
   end
 end

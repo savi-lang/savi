@@ -74,7 +74,7 @@ task:
           CLANG=/usr/local/bin/clang14 \
           CLANGXX=/usr/local/bin/clang++14"
       freebsd_instance:
-        image: freebsd-13-1-release-amd64
+        image: freebsd-13-2-release-amd64
         cpu: 2
         memory: 8G
 

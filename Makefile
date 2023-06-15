@@ -243,7 +243,7 @@ CRYSTAL_PATH?=$(shell env $(shell crystal env) printenv CRYSTAL_PATH | rev | cut
 lib/libsavi_runtime: $(MAKE_VAR_CACHE)/RUNTIME_BITCODE_RELEASE_URL
 	rm -rf $@-tmp
 	mkdir -p $@-tmp
-	cd $@-tmp && curl -L --fail -sS \
+	cd $@-tmp && curl -L --fail --retry 10 -sS \
 		"${RUNTIME_BITCODE_RELEASE_URL}/libsavi_runtime.tar.gz" \
 	| tar -xzvf -
 	rm -rf $@
@@ -257,7 +257,7 @@ lib/libsavi_runtime: $(MAKE_VAR_CACHE)/RUNTIME_BITCODE_RELEASE_URL
 $(BUILD)/llvm-static: $(MAKE_VAR_CACHE)/LLVM_STATIC_RELEASE_URL
 	rm -rf $@-tmp
 	mkdir -p $@-tmp
-	cd $@-tmp && curl -L --fail -sS \
+	cd $@-tmp && curl -L --fail --retry 10 -sS \
 		"${LLVM_STATIC_RELEASE_URL}/${LLVM_STATIC_PLATFORM}-llvm-static.tar.gz" \
 	| tar -xzvf -
 	rm -rf $@
@@ -268,7 +268,7 @@ $(BUILD)/llvm-static: $(MAKE_VAR_CACHE)/LLVM_STATIC_RELEASE_URL
 # See github.com/jemc-savi/CapnProto for more info.
 $(BUILD)/capnpc-savi: $(MAKE_VAR_CACHE)/CAPNPC_SAVI_DOWNLOAD_URL
 	rm -f $@-tmp
-	curl -L --fail -sS "${CAPNPC_SAVI_DOWNLOAD_URL}" | tar -C $(BUILD) -xzvf -
+	curl -L --fail --retry 10 -sS "${CAPNPC_SAVI_DOWNLOAD_URL}" | tar -C $(BUILD) -xzvf -
 	chmod a+x $@
 	touch $@
 
@@ -303,7 +303,7 @@ $(BUILD)/savi-release.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
-		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
+		crystal build -Duse_pcre $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
 			--release --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi compiler object file, based on the Crystal source code.
@@ -317,7 +317,7 @@ $(BUILD)/savi-debug.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
-		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
+		crystal build -Duse_pcre $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
 			--debug --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi specs object file, based on the Crystal source code.
@@ -331,7 +331,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
 		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
-		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
+		crystal build -Duse_pcre $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
 			--debug --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi compiler executable, by linking the above targets together.

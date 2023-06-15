@@ -120,7 +120,7 @@ module Savi::AST
     end
 
     def name; :doc end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       list.each { |x| res << x.to_a.as(A) }
       res
@@ -156,7 +156,7 @@ module Savi::AST
     end
 
     def name; :declare end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       res.concat(terms.map(&.to_a.as(A)))
       res.concat(nested.map(&.to_a.as(A)))
@@ -211,7 +211,7 @@ module Savi::AST
     end
 
     def name; :fun end
-    def to_a: Array(A); [
+    def to_a : Array(A); [
       cap.to_a,
       ident.to_a,
       params.try(&.to_a),
@@ -269,7 +269,7 @@ module Savi::AST
     def initialize(@value : String)
     end
     def name; :doc_string end
-    def to_a: Array(A); [name, value] of A end
+    def to_a : Array(A); [name, value] of A end
   end
 
   # An Identifier is any "bare word" in the source code, identifying something.
@@ -283,7 +283,7 @@ module Savi::AST
     def initialize(@value : String)
     end
     def name; :ident end
-    def to_a: Array(A); [name, value] of A end
+    def to_a : Array(A); [name, value] of A end
 
     # If this identifier is immediately dot-nested within the given outer
     # identifier, then return the nested portion as a new identifier.
@@ -319,7 +319,7 @@ module Savi::AST
     def initialize(@value : String, @prefix_ident : Identifier? = nil)
     end
     def name; :string end
-    def to_a: Array(A); [name, value, prefix_ident.try(&.to_a)] of A end
+    def to_a : Array(A); [name, value, prefix_ident.try(&.to_a)] of A end
   end
 
   # A LiteralCharacter is similar to a LiteralString, but it uses single-quotes
@@ -334,7 +334,7 @@ module Savi::AST
     def initialize(@value : UInt64 | Int64)
     end
     def name; :char end
-    def to_a: Array(A); [name, value] of A end
+    def to_a : Array(A); [name, value] of A end
   end
 
   # A LiteralInteger is an integer-appearing number in the source code,
@@ -355,7 +355,7 @@ module Savi::AST
     def initialize(@value : UInt64 | Int64)
     end
     def name; :integer end
-    def to_a: Array(A); [name, value] of A end
+    def to_a : Array(A); [name, value] of A end
   end
 
   # A LiteralFloat is a floating-point-appearing number in the source code,
@@ -370,7 +370,7 @@ module Savi::AST
     def initialize(@value : Float64)
     end
     def name; :float end
-    def to_a: Array(A); [name, value] of A end
+    def to_a : Array(A); [name, value] of A end
   end
 
   # A ComposeString is surrounded by double-quotes in source code much like
@@ -390,7 +390,7 @@ module Savi::AST
     def initialize(@terms = [] of Term, @prefix_ident : Identifier? = nil)
     end
     def name; :compose_string end
-    def to_a: Array(A); [name, *terms.map(&.to_a), prefix_ident.try(&.to_a)] of A end
+    def to_a : Array(A); [name, *terms.map(&.to_a), prefix_ident.try(&.to_a)] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @terms.each(&.accept(ctx, visitor))
     end
@@ -415,7 +415,7 @@ module Savi::AST
     def initialize(@value : String)
     end
     def name; :op end
-    def to_a: Array(A); [name, value] of A end
+    def to_a : Array(A); [name, value] of A end
   end
 
   # A Prefix is an AST node containing a single Term to which a single Operator
@@ -436,7 +436,7 @@ module Savi::AST
     end
 
     def name; :prefix end
-    def to_a: Array(A); [name, op.to_a, term.to_a] of A end
+    def to_a : Array(A); [name, op.to_a, term.to_a] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @op.accept(ctx, visitor)
       @term.accept(ctx, visitor)
@@ -470,7 +470,7 @@ module Savi::AST
     end
 
     def name; :qualify end
-    def to_a: Array(A); [name, term.to_a, group.to_a] of A end
+    def to_a : Array(A); [name, term.to_a, group.to_a] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @term.accept(ctx, visitor)
       @group.accept(ctx, visitor)
@@ -554,7 +554,7 @@ module Savi::AST
     end
 
     def name; :group end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       res << style
       terms.each { |x| res << x.to_a }
@@ -618,7 +618,7 @@ module Savi::AST
     end
 
     def name; :relate end
-    def to_a: Array(A); [name, lhs.to_a, op.to_a, rhs.to_a] of A end
+    def to_a : Array(A); [name, lhs.to_a, op.to_a, rhs.to_a] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @lhs.accept(ctx, visitor)
       @op.accept(ctx, visitor)
@@ -646,7 +646,7 @@ module Savi::AST
     def initialize(@value : String)
     end
     def name; :field_r end
-    def to_a: Array(A); [name, value] of A end
+    def to_a : Array(A); [name, value] of A end
   end
 
   # A FieldWrite node indicates a value being written to a particular field.
@@ -660,7 +660,7 @@ module Savi::AST
     end
 
     def name; :field_w end
-    def to_a: Array(A); [name, value, rhs.to_a] of A end
+    def to_a : Array(A); [name, value, rhs.to_a] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @rhs.accept(ctx, visitor)
     end
@@ -685,7 +685,7 @@ module Savi::AST
     end
 
     def name; :field_x end
-    def to_a: Array(A); [name, value, rhs.to_a] of A end
+    def to_a : Array(A); [name, value, rhs.to_a] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @rhs.accept(ctx, visitor)
     end
@@ -727,7 +727,7 @@ module Savi::AST
     end
 
     def name; :call end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       res << receiver.to_a
       res << ident.to_a
@@ -783,7 +783,7 @@ module Savi::AST
     end
 
     def name; :choice end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       list.each { |cond, body| res << [cond.to_a, body.to_a] of A}
       res
@@ -834,7 +834,7 @@ module Savi::AST
     end
 
     def name; :loop end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       res << initial_cond.to_a
       res << body.to_a
@@ -884,7 +884,7 @@ module Savi::AST
     end
 
     def name; :try end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       res << body.to_a
       res << else_body.to_a
@@ -928,7 +928,7 @@ module Savi::AST
     end
 
     def name; :yield end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       res.concat(terms.map(&.to_a.as(A)))
       res
@@ -968,7 +968,7 @@ module Savi::AST
     end
 
     def name; :jump end
-    def to_a: Array(A)
+    def to_a : Array(A)
       res = [name] of A
       res << kind.to_s.downcase
       res << term.to_a
