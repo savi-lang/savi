@@ -186,7 +186,7 @@ class Savi::Compiler::Binary
 
     link_args << "-lc" << "-ldl" << "-lpthread" << "-lm"
     link_args << "-latomic" unless target.freebsd? || target.dragonfly?
-    link_args << "-lexecinfo" if target.musl? || target.freebsd? || target.dragonfly?
+    link_args << "-lexecinfo" if target.freebsd? || target.dragonfly?
 
     # Link the C++ runtime if needed.
     if ctx.link_cpp_files.any?
