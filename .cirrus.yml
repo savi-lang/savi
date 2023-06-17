@@ -35,12 +35,12 @@ task:
           apk add --no-cache --update \
             bash curl alpine-sdk coreutils \
             gcc g++ clang make linux-headers llvm-dev zlib-static \
-            pcre-dev libevent-static gc-dev crystal shards libexecinfo-dev"
+            pcre-dev libevent-static gc-dev crystal shards"
         # For some reason clang doesn't like it if we omit the "alpine" vendor
         # in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
         MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=x86_64-alpine-linux-musl
       container:
-        image: alpine:3.16
+        image: alpine:3.18
         cpu: 2
         memory: 8G
 
@@ -51,13 +51,13 @@ task:
           apk add --no-cache --update \
             bash curl alpine-sdk coreutils \
             gcc g++ clang make linux-headers llvm-dev zlib-static \
-            pcre-dev libevent-static gc-dev crystal shards libexecinfo-dev"
+            pcre-dev libevent-static gc-dev crystal shards"
         # For some reason clang doesn't like it if we omit the "alpine" vendor
         # in the triple, where we'd otherwise use `arm64-unknown-linux-musl`.
         # We also need to use `aarch64` instead of `arm64` here...
         MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=aarch64-alpine-linux-musl
       arm_container:
-        image: alpine:3.16
+        image: alpine:3.18
         cpu: 2
         memory: 8G
 

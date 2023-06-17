@@ -297,6 +297,21 @@
     assert: indices    == [20,  19,  16,  13,  10,   7,   4,   1,   0]
     assert: widths     == [1,    1,   3,   3,   3,   3,   3,   3,   1]
 
+  :it "replaces all occurrences of a substring with an equal-length string"
+    assert: "AA--BB--CC-DD---EE----FF--GG".clone.replace_all(
+      "--", ".."
+    ) == "AA..BB..CC-DD..-EE....FF..GG"
+
+  :it "replaces all occurrences of a substring with a longer string"
+    assert: "AA--BB--CC-DD---EE----FF--GG".clone.replace_all(
+      "--", "...."
+    ) == "AA....BB....CC-DD....-EE........FF....GG"
+
+  :it "replaces all occurrences of a substring with a shorter string"
+    assert: "AA----BB----CC---DD-----EE--------FF----GG".clone.replace_all(
+      "----", ".."
+    ) == "AA..BB..CC---DD..-EE....FF..GG"
+
   :it "joins an array of strings"
     assert: String.join([
       "foo"
@@ -319,3 +334,35 @@
     assert: "foo=".split2!('=').second == ""
 
     assert error: "foo".split2!('=')
+
+  :it "finds the end of leading whitespace at the start of the string"
+    assert: "  \t\t\f\f\v\v\r\r\n\nFOO".leading_whitespace_index == 12
+    assert: "  \t\t\f\f\v\v\r\r\n\n".leading_whitespace_index == 12
+    assert: "  FOO".leading_whitespace_index == 2
+    assert: "FOO".leading_whitespace_index == 0
+    assert: "".leading_whitespace_index == 0
+
+  :it "finds the end of leading whitespace from somewhere in the string"
+    assert: "  ...  \t\t\f\f\v\v\r\r\n\nFOO".leading_whitespace_index(5) == 17
+    assert: "  ...  \t\t\f\f\v\v\r\r\n\n".leading_whitespace_index(5) == 17
+    assert: "  ...  FOO".leading_whitespace_index(5) == 7
+    assert: "  ...  FOO".leading_whitespace_index(6) == 7
+    assert: "  ...  FOO".leading_whitespace_index(7) == 7
+    assert: "  ...  FOO".leading_whitespace_index(8) == 8
+    assert: "  ...FOO".leading_whitespace_index(5) == 5
+    assert: "  ...".leading_whitespace_index(5) == 5
+
+  :it "finds the end of trailing whitespace at the end of the string"
+    assert: "FOO  \t\t\f\f\v\v\r\r\n\n".trailing_whitespace_index == 3
+    assert: "  \t\t\f\f\v\v\r\r\n\n".trailing_whitespace_index == 0
+    assert: "FOO  ".trailing_whitespace_index == 3
+    assert: "FOO".trailing_whitespace_index == 3
+    assert: "".trailing_whitespace_index == 0
+
+  :it "finds the end of trailing whitespace from somewhere in the string"
+    assert: "FOO  \t\t\f\f\v\v\r\r\n\n...  ".trailing_whitespace_index(12) == 3
+    assert: "FOO  ...  ".trailing_whitespace_index(5) == 3
+    assert: "FOO  ...  ".trailing_whitespace_index(4) == 3
+    assert: "FOO  ...  ".trailing_whitespace_index(3) == 3
+    assert: "FOO  ...  ".trailing_whitespace_index(2) == 2
+    assert: "...  ".trailing_whitespace_index(0) == 0
