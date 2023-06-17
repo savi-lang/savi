@@ -22,11 +22,11 @@
 
   :new (space USize = 0)
     @_size = 0
-    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
+    if space > 0 (@_ptr_allocate(space) | @_ptr_set_null)
 
   :new iso new_iso(space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
-    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
+    if space > 0 (@_ptr_allocate(space) | @_ptr_set_null)
 
   :fun size: @_size
   :fun space: @_space
@@ -43,7 +43,7 @@
     from = from.at_most(to)
     size = to - from
 
-    space = if (to == @_size) (
+    space = if to == @_size (
       // If our new final address lines up with the current final address,
       // then we can keep any extra bytes allocated beyond the current size.
       // We'll only trim off the left side.
@@ -54,7 +54,7 @@
       size
     )
 
-    ptr = if (space == 0) (
+    ptr = if space == 0 (
       // If the new allocation space is zero, use a null pointer to avoid issue.
       CPointer(A)._null
     |
@@ -69,7 +69,7 @@
     from = from.at_most(to)
     size = to - from
 
-    if (to == @_size) (
+    if to == @_size (
       // If our new final address lines up with the current final address,
       // then we can keep any extra bytes allocated beyond the current size.
       // We'll only trim off the left side.
@@ -82,7 +82,7 @@
 
     @_size = size
 
-    if (@_space == 0) (
+    if @_space == 0 (
       // If the new allocation space is zero, use a null pointer to avoid issue.
       @_ptr = CPointer(A)._null
     |
@@ -96,7 +96,7 @@
   :: The size (number of actual elements present in the array) does not change.
 
   :fun ref reserve(space USize)
-    if (@_space < space) \
+    if @_space < space \
       @_ptr_reallocate(space)
     @
 
@@ -106,7 +106,7 @@
   :: if the element type isn't aliasable, the cloned array will be empty.
 
   :fun clone @'iso
-    if (A <: alias) (
+    if A <: alias (
       array = @new_iso(@size)
       _ptr_tag CPointer(A)'tag = @_ptr // TODO: this indirection shouldn't be needed
       array._clone_from(_ptr_tag, @size)
@@ -120,15 +120,15 @@
     other_ptr._unsafe._copy_to(@_ptr, size)
 
   :fun "[]!"(index) @->(A'aliased)
-    if (@size <= index) error!
+    if @size <= index error!
     @_ptr._get_at(index)
 
   :fun ref "[]=!"(index, value)
-    if (@size <= index) error!
+    if @size <= index error!
     @_ptr._assign_at(index, --value)
 
   :fun ref "[]<<=!"(index, value)
-    if (@size <= index) error!
+    if @size <= index error!
     @_ptr._displace_at(index, --value)
 
   :fun ref "<<"(value): @push(--value)
@@ -145,13 +145,13 @@
   :: Return the first element in the array.
   :: Raises an error if the array is empty.
   :fun first! @->(A'aliased)
-    error! if (@size == 0)
+    error! if @size == 0
     @_ptr._get_at(0)
 
   :: Assign the given value to replace the first element in the array.
   :: Raises an error if the array is empty.
   :fun ref "first=!"(value A)
-    error! if (@size == 0)
+    error! if @size == 0
     @_ptr._assign_at(0, --value)
 
   :: Return the last element in the array.
@@ -170,8 +170,8 @@
     // value/identity instead of structural equality (e.g. Array(U8))
     equal_so_far = (@size == other.size)
     index USize = 0
-    while (equal_so_far && index < @_size) (
-      equal_so_far = if (A <: Equatable(A)'read) (
+    while equal_so_far && index < @_size (
+      equal_so_far = if A <: Equatable(A)'read (
         @_ptr._get_at(index) == other._ptr._get_at(index)
       |
         @_ptr._get_at(index) === other._ptr._get_at(index)
@@ -182,7 +182,7 @@
 
   :fun ref replace_at!(index)
     :yields A for A
-    error! if (@size <= index)
+    error! if @size <= index
 
     new_value = yield @_ptr._get_at_no_alias(index)
     new_value_alias = new_value
@@ -197,13 +197,13 @@
   :: Elements at all later indexes will be shifted one index to make room
   :: for the insertion of the new element.
   :fun ref insert_at!(index, value)
-    error! if (@_size < index)
+    error! if @_size < index
 
     // Make sure the buffer is large enough to hold another element.
     @reserve(@_size + 1)
 
     // Copy the tail of later elements forward, to make room for the element.
-    if (@_size > index) (
+    if @_size > index (
       tail_size = @size - index
       @_ptr._offset(index)._copy_to(@_ptr._offset(index + 1), tail_size)
     )
@@ -222,10 +222,10 @@
   ::
   :: If you want to return the removed element, use `remove_at!` instead.
   :fun ref delete_at!(index)
-    error! if (@size <= index)
+    error! if @size <= index
     tail_size = @size - index - 1
 
-    if (tail_size > 0) (
+    if tail_size > 0 (
       @_ptr._offset(index + 1)._copy_to(@_ptr._offset(index), tail_size)
     )
 
@@ -240,11 +240,11 @@
   ::
   :: If you want to discard the removed element, use `delete_at!` instead.
   :fun ref remove_at!(index) A
-    error! if (@size <= index)
+    error! if @size <= index
     element = @_ptr._get_at_no_alias(index)
     tail_size = @size - index - 1
 
-    if (tail_size > 0) (
+    if tail_size > 0 (
       @_ptr._offset(index + 1)._copy_to(@_ptr._offset(index), tail_size)
     )
 
@@ -257,7 +257,7 @@
     stride USize = 1
   )
     index = from
-    while (index < to.at_most(@_size)) (
+    while index < to.at_most(@_size) (
       yield (@_ptr._get_at(index), index)
       index += stride
     )
@@ -270,7 +270,7 @@
   )
     try (
       index USize = from.at_most(@_size) -! 1
-      while (index >= to) (
+      while index >= to (
         yield (@_ptr._get_at(index), index)
         index = index.at_most(@_size) -! stride
       )
@@ -290,8 +290,8 @@
     // False
     is_found = False
     index USize = 0
-    while (!is_found && index < @_size) (
-      is_found = if (A <: Equatable(A)'read) (
+    while !is_found && index < @_size (
+      is_found = if A <: Equatable(A)'read (
         @_ptr._get_at(index) == expected
       |
         @_ptr._get_at(index) === expected
@@ -329,13 +329,13 @@
     if @_sort_in_place(0, @size.isize - 1) (@ | @clear)
 
   :fun ref _sort_in_place(lo_pivot ISize, hi_pivot ISize) Bool // TODO: should be actually private
-    if (A <: Comparable(A)'read) (
-      if (lo_pivot < hi_pivot) (
+    if A <: Comparable(A)'read (
+      if lo_pivot < hi_pivot (
         // Choose the outermost elements as pivots, ensuring that the higher
         // of the two is on the right, swapping to make it so if needed.
         lo_pivot_value = @_ptr._get_at(lo_pivot.usize)
         hi_pivot_value = @_ptr._get_at(hi_pivot.usize)
-        if (lo_pivot_value > hi_pivot_value) (
+        if lo_pivot_value > hi_pivot_value (
           @_ptr._assign_at(lo_pivot.usize, hi_pivot_value)
           @_ptr._assign_at(hi_pivot.usize, lo_pivot_value)
           lo_pivot_value = @_ptr._get_at(lo_pivot.usize)
@@ -350,7 +350,7 @@
         scan = lo
 
         // Scan the range, swapping as necessary.
-        while (scan <= hi) (scan_value = @_ptr._get_at(scan.usize)
+        while scan <= hi (scan_value = @_ptr._get_at(scan.usize)
           case (
           // When we scan a value less than our pivot, swap the value downward.
           | scan_value < lo_pivot_value |
@@ -360,7 +360,7 @@
           // When we scan a value greater than our pivot, swap the value upward.
           | scan_value >= hi_pivot_value |
             // First move `hi` cursor until it's greater than the `hi_pivot`.
-            while (@_ptr._get_at(hi.usize) > hi_pivot_value && scan < hi) (
+            while @_ptr._get_at(hi.usize) > hi_pivot_value && scan < hi (
               hi -= 1
             )
 
@@ -371,7 +371,7 @@
             // Possibly swap the just-swapped value downward if it needs to be.
             // Note that `scan_value` here is the previous `hi` value.
             scan_value = @_ptr._get_at(scan.usize)
-            if (scan_value < lo_pivot_value) (
+            if scan_value < lo_pivot_value (
               @_ptr_swap(scan.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
               lo += 1
             )
@@ -398,8 +398,8 @@
     )
 
   :fun ref swap!(index_1, index_2)
-    error! if (@size <= index_1)
-    error! if (@size <= index_2)
+    error! if @size <= index_1
+    error! if @size <= index_2
     @_ptr_swap(index_1, index_2)
 
   :fun ref _ptr_swap(index_1 USize, index_2 USize)

@@ -1,0 +1,5 @@
+:actor Main
+  :new (env Env)
+    Spec.Process.run(env, [
+      Spec.Run(Bar.Spec).new(env)
+    ])

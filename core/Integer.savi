@@ -376,7 +376,7 @@
   :is Integer.Countable(@)
   :fun val times
     i = @zero
-    while (i < @) (
+    while i < @ (
       yield i
       i = i + @one
     )
@@ -404,7 +404,7 @@
 
   // TODO: explicit conformance to a particular trait for `hash`
   :fun hash USize
-    if (USize.bit_width == 32) (
+    if USize.bit_width == 32 (
       x = @usize
       x = x.invert + x.bit_shl(15)
       x = x.bit_xor(x.bit_shr(12))

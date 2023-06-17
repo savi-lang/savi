@@ -34,7 +34,7 @@ Nested groups should be indented correctly.
     .baz(
     1
     2
-  if (x > 5) (0 |
+  if x > 5 (0 |
 x <<= 0
   )
     )
@@ -73,7 +73,7 @@ x <<= 0
             .baz(
               1
               2
-              if (x > 5) (0 |
+              if x > 5 (0 |
                 x <<= 0
               )
             )

@@ -609,7 +609,13 @@ module Savi::AST
     property lhs
     property op
     property rhs
+    property is_assign = false
     def initialize(@lhs : Term, @op : Operator, @rhs : Term)
+    end
+
+    def with_assign_flag
+      @is_assign = true
+      self
     end
 
     def span_pos(source)

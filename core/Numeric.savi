@@ -565,11 +565,11 @@
   :fun ">="(other @'box) Bool: compiler intrinsic
   :fun val negate: @zero - @
   :fun val is_zero Bool: @ == @zero
-  :fun val at_least(minimum @) @: if (@ > minimum) (@ | minimum)
-  :fun val at_most(maximum @) @: if (@ < maximum) (@ | maximum)
+  :fun val at_least(minimum @) @: if @ > minimum (@ | minimum)
+  :fun val at_most(maximum @) @: if @ < maximum (@ | maximum)
   :fun val max(other @) @: @at_least(other)
   :fun val min(other @) @: @at_most(other)
-  :fun val abs: if (@is_signed && @ < @zero) (@zero - @ | @)
+  :fun val abs: if @is_signed && @ < @zero (@zero - @ | @)
 
 :: The standard 8-bit unsigned integer numeric type.
 :: This type is often used to represent a byte.

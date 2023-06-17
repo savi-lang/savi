@@ -1,0 +1,6 @@
+:class Bar.Spec
+  :is Spec
+  :const describes: "Bar"
+
+  :it "has a placeholder method for demonstrating testing"
+    assert: Bar.placeholder == True

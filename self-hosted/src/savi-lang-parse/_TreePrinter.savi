@@ -8,8 +8,8 @@
     parent_token = try (@[parent_index]! | return 0)
     sep = parent_token.start
     @tokens.each_with_index(parent_index + 1) -> (token, index |
-      break if (token.start >= parent_token.end)
-      next unless (token.start >= sep)
+      break if token.start >= parent_token.end
+      next unless token.start >= sep
       sep = token.end
       yield (token, index)
     )
@@ -35,7 +35,7 @@
     children_count = data.count_children_of(index)
 
     indent.times -> (@out << "  ")
-    if (children_count > 0) (
+    if children_count > 0 (
       @out << "\(token.kind)(\(children_count)):\n"
     |
       @out << "\(token.kind)\n"

@@ -358,7 +358,7 @@
   ) String.DecodeUTF8.State
     byte_class = @_byte_class_table(byte)
 
-    codepoint = if (state._current == 0) (
+    codepoint = if state._current == 0 (
       // When state is zero, this is considered to be an initial byte,
       // so we need to determine its type and mask it appropriately.
       // The UTF-8 encoding specification defines different data mask sizes
@@ -374,7 +374,7 @@
 
     // Errors are indicated by the value 12 in the state table.
     state_next = @_state_table(byte_class, state._current)
-    error! if (state_next == 12)
+    error! if state_next == 12
 
     String.DecodeUTF8.State._new(codepoint, state_next)
 
@@ -400,7 +400,7 @@
 
     // Errors are indicated by the value 12 in the state table.
     state_next = @_reverse_state_table(byte_class, state._current)
-    error! if (state_next == 12)
+    error! if state_next == 12
 
     codepoint = state.codepoint
     shift_amount = state._shift_amount
@@ -409,7 +409,7 @@
       shift_amount = 0
     )
 
-    if (state_next == 0) (
+    if state_next == 0 (
       mask = U8[0xff].bit_shr(byte_class)
       codepoint = byte.bit_and(mask).u32.bit_shl(shift_amount).bit_or(codepoint)
     |

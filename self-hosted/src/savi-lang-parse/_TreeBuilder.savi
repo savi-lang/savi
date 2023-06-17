@@ -22,7 +22,7 @@
     token = try (data[index]! | return)
 
     // Confirm the initial token type.
-    if (token.kind != _Token.Document) (
+    if token.kind != _Token.Document (
       @error.at(token, _Error.BugInitialTokenIsNotDocument)
       return
     )
@@ -161,7 +161,7 @@
     first_byte = data.get_first_byte(token)
     last_byte = data.get_last_byte(token)
     group.has_exclamation = last_byte == '!'
-    group.style = if (token.kind == _Token.GroupWhitespace) (
+    group.style = if token.kind == _Token.GroupWhitespace (
       SaviProto.AST.Group.Style.Space
     |
       case first_byte == (
@@ -210,7 +210,7 @@
     // When that happens, the outer token disappears and we keep only the child.
     if (children_count == 1 && (
       token.kind == _Token.Relate ||
-      token.kind == _Token.RelateRight ||
+      token.kind == _Token.RelateAssign ||
       token.kind == _Token.Compound
     )) (
       data.each_child_with_index_of(index) -> (child_token, child_index |
@@ -227,14 +227,14 @@
       ast.init_name(data.get_string(token))
 
     | _Token.String |
-      if (children_count == 0) (
+      if children_count == 0 (
         ast.init_string(data.get_string(token))
       |
         @error.at(token, _Error.ToDoComposeString)
       )
 
     | _Token.BracketString |
-      if (children_count == 0) (
+      if children_count == 0 (
         ast.init_string(
           _StringLiterals.process_bracket_string_indentation(data.get_string(token))
         )
@@ -244,7 +244,7 @@
 
     | _Token.PrefixedString |
       try (
-        error! if (children_count != 2)
+        error! if children_count != 2
 
         string_with_prefix = ast.init_string_with_prefix
 
@@ -310,9 +310,9 @@
       child_token = child_info.head, child_index = child_info.tail
       @_build_ast(prefix.term, data, child_token, child_index)
 
-    | _Token.RelateRight |
+    | _Token.RelateAssign |
       child_number USize = 0
-      while (child_number < children_count) (
+      while child_number < children_count (
         child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
         child_token = child_info.head, child_index = child_info.tail
 
@@ -329,7 +329,7 @@
           child_number += 1
           child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
           child_token = child_info.head, child_index = child_info.tail
-          if (child_token.kind != _Token.Operator) (
+          if child_token.kind != _Token.Operator (
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )
@@ -349,7 +349,7 @@
 
     | _Token.Relate |
       child_number = children_count
-      while (child_number > 0) (
+      while child_number > 0 (
         child_number -= 1
         child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
         child_token = child_info.head, child_index = child_info.tail
@@ -366,7 +366,7 @@
           child_number -= 1
           child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
           child_token = child_info.head, child_index = child_info.tail
-          if (child_token.kind != _Token.Operator) (
+          if child_token.kind != _Token.Operator (
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )
@@ -384,7 +384,7 @@
 
     | _Token.Compound |
       child_number = children_count
-      while (child_number > 0) (
+      while child_number > 0 (
         child_number -= 1
         child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
         child_token = child_info.head, child_index = child_info.tail
@@ -407,7 +407,7 @@
           child_number -= 1
           child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
           child_token = child_info.head, child_index = child_info.tail
-          if (child_token.kind != _Token.Operator) (
+          if child_token.kind != _Token.Operator (
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )

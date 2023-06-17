@@ -5,24 +5,24 @@
   :fun check(string String) String
     forward = @check_forward(string)
     reverse = @check_reverse(string)
-    return forward if (forward == reverse)
+    return forward if forward == reverse
 
     "\(forward); reverse is \(reverse)"
 
   :fun check_forward(string String) String
     string.each_char_with_index_and_width -> (codepoint, index, width |
-      return "invalid at byte \(index + width - 1)" if (codepoint == 0xfffd)
+      return "invalid at byte \(index + width - 1)" if codepoint == 0xfffd
       return "non-zero start index: \(index)" if index.is_nonzero
-      return "\(codepoint.format.hex) (\(width) byte\(if (width != 1) "s"))"
+      return "\(codepoint.format.hex) (\(width) byte\(if width != 1 "s"))"
       None // TODO: this shouldn't be needed
     )
     "no codepoint?"
 
   :fun check_reverse(string String) String
     string.reverse_each_char_with_index_and_width -> (codepoint, index, width |
-      return "invalid at byte \(index)" if (codepoint == 0xfffd)
+      return "invalid at byte \(index)" if codepoint == 0xfffd
       return "non-zero start index: \(index)" if index.is_nonzero
-      return "\(codepoint.format.hex) (\(width) byte\(if (width != 1) "s"))"
+      return "\(codepoint.format.hex) (\(width) byte\(if width != 1 "s"))"
       None // TODO: this shouldn't be needed
     )
     "no codepoint?"

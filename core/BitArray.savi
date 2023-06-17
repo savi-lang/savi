@@ -51,11 +51,11 @@
 
   :new (space USize = 0)
     @_size = 0
-    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
+    if space > 0 (@_ptr_allocate(space) | @_ptr_set_null)
 
   :new iso new_iso(space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
-    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
+    if space > 0 (@_ptr_allocate(space) | @_ptr_set_null)
 
   :fun size: @_size
   :fun space: @_space
@@ -70,7 +70,7 @@
   :: Reserve enough total space for the given number of bits.
   :: The size (number of actual bits present in the array) does not change.
   :fun ref reserve(space USize)
-    if (@_space < space) @_ptr_reallocate(space)
+    if @_space < space @_ptr_reallocate(space)
     @
 
   :: Create a clone of this bit array, containing all of the same bit values.
@@ -92,15 +92,15 @@
     Array(U64).val_from_cpointer(@_ptr._unsafe, @_u64_space, @_u64_space)
 
   :fun "[]!"(index)
-    error! if (@size <= index)
+    error! if @size <= index
     @_ptr_get_at(index)
 
   :fun ref "[]=!"(index, value)
-    error! if (@size <= index)
+    error! if @size <= index
     @_ptr_assign_at(index, value)
 
   :fun ref "[]<<=!"(index, value)
-    error! if (@size <= index)
+    error! if @size <= index
     @_ptr_displace_at(index, value)
 
   :fun ref "<<"(value): @push(value)
@@ -117,13 +117,13 @@
   :: Return the first bit in the bit array.
   :: Raises an error if the bit array is empty.
   :fun first!
-    error! if (@size == 0)
+    error! if @size == 0
     @_ptr._get_at(0)
 
   :: AssigU64 the given value to replace the first bit in the bit array.
   :: Raises an error if the bit array is empty.
   :fun ref "first=!"(value)
-    error! if (@size == 0)
+    error! if @size == 0
     @_ptr._assign_at(0, value)
 
   :: Return the last bit in the bit array.
@@ -147,7 +147,7 @@
   )
     to = @_size.at_most(to)
     index = from
-    while (index < to.at_most(@_size)) (
+    while index < to.at_most(@_size) (
       yield (@_ptr_get_at(index), index)
       index += stride
     )
@@ -160,7 +160,7 @@
   )
     try (
       index USize = from.at_most(@_size) -! 1
-      while (index >= to) (
+      while index >= to (
         yield (@_ptr_get_at(index), index)
         index = index.at_most(@_size) -! stride
       )
@@ -168,8 +168,8 @@
     None
 
   :fun ref swap!(index_1, index_2)
-    error! if (@size <= index_1)
-    error! if (@size <= index_2)
+    error! if @size <= index_1
+    error! if @size <= index_2
     @_ptr_swap(index_1, index_2)
 
   :fun ref _ptr_swap(index_1 USize, index_2 USize)
@@ -189,14 +189,14 @@
   :: in that last bit index position should now check it at its new position,
   :: which is the bit index that had its value deleted by this operation.
   :fun ref delete_by_moving_last!(index)
-    error! if (index >= @_size)
+    error! if index >= @_size
 
     // The number of bits will decrease by one.
     @_size -= 1
 
     // If the index we wanted to remove was the last index,
     // there's nothing left to do - it was removed by changing the size.
-    return if (index == @_size)
+    return if index == @_size
 
     // Otherwise we need to grab the value from the last index
     // and assign it to the position of the value we are deleting.

@@ -115,7 +115,7 @@
     // TODO: allow the caller to specify space?
     new_array = Array((@->A)'aliased).new
     @each(from, to, stride) -> (value |
-      if (yield value) (new_array << value)
+      if (yield value) new_array << value
     )
     new_array
 
@@ -129,6 +129,6 @@
     // TODO: allow the caller to specify space?
     new_array = Array((@->A)'aliased).new
     @each(from, to, stride) -> (value |
-      if (yield value).is_false (new_array << value)
+      if (yield value).is_false new_array << value
     )
     new_array

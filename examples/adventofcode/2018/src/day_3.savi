@@ -37,9 +37,9 @@
     cloth Array(Array(U64)) = []
     claims.each -> (claim |
       // Make sure the number of rows and width of rows is enough for the claim.
-      while (cloth.size <= (claim.top + claim.height)) (cloth << [])
+      while cloth.size <= (claim.top + claim.height) cloth << []
       cloth.each -> (row |
-        while (row.size <= (claim.left + claim.width)) (row << 0)
+        while row.size <= (claim.left + claim.width) row << 0
       )
 
       // Place the claims on the cloth.
@@ -64,7 +64,7 @@
     overlap_count USize = 0
     cloth.each -> (row |
       row.each -> (cell |
-        if (cell > 1) (overlap_count += 1)
+        if cell > 1 (overlap_count += 1)
       )
     )
     overlap_count
@@ -80,7 +80,7 @@
         claim.height.times -> (i | i += claim.top
           claim.width.times -> (j | j += claim.left
             // If this cell in the cloth has overlap, error out of the loops.
-            if (cloth[i]![j]! > 1) error!
+            if cloth[i]![j]! > 1 error!
           )
         )
         // If we get to this point, we know we've found an overlap-free claim.
@@ -89,7 +89,7 @@
     )
 
     // We expect exactly one claim to meet the criteria.
-    if (found_ids.size > 1) (
+    if found_ids.size > 1 (
       env.err.print("warning: found multiple overlap-free claims")
     )
     try (found_ids[0]! | "")

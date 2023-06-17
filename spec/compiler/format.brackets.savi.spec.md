@@ -103,7 +103,7 @@ Whitespace-grouped macros should not have unnecessary parens around their terms.
       error!
     ) // these multi-line parens are acceptable for readability
 
-    if (@size == 0) (yield False) // these are necessary in a whitespace group
+    if (@size == 0) (yield False) // only the latter parens are necessary here
     if (((@size == 0))) (((yield False)))
 ```
 ```savi format.NoUnnecessaryParens
@@ -113,8 +113,8 @@ Whitespace-grouped macros should not have unnecessary parens around their terms.
       error!
     ) // these multi-line parens are acceptable for readability
 
-    if (@size == 0) (yield False) // these are necessary in a whitespace group
-    if (@size == 0) (yield False)
+    if @size == 0 (yield False) // only the latter parens are necessary here
+    if @size == 0 (yield False)
 ```
 
 ---
@@ -126,12 +126,12 @@ Relation terms should not have unnecessary parens, except to disambiguate.
     x = (((y > 0)))
     x = ((((((y))) > 0)))
     x = (((y + 1) * 2) + 3)
-    x = (if (y > 0) (y + 1))
+    x = (if (y > 0) (y + 1 | y - 1))
 ```
 ```savi format.NoUnnecessaryParens
     x = y
     x = (y > 0)
     x = (y > 0)
     x = (((y + 1) * 2) + 3)
-    x = if (y > 0) (y + 1)
+    x = if y > 0 (y + 1 | y - 1)
 ```

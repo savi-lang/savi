@@ -222,22 +222,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
   def visit_pre(ctx, node : AST::Relate)
     lhs = node.lhs
 
-    if lhs.is_a?(AST::Group) && lhs.style == " " && Util.match_ident?(lhs, 0, "case")
-      term = lhs.terms[1]
-      Error.at term,
-        "Expected this term to not be a parenthesized group" \
-          if term.is_a?(AST::Group) && (term.style == "(" || term.style == "|")
-
-      group = node.rhs
-      Error.at group,
-        "Expected this term to be a parenthesized group of cases to check,\n" \
-        "  partitioned into sections by `|`, in which each body section\n" \
-        "  is preceded by a condition section to be evaluated as a Bool,\n" \
-        "  with an optional else body section at the end" \
-          unless group.is_a?(AST::Group) && group.style == "|"
-
-      visit_case(node)
-    elsif lhs.is_a?(AST::Identifier) && lhs.value == "assert" && node.op.value == ":"
+    if lhs.is_a?(AST::Identifier) && lhs.value == "assert" && node.op.value == ":"
       visit_assert(node, node.rhs)
     elsif node.op.value == ":" &&
           lhs.is_a?(AST::Group) &&
@@ -409,6 +394,10 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     orig = node.terms[0]
     group = node.terms[1]
 
+    if group.is_a?(AST::Relate)
+      return visit_case_relate(orig, group)
+    end
+
     Error.at group,
       "Expected this term to be a parenthesized group of cases to check,\n" \
       "  partitioned into sections by `|`, in which each body section\n" \
@@ -446,11 +435,17 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     ] of AST::Term).from(node)
   end
 
-  def visit_case(node : AST::Relate)
-    term = node.lhs.as(AST::Group).terms[1]
+  def visit_case_relate(orig : AST::Node, node : AST::Relate)
+    term = node.lhs
     op = node.op
-    group = node.rhs.as(AST::Group)
-    orig = group.terms[0]
+
+    group = node.rhs
+    Error.at group,
+      "Expected this term to be a parenthesized group of cases to check,\n" \
+      "  partitioned into sections by `|`, in which each body section\n" \
+      "  is preceded by a condition section to be evaluated as a Bool,\n" \
+      "  with an optional else body section at the end" \
+        unless group.is_a?(AST::Group) && group.style == "|"
 
     # If the term is not a simple identifier, use a hygienic local to \
     # hold the value resulting from the term so that we can refer to it

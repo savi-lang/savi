@@ -97,7 +97,7 @@
   :fun _emit_ascii(out String'ref, byte_address USize) None
     try (
       byte = @_value[byte_address]!
-      if (byte > 0x20 && byte < 0x7f) (
+      if byte > 0x20 && byte < 0x7f (
         out.push_byte(byte)
       |
         out.push_byte('.')

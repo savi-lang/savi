@@ -188,7 +188,7 @@ class Savi::AST::Format < Savi::AST::Visitor
         # Parens for readability are acceptable when they are multi-line.
         next unless term.pos.single_line?
 
-        # Parens are necessary when there is more than one term inside.
+        # Parens may be necessary only when there is more than one term inside.
         next unless term.terms.size == 1
         term_term = term.terms.first
 
@@ -202,8 +202,8 @@ class Savi::AST::Format < Savi::AST::Visitor
         # Parens are necessary to delineate one whitespace-group from another.
         next if term_term.is_a?(AST::Group) && term_term.style == " "
 
-        # Parens are necessary to delineate a relate inside a whitespace-group.
-        next if term_term.is_a?(AST::Relate)
+        # Parens are necessary for an assign relate inside a whitespace-group.
+        next if term_term.is_a?(AST::Relate) && term_term.is_assign
       end
 
       # If we get to this point, the parens are considered unnecessary.
@@ -242,7 +242,7 @@ class Savi::AST::Format < Savi::AST::Visitor
       # Parens for readability are acceptable when they are multi-line.
       next unless term.pos.single_line?
 
-      # Parens are necessary when there is more than one term inside.
+      # Parens may be necessary only when there is more than one term inside.
       next unless term.terms.size == 1
       term_term = term.terms.first
 
@@ -258,6 +258,10 @@ class Savi::AST::Format < Savi::AST::Visitor
 
       # Parens for disambiguating precedence of a qualify are acceptable.
       next if term_term.is_a?(AST::Qualify)
+
+      # Parens are necessary for a whitespace group in a surrounding relate,
+      # unless the relate is an assignment (in which case they are unnecessary).
+      next if term_term.is_a?(AST::Group) && term_term.style == " " && !relate.is_assign
 
       # If we get to this point, the parens are considered unnecessary.
       pos = term.pos
