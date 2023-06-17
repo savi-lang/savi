@@ -496,6 +496,99 @@
       String.new_iso
     )
 
+  :: Replace every occurrence of the given `old` substring with the given `new`.
+  :: The existing string is modified in-place.
+  ::
+  :: No new internal buffer is allocated if the length of the `new` substring
+  :: is less than or equal to the length of the `old` substring.
+  :fun ref replace_all(old String'box, new String'box) @
+    // Get the offsets of all occurrences of the old string.
+    // TODO: It should be possible to avoid allocating this array (and lazily
+    // find each offset one at a time), at least in the particular cases
+    // where the `new` substring is equal or less than the `old` one.
+    // For now we keep it here just to keep things easier to read,
+    // but if somebody's hot path needed this to be faster we could try it.
+    offsets Array(USize) = []
+    try (
+      last_offset USize = 0
+      while True (
+        found_offset = @offset_of!(old, last_offset)
+        offsets << found_offset
+        last_offset = found_offset + old.size
+      )
+    )
+    return @ if offsets.is_empty
+
+    case (
+    | new.size == old.size |
+      // If the new string is the same size as the old string, we can
+      // just replace each occurrence of the old string with the new string.
+      // We don't need to move any surrounding chunks around.
+      if new.is_not_empty (
+        offsets.each -> (offset |
+          new._ptr._unsafe._copy_to(@_ptr._offset(offset), new.size)
+        )
+      )
+    | new.size < old.size |
+      // If the new string is shorter than the old string, we need to
+      // shift chunks toward the left, starting from the left side.
+      new_size_delta = new.size - old.size
+      offsets.each_with_index -> (source_offset, index |
+        // Compensate for the size difference between the old and new string.
+        offset_delta = new_size_delta * index
+        dest_offset = source_offset + offset_delta
+
+        // Replace (part of) the old string with the new string.
+        if new.is_not_empty (
+          new._ptr._unsafe._copy_to(@_ptr._offset(dest_offset), new.size)
+        )
+
+        // Shift the chunk to the left.
+        chunk_source_offset = source_offset + old.size
+        chunk_size = try (offsets[index + 1]! | @_size) - chunk_source_offset
+        if chunk_size.is_nonzero (
+          chunk_dest_offset = dest_offset + new.size
+          @_ptr._offset(chunk_source_offset)._unsafe._copy_to(
+            @_ptr._offset(chunk_dest_offset)
+            chunk_size
+          )
+        )
+      )
+      @_size += new_size_delta * offsets.size
+
+    | // Otherwise, we know that `new.size > old.size`.
+      // The overall string is going to get larger, so we need to reserve space.
+      new_size_delta = new.size - old.size
+      @reserve(@_size + new_size_delta * offsets.size)
+
+      // If the new string is longer than the old string, we need to
+      // shift the data to the right to make room for the new string, starting
+      // from the right side (so we don't overwrite data we haven't copied yet).
+      offsets.reverse_each_with_index -> (source_offset, index |
+        // Compensate for the size difference between the old and new string.
+        offset_delta = new_size_delta * index
+        dest_offset = source_offset + offset_delta
+
+        // Shift the chunk to the right.
+        chunk_source_offset = source_offset + old.size
+        chunk_size = try (offsets[index + 1]! | @_size) - chunk_source_offset
+        if chunk_size.is_nonzero (
+          chunk_dest_offset = dest_offset + new.size
+          @_ptr._offset(chunk_source_offset)._unsafe._copy_to(
+            @_ptr._offset(chunk_dest_offset)
+            chunk_size
+          )
+        )
+
+        // Copy the new string into its place, before the chunk.
+        if new.is_not_empty (
+          new._ptr._unsafe._copy_to(@_ptr._offset(dest_offset), new.size)
+        )
+      )
+      @_size += new_size_delta * offsets.size
+    )
+    @
+
   :fun non join(others Array(String)'box, separator = "") String'iso
     res = String.new_iso
     others.each_with_index -> (other, index |
