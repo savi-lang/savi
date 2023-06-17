@@ -1,0 +1,23 @@
+#1:
+  declares: #2:
+    0: #3:
+      terms: #4:
+        0: #5:
+          name: "actor"
+        1: #6:
+          name: "Main"
+      body: #7:
+    1: #8:
+      terms: #9:
+        0: #10:
+          name: "new"
+      body: #11:
+        terms: #12:
+          0: #13:
+            string: "FOO"
+          1: #14:
+            string: "FOO<<<BAR>>>BAZ"
+          2: #15:
+            string: "FOO\nBAR\nBAZ"
+          3: #16:
+            string: "FOO\n<<<\n  BAR\n>>>\nBAZ"

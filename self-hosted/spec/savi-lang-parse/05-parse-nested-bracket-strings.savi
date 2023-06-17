@@ -1,0 +1,16 @@
+:actor Main
+  :new
+    <<<FOO>>>
+    <<<FOO<<<BAR>>>BAZ>>>
+    <<<
+      FOO
+      BAR
+      BAZ
+    >>>
+    <<<
+      FOO
+      <<<
+        BAR
+      >>>
+      BAZ
+    >>>

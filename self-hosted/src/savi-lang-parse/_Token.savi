@@ -8,7 +8,7 @@
   :member Character          7
   :member String             8
   :member PrefixedString     9
-  :member HereDoc            10
+  :member BracketString      10
   :member Operator           11
   :member Compound           12
   :member Prefix             13
