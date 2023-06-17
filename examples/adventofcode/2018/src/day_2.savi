@@ -38,8 +38,8 @@
           // two different byte indexes between the two strings are found.
           try (
             line_l.each_byte_with_index -> (byte_l, index |
-              if (byte_l != line_r.byte_at!(index)) (
-                if (diff != -1) (
+              if byte_l != line_r.byte_at!(index) (
+                if diff != -1 (
                   // We already found a difference, but this is another one,
                   // so we know this isn't the pair we wanted. Error out.
                   diff = -1
@@ -54,7 +54,7 @@
           // If diff is not -1 here, it means that we found a line pair with
           // exactly one difference, which means we can exit early from the
           // outer two loops with an "error" - we fulfilled the mission.
-          if (diff != -1) (
+          if diff != -1 (
             found_l = line_l
             found_r = line_r
             error! // TODO: use double-break? or early return?
@@ -66,7 +66,7 @@
     // only the bytes that are the same between the two strings found.
     result = String.new
     found_l.each_byte_with_index -> (byte, index |
-      if (diff != index && diff != -1) result.push_byte(byte)
+      if diff != index && diff != -1 result.push_byte(byte)
     )
     result
 

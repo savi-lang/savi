@@ -22,7 +22,7 @@
 
     test["try: if error; without error"].pass = U64[33] == (
       try (
-        if (zero > 1) (error! | 33)
+        if zero > 1 (error! | 33)
       |
         11
       )
@@ -30,7 +30,7 @@
 
     test["try: if error; with error"].pass = U64[33] == (
       try (
-        if (zero < 1) (error! | 11)
+        if zero < 1 (error! | 11)
       |
         33
       )
@@ -38,7 +38,7 @@
 
     test["try: if else error; without error"].pass = U64[33] == (
       try (
-        if (zero < 1) (33 | error!)
+        if zero < 1 (33 | error!)
       |
         11
       )
@@ -46,7 +46,7 @@
 
     test["try: if else error; with error"].pass = U64[33] == (
       try (
-        if (zero > 1) (11 | error!)
+        if zero > 1 (11 | error!)
       |
         33
       )
@@ -54,7 +54,7 @@
 
     test["try: if error else error; with error"].pass = U64[33] == (
       try (
-        if (zero < 1) (error! | error!)
+        if zero < 1 (error! | error!)
       |
         33
       )
@@ -62,7 +62,7 @@
 
     test["try: while error; without error"].pass = U64[33] == (
       try (
-        while (zero > 1) (error! | 33)
+        while zero > 1 (error! | 33)
       |
         11
       )
@@ -70,7 +70,7 @@
 
     test["try: while error; with error"].pass = U64[33] == (
       try (
-        while (zero < 1) (error! | 11)
+        while zero < 1 (error! | 11)
       |
         33
       )
@@ -78,7 +78,7 @@
 
     test["try: while else error; without error"].pass = U64[33] == (
       try (
-        while (zero < 1) (zero = zero + 1, 33 | error!)
+        while zero < 1 (zero = zero + 1, 33 | error!)
       |
         11
       )
@@ -86,7 +86,7 @@
 
     test["try: while else error; with error"].pass = U64[33] == (
       try (
-        while (zero > 1) (11 | error!)
+        while zero > 1 (11 | error!)
       |
         33
       )
@@ -94,7 +94,7 @@
 
     test["try: while error else error; with error"].pass = U64[33] == (
       try (
-        while (zero < 1) (error! | error!)
+        while zero < 1 (error! | error!)
       |
         33
       )

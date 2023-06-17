@@ -28,11 +28,11 @@
 
   :new ref (space USize = 0)
     @_size = 0
-    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
+    if space > 0 (@_ptr_allocate(space) | @_ptr_set_null)
 
   :new iso new_iso(space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
-    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
+    if space > 0 (@_ptr_allocate(space) | @_ptr_set_null)
 
   :new val from_array(data Array(U8)'val)
     @_size = data.size
@@ -114,17 +114,17 @@
     from = from.at_most(@_size)
 
     // If the fill range size is empty or negative, we have nothing to do.
-    return @ if (to <= from)
+    return @ if to <= from
 
     // We may need to expand the buffer, if the fill range goes beyond it.
-    if (@_size < to) (
+    if @_size < to (
 
       // We may need to allocate a new pointer, if the fill range goes past it.
-      if (@_space < to) (
+      if @_space < to (
         // If we're not filling the entire buffer, we need to reallocate the
         // pointer so that existing data is copied. Otherwise we will allocate
         // a new pointer with undefined data, because all of it will be memset.
-        if (from > 0) (@_ptr_reallocate(to) | @_ptr_allocate(to))
+        if from > 0 (@_ptr_reallocate(to) | @_ptr_allocate(to))
       )
       // The extended buffer has the size extended to include the fill range.
       @_size = to
@@ -176,14 +176,14 @@
     // Return early if the source range is zero-sized.
     dest_offset = dest_offset.at_most(@_size)
     to = to.at_most(source.size)
-    return @ if (from >= to)
+    return @ if from >= to
 
     // Reserve space in the buffer and copy into it.
     copy_size = to - from
     dest_end = dest_offset + copy_size
     @reserve(dest_end)
     source._ptr._offset(from)._copy_to(@_ptr._offset(dest_offset), copy_size)
-    if (@_size < dest_end) (@_size = dest_end)
+    if @_size < dest_end (@_size = dest_end)
 
     @
 
@@ -205,8 +205,8 @@
     found Bool = False
     offset = start_offset
     other_first = other[0]! // cache here and error out if the other is empty
-    while (!found && offset < @_size) (
-      if (@_ptr._get_at(offset) == other_first) (
+    while !found && offset < @_size (
+      if @_ptr._get_at(offset) == other_first (
         found = (@_ptr._offset(offset)._compare(other._ptr, other._size) == 0)
       )
       offset = offset + 1
@@ -245,7 +245,7 @@
   :: The size (number of actual bytes present in the string) does not change.
 
   :fun ref reserve(space USize)
-    if (@_space < space) @_ptr_reallocate(space)
+    if @_space < space @_ptr_reallocate(space)
     @
 
   :: Ensure enough capacity is allocated for the given added space, in bytes.
@@ -285,11 +285,11 @@
   :fun ref "[]=!"(index, value): @set_byte_at!(index, value)
 
   :fun byte_at!(index USize)
-    if (@size <= index) error!
+    if @size <= index error!
     @_ptr._get_at(index)
 
   :fun ref set_byte_at!(index USize, byte U8)
-    if (@size <= index) error!
+    if @size <= index error!
     @_ptr._assign_at(index, byte)
 
   :: Return a shared portion of this string, covering `from` until `to`,
@@ -303,7 +303,7 @@
     start = from
     finish = to.at_most(@size)
 
-    if (start < @_size && start < finish) (
+    if start < @_size && start < finish (
       size = finish - start
       @val_from_cpointer(
         @_ptr._offset(start)
@@ -318,7 +318,7 @@
     start = from
     finish = to.at_most(@size)
 
-    if (start < @_size && start < finish) (
+    if start < @_size && start < finish (
       @_size = finish - start
       @_ptr = @_ptr._offset(start)
     |
@@ -338,7 +338,7 @@
     stride USize = 1
   )
     index = from
-    while (index < to.at_most(@_size)) (
+    while index < to.at_most(@_size) (
       yield (@_ptr._get_at(index), index)
       index += stride
     )
@@ -351,7 +351,7 @@
   )
     try (
       index USize = from.at_most(@_size) -! 1
-      while (index >= to) (
+      while index >= to (
         yield (@_ptr._get_at(index), index)
         index = index.at_most(@_size) -! stride
       )
@@ -359,7 +359,7 @@
     None
 
   :fun ref "<<"(other Bytes'box)
-    if (other._size > 0) (
+    if other._size > 0 (
       new_size = @_size + other._size
       if other.is_null_terminated (
         @reserve(new_size + 1)
@@ -384,7 +384,7 @@
     start = from
     finish = to.at_most(other.size)
 
-    if (start < other._size && start < finish) (
+    if start < other._size && start < finish (
       size = finish - start
       other._ptr._offset(start)._copy_to(@_ptr._offset(@_size), size)
       @_size += size
@@ -396,11 +396,11 @@
       @_size = @_size + byte_count
       @reserve(@_size)
       @_ptr._assign_at(i, byte_1)
-      if (byte_count > 1) (
+      if byte_count > 1 (
         @_ptr._assign_at(i + 1, byte_2)
-        if (byte_count > 2) (
+        if byte_count > 2 (
           @_ptr._assign_at(i + 2, byte_3)
-          if (byte_count > 3) (
+          if byte_count > 3 (
             @_ptr._assign_at(i + 3, byte_4)
           )
         )
@@ -410,11 +410,11 @@
 
   :: Return a new string consisting of the original string copied `n` times.
   :fun "*"(times USize)
-    if (times > 0) (
+    if times > 0 (
       ptr = @_ptr._alloc(@size * times)
       size USize = 0
 
-      while (times > 0) (times -= 1
+      while times > 0 (times -= 1
         @_ptr._copy_to(ptr._offset(size), @size)
         size += @size
       )
@@ -433,9 +433,9 @@
     :yields Bytes
     finish USize = 0
     start = finish
-    while (finish < @_size) (
+    while finish < @_size (
       byte = @_ptr._get_at(finish)
-      if (byte == split_byte) (
+      if byte == split_byte (
         yield @val_from_cpointer(
           @_ptr._offset(start)
           finish - start
@@ -459,7 +459,7 @@
     index USize = 0
     result = False
     try (
-      while (index < shared_size) (
+      while index < shared_size (
         a = @_ptr._get_at(index)
         b = other._ptr._get_at(index)
         case (
@@ -477,7 +477,7 @@
     index USize = 0
     result = False
     try (
-      while (index < shared_size) (
+      while index < shared_size (
         a = @_ptr._get_at(index)
         b = other._ptr._get_at(index)
         case (
@@ -491,10 +491,10 @@
     result
 
   :fun slice(from USize, to USize = 0) Bytes'iso
-    if (to == 0 || to > @_size) (
+    if to == 0 || to > @_size (
       to = @_size
     )
-    if (from < to) (
+    if from < to (
       new_size = to - from
       new_alloc = new_size.next_pow2
       new_ptr = @_ptr._alloc(new_alloc)
@@ -533,7 +533,7 @@
     chopped = Bytes.iso_from_cpointer(@_ptr, offset, offset)
     @_size -= offset
     @_space -= offset
-    @_ptr = if (@_space > 0) (@_ptr._offset(offset) | @_ptr._null)
+    @_ptr = if @_space > 0 (@_ptr._offset(offset) | @_ptr._null)
     --chopped
 
   :: Split this byte buffer at the given offset, leaving the left side here
@@ -549,7 +549,7 @@
   :fun ref chop_right(offset USize) Bytes'iso
     offset = offset.at_most(@_size)
     chopped = Bytes.iso_from_cpointer(
-      if (@_space > offset) (@_ptr._offset(offset) | @_ptr._null)
+      if @_space > offset (@_ptr._offset(offset) | @_ptr._null)
       @_size - offset
       @_space - offset
     )
@@ -564,7 +564,7 @@
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U16.
   :fun read_native_u16!(offset USize) U16
-    if ((offset + U16.byte_width.usize) > @_size) error!
+    if (offset + U16.byte_width.usize) > @_size error!
     _FFI.Cast(CPointer(U8), CPointer(U16)'box).pointer(@_ptr._offset(offset))
       ._get_at(0)
 
@@ -573,7 +573,7 @@
   :: Raises an error if there aren't enough bytes at that offset to fit a U16.
   :: Use push_native_u16 instead if writing past the end is needed.
   :fun ref write_native_u16!(offset USize, number U16)
-    if ((offset + U16.byte_width.usize) > @_size) error!
+    if (offset + U16.byte_width.usize) > @_size error!
     _FFI.Cast(CPointer(U8), CPointer(U16)'ref).pointer(@_ptr._offset(offset))
       ._assign_at(0, number)
     @
@@ -591,7 +591,7 @@
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.
   :fun read_native_u32!(offset USize) U32
-    if ((offset + U32.byte_width.usize) > @_size) error!
+    if (offset + U32.byte_width.usize) > @_size error!
     _FFI.Cast(CPointer(U8), CPointer(U32)'box).pointer(@_ptr._offset(offset))
       ._get_at(0)
 
@@ -600,7 +600,7 @@
   :: Raises an error if there aren't enough bytes at that offset to fit a U32.
   :: Use push_native_u32 instead if writing past the end is needed.
   :fun ref write_native_u32!(offset USize, number U32)
-    if ((offset + U32.byte_width.usize) > @_size) error!
+    if (offset + U32.byte_width.usize) > @_size error!
     _FFI.Cast(CPointer(U8), CPointer(U32)'ref).pointer(@_ptr._offset(offset))
       ._assign_at(0, number)
     @
@@ -618,7 +618,7 @@
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U64.
   :fun read_native_u64!(offset USize) U64
-    if ((offset + U64.byte_width.usize) > @_size) error!
+    if (offset + U64.byte_width.usize) > @_size error!
     _FFI.Cast(CPointer(U8), CPointer(U64)'box).pointer(@_ptr._offset(offset))
       ._get_at(0)
 
@@ -627,7 +627,7 @@
   :: Raises an error if there aren't enough bytes at that offset to fit a U64.
   :: Use push_native_u64 instead if writing past the end is needed.
   :fun ref write_native_u64!(offset USize, number U64)
-    if ((offset + U64.byte_width.usize) > @_size) error!
+    if (offset + U64.byte_width.usize) > @_size error!
     _FFI.Cast(CPointer(U8), CPointer(U64)'ref).pointer(@_ptr._offset(offset))
       ._assign_at(0, number)
     @
@@ -645,6 +645,6 @@
     res = Bytes.new_iso
     others.each_with_index -> (other, index |
       res << other
-      if (index != others.size - 1) (res << separator)
+      if index != others.size - 1 res << separator
     )
     --res

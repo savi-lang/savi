@@ -28,7 +28,7 @@
 
     // Parse the guard id from the message (on "begin" events).
     guard = ""
-    if (event == Day4Event.Begin) (
+    if event == Day4Event.Begin (
       guard = message.split('#')[1]!.split(' ')[0]!
     )
 
@@ -60,7 +60,7 @@
 
         // Only the first entry for each guard has the guard id, so we need
         // to retain it in memory and assign it when missing in the entry.
-        if (entry.guard == "") (
+        if entry.guard == "" (
           entry.guard = current_guard
         |
           current_guard = entry.guard
@@ -75,8 +75,8 @@
     sleeps = Map(String, Map(I32, Array(U32))).new
     last_entry = try (entries[0]! | Day4Entry.empty)
     entries.each -> (entry |
-      if (entry.event == Day4Event.Awake) (
-        if (last_entry.event != Day4Event.Sleep) (
+      if entry.event == Day4Event.Awake (
+        if last_entry.event != Day4Event.Sleep (
           env.err.print("warning: awoke without first sleeping!")
         )
 
@@ -85,7 +85,7 @@
         )
 
         minute_id = last_entry.minute_id
-        while (minute_id < entry.minute_id) (
+        while minute_id < entry.minute_id (
           night_ids = try (times[minute_id]! | times[minute_id] = [])
           night_ids << entry.night_id
           minute_id += 1
@@ -106,7 +106,7 @@
       sleep_count USize = 0
       times.each -> (minute_id, night_ids | sleep_count += night_ids.size)
 
-      if (sleep_count > sleepiest_count) (
+      if sleep_count > sleepiest_count (
         sleepiest_guard = guard
         sleepiest_count = sleep_count
       )
@@ -117,7 +117,7 @@
     sleepiest_count = 0
     try (
       sleeps[sleepiest_guard]!.each -> (minute_id, night_ids |
-        if (night_ids.size > sleepiest_count) (
+        if night_ids.size > sleepiest_count (
           sleepiest_minute = minute_id
           sleepiest_count = night_ids.size
         )
@@ -148,13 +148,13 @@
       this_sleepiest_count USize = 0
       this_sleepiest_minute I32 = 0
       times.each -> (minute_id, night_ids |
-        if (night_ids.size > this_sleepiest_count) (
+        if night_ids.size > this_sleepiest_count (
           this_sleepiest_count = night_ids.size
           this_sleepiest_minute = minute_id
         )
       )
 
-      if (this_sleepiest_count > sleepiest_count) (
+      if this_sleepiest_count > sleepiest_count (
         sleepiest_guard = guard
         sleepiest_count = this_sleepiest_count
         sleepiest_minute = this_sleepiest_minute

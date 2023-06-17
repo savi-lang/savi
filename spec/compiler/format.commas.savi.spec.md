@@ -95,8 +95,8 @@ Trailing commas should not be used in expression bodies.
     color_r = "red",
     color_g = "green"   ,
     color_b = "blue",
-    if (color_r == "red") (color_o = "orange", color_v = "violet")   ,
-    if (color_g == "green") (
+    if color_r == "red" (color_o = "orange", color_v = "violet")   ,
+    if color_g == "green" (
       color_y = "yellow",
       color_c = "cyan",
     ),
@@ -105,8 +105,8 @@ Trailing commas should not be used in expression bodies.
     color_r = "red"
     color_g = "green"
     color_b = "blue"
-    if (color_r == "red") (color_o = "orange", color_v = "violet")
-    if (color_g == "green") (
+    if color_r == "red" (color_o = "orange", color_v = "violet")
+    if color_g == "green" (
       color_y = "yellow"
       color_c = "cyan"
     )

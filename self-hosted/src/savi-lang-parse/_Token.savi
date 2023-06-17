@@ -15,6 +15,6 @@
   :member Group              14
   :member GroupWhitespace    15
   :member Relate             16
-  :member RelateRight        17
+  :member RelateAssign       17
   :member Declare            18
   :member Document           19

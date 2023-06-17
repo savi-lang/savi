@@ -4,7 +4,7 @@
 
     test["while; resulting in break value"].pass = U64[33] == (
       i = zero
-      while (i < 1) (i += 1, break 33 | 11)
+      while i < 1 (i += 1, break 33 | 11)
     )
 
     // This test just proves that codegen doesn't choke on unreachable code.
@@ -14,19 +14,19 @@
 
     test["while; resulting in next value"].pass = U64[33] == (
       i = zero
-      while (i < 1) (i += 1, next 33 | 11)
+      while i < 1 (i += 1, next 33 | 11)
     )
 
     // This test just proves that codegen doesn't choke on unreachable code.
     test["while; unreachable code after next"].pass = U64[33] == (
       i = zero
-      while (i < 1) (i += 1, next 33, totally = "unreachable" | 11)
+      while i < 1 (i += 1, next 33, totally = "unreachable" | 11)
     )
 
     test["while; not executing the break"].pass = U64[33] == (
       i = zero
-      while (i < 1) (i += 1
-        if (zero > 1) (break 22)
+      while i < 1 (i += 1
+        if zero > 1 (break 22)
         33
       |
         11
@@ -35,8 +35,8 @@
 
     test["while; not executing the next"].pass = U64[33] == (
       i = zero
-      while (i < 1) (i += 1
-        if (zero > 1) (next 22)
+      while i < 1 (i += 1
+        if zero > 1 (next 22)
         33
       |
         11
@@ -45,8 +45,8 @@
 
     test["while; not using the value of the next"].pass = U64[33] == (
       i = zero
-      while (i < 2) (i += 1
-        if (i < 1) (next 22)
+      while i < 2 (i += 1
+        if i < 1 (next 22)
         33
       |
         11

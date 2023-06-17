@@ -22,7 +22,7 @@
   :: If the given value is a `TraceData`, it will be returned as-is.
   :: Otherwise, `TraceData.Untraceable` will be returned in its place.
   :fun "[]"(value Any'box) TraceData
-    if (value <: TraceData) (value | TraceData.Untraceable)
+    if value <: TraceData (value | TraceData.Untraceable)
 
 :: A trait that defines a standard for observing a data structure being traced.
 :: The data structure being traced is one that implements the `TraceData` trait.

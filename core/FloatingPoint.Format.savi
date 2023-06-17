@@ -85,7 +85,7 @@
     // Check the divisor for that digit count against the significand.
     // If the divisor is too big, we need to reduce the digit count by one.
     divisor = try (@_powers_of_10[(digit_count - 1).usize]! | 10)
-    if (significand < divisor) (digit_count -= 1)
+    if significand < divisor (digit_count -= 1)
 
     // Return the now-accurate digit count.
     digit_count
@@ -158,14 +158,14 @@
   :new val _new(@_value)
 
   :fun into_string_space USize
-    if (@_value.power_of_10 > 2 || @_value.scientific_exponent < -3) (
+    if @_value.power_of_10 > 2 || @_value.scientific_exponent < -3 (
       FloatingPoint.Format.Scientific(T)._new(@_value).into_string_space
     |
       FloatingPoint.Format.WithoutExponent(T)._new(@_value).into_string_space
     )
 
   :fun into_string(out String'ref) None
-    if (@_value.power_of_10 > 2 || @_value.scientific_exponent < -3) (
+    if @_value.power_of_10 > 2 || @_value.scientific_exponent < -3 (
       FloatingPoint.Format.Scientific(T)._new(@_value).into_string(out)
     |
       FloatingPoint.Format.WithoutExponent(T)._new(@_value).into_string(out)
@@ -217,7 +217,7 @@
       if digit_index.is_zero out.push_byte('.')
       divisor = divisor / 10
     )
-    if (digit_count == 1) out.push_byte('0')
+    if digit_count == 1 out.push_byte('0')
 
     // Print the base-10 exponent suffix.
     if exponent.is_nonzero (
@@ -278,7 +278,7 @@
 
     // Print the digits of the significand, with decimal point if applicable.
     digit_count.times -> (digit_index |
-      if (digit_index.i16 - 1 == exponent && digit_index > 0) out.push_byte('.')
+      if digit_index.i16 - 1 == exponent && digit_index > 0 out.push_byte('.')
       out.push_byte((significand / divisor % 10).u8 + '0')
       divisor = divisor / 10
     )

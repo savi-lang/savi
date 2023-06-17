@@ -59,7 +59,7 @@
     significand_base2 = original_significand * 4 // ("v" in the paper)
     upper_bound_base2 = significand_base2 + 2 // ("w" in the paper)
     lower_bound_base2 = significand_base2 - (
-      if (original_significand == U64.one.bit_shl(F64.sig_bit_width)) (1 | 2)
+      if original_significand == U64.one.bit_shl(F64.sig_bit_width) (1 | 2)
     ) // ("u" in the paper)
 
     ///
@@ -69,7 +69,7 @@
     //    `(a, b, c) * 10**e10` equals `(u, v, w) * 2**e2`; there are many
     //    possible choices for `e10`, and we choose specific values"
 
-    if (exponent_base2 >= 0) (
+    if exponent_base2 >= 0 (
       // "For each possible value of `e2` that is greater than or equal to
       // zero, we determine `q` as `max(0, ⌊e2 * log10(2)⌋ − 1)` (Lemma 3.2)"
       q = try (@_approx_floor_multiply_log10of2(exponent_base2.u16) -! 1 | 0)
@@ -160,7 +160,7 @@
     // Our counter `i` keeps track of the number of digits we discarded,
     // and the other variables we track (apart from `a_i`, `b_i`, and `c_i`)
     // will be used later for rounding logic.
-    while (a_i / 10 < c_i / 10) (
+    while a_i / 10 < c_i / 10 (
       digit_i = (b_i % 10).u8
       all_a_zero = all_a_zero && (a_i % 10 == 0)
       all_b_zero = all_b_zero && (digit_i == 0)
@@ -170,8 +170,8 @@
       i += 1
     )
 
-    if (accept_smaller && all_a_zero) (
-      while (a_i % 10 == 0) (
+    if accept_smaller && all_a_zero (
+      while a_i % 10 == 0 (
         a_i = a_i / 10
         b_i = b_i / 10
         c_i = c_i / 10

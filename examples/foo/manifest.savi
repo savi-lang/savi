@@ -1,0 +1,5 @@
+:manifest bin "example"
+  :sources "src/*.savi"
+
+  :dependency Bar
+    :from "relative:../bar"

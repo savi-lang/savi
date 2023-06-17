@@ -25,8 +25,8 @@
     | _InspectEach |
       output.push_byte('[')
       index USize = 0
-      while (index < input.size) (
-        if (index > 0) (output.push_byte(','), output.push_byte(' '))
+      while index < input.size (
+        if index > 0 (output.push_byte(','), output.push_byte(' '))
         try (
           element = input[index]!
           @into(output, element)
@@ -43,7 +43,7 @@
       input.into_string(output)
     |
       // Otherwise, fall back to just printing the name of the type.
-      output << reflection_of_runtime_type_name input
+      output << (reflection_of_runtime_type_name input)
     )
 
 :class Inspect.TraceData.Printer
@@ -114,7 +114,7 @@
     @_index += 1
 
   :fun ref primitive_none None: @_out << "None"
-  :fun ref primitive_bool(value Bool) None: @_out << if value ("True" | "False")
+  :fun ref primitive_bool(value Bool) None: @_out << (if value ("True" | "False"))
   :fun ref primitive_u64(value U64): value.into_string(@_out)
   :fun ref primitive_u32(value U32): value.into_string(@_out)
   :fun ref primitive_u16(value U16): value.into_string(@_out)

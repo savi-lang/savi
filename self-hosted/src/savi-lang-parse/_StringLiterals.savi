@@ -25,7 +25,7 @@
     )
 
     // If the string has no indentation, or is only whitespace, return as-is.
-    return string if (first_non_space_index == 0 || !saw_newline)
+    return string if first_non_space_index == 0 || !saw_newline
 
     // Remove the indentation and trim remaining whitespace before and after.
     initial_indentation = string.trim(0, first_non_space_index)

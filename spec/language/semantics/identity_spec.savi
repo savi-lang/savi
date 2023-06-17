@@ -3,31 +3,25 @@
     test["string literal ==="].pass = "example" === "example"
     test["string literal !=="].pass = "example" !== "differs"
     test["identity_digest_of string literal =="].pass =
-      identity_digest_of "example" ==
-      identity_digest_of "example"
+      (identity_digest_of "example") == (identity_digest_of "example")
     test["identity_digest_of string literal !="].pass =
-      identity_digest_of "example" !=
-      identity_digest_of "differs"
+      (identity_digest_of "example") != (identity_digest_of "differs")
 
-    class_instance_a = Container(String).new("example")
-    class_instance_b = Container(String).new("example")
-    test["class ==="].pass = class_instance_a === class_instance_a
-    test["class !=="].pass = class_instance_a !== class_instance_b
+    class_inst_a = Container(String).new("example")
+    class_inst_b = Container(String).new("example")
+    test["class ==="].pass = class_inst_a === class_inst_a
+    test["class !=="].pass = class_inst_a !== class_inst_b
     test["identity_digest_of class !="].pass =
-      identity_digest_of class_instance_a !=
-      identity_digest_of class_instance_b
+      (identity_digest_of class_inst_a) != (identity_digest_of class_inst_b)
     test["identity_digest_of class =="].pass =
-      identity_digest_of class_instance_a ==
-      identity_digest_of class_instance_a
+      (identity_digest_of class_inst_a) == (identity_digest_of class_inst_a)
 
-    struct_instance_a = ContainerStruct(String).new("example")
-    struct_instance_b = ContainerStruct(String).new("example")
-    struct_instance_c = ContainerStruct(String).new("differs")
-    test["struct ==="].pass = struct_instance_a === struct_instance_b
-    test["struct !=="].pass = struct_instance_a !== struct_instance_c
+    struct_inst_a = ContainerStruct(String).new("example")
+    struct_inst_b = ContainerStruct(String).new("example")
+    struct_inst_c = ContainerStruct(String).new("differs")
+    test["struct ==="].pass = struct_inst_a === struct_inst_b
+    test["struct !=="].pass = struct_inst_a !== struct_inst_c
     test["identity_digest_of struct =="].pass =
-      identity_digest_of struct_instance_a ==
-      identity_digest_of struct_instance_b
+      (identity_digest_of struct_inst_a) == (identity_digest_of struct_inst_b)
     test["identity_digest_of struct !="].pass =
-      identity_digest_of struct_instance_a !=
-      identity_digest_of struct_instance_c
+      (identity_digest_of struct_inst_a) != (identity_digest_of struct_inst_c)

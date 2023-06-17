@@ -14,7 +14,7 @@
 
   :it "never under-estimates the amount of space to emit a U64 into a string"
     value = U64.max_value
-    while (value > 0) (
+    while value > 0 (
       value = value.bit_shr(1)
       assert: value.into_string_space >= "\(value)".size
     )

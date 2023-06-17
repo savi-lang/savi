@@ -112,13 +112,13 @@ module Savi::Parser::Builder
     when :op
       value = state.slice(main)
       AST::Operator.new(value).with_pos(state.pos(main))
-    when :relate   then build_relate(main, iter, state)
-    when :relate_r then build_relate_r(main, iter, state)
-    when :group    then build_group(main, iter, state)
-    when :group_w  then build_group_w(main, iter, state)
-    when :prefix   then build_prefix(main, iter, state)
-    when :qualify  then build_qualify(main, iter, state)
-    when :compound then build_compound(main, iter, state)
+    when :relate        then build_relate(main, iter, state)
+    when :relate_assign then build_relate_assign(main, iter, state)
+    when :group         then build_group(main, iter, state)
+    when :group_w       then build_group_w(main, iter, state)
+    when :prefix        then build_prefix(main, iter, state)
+    when :qualify       then build_qualify(main, iter, state)
+    when :compound      then build_compound(main, iter, state)
     else
       raise NotImplementedError.new(kind)
     end
@@ -207,8 +207,8 @@ module Savi::Parser::Builder
     end
   end
 
-  private def self.build_relate_r(main, iter, state)
-    assert_kind(main, :relate_r)
+  private def self.build_relate_assign(main, iter, state)
+    assert_kind(main, :relate_assign)
     terms = [] of AST::Term
 
     iter.while_next_is_child_of(main) do |child|
@@ -217,7 +217,7 @@ module Savi::Parser::Builder
 
     # Parsing operator precedeence without too much nested backtracking
     # requires us to generate a lot of false positive relates in the grammar
-    # (:relate_r nodes with no operator and only one term); cleanse those here.
+    # (:relate_assign nodes with no operator and only one term); cleanse those here.
     return terms.shift if terms.size == 1
 
     # Build a right-leaning tree of Relate nodes, each with a left-hand-side,
@@ -225,7 +225,7 @@ module Savi::Parser::Builder
     terms[0...-1].reverse.each_slice(2).reduce(terms.last) do |rhs, (op, lhs)|
       AST::Relate.new(lhs, op.as(AST::Operator), rhs).with_pos(
         lhs.pos.span([rhs.pos])
-      )
+      ).with_assign_flag
     end
   end
 

@@ -29,7 +29,7 @@
       u64 = u64 / 10
       high = high.bit_shl(4).bit_or(low.bit_shr(60).bit_and(0xF))
       low = low.bit_shl(4).bit_or(digit)
-      if (u64 == 0) (
+      if u64 == 0 (
         break
       )
     )
@@ -57,7 +57,7 @@
     // 1234  -> 0xF_4321
     // pos=0 ->     ^-- index=3       == ndigits - (pos + 1)
     // pos=3 ->        ^-- index=0    == ndigits - (pos + 1)
-    index USize = if (pos < @ndigits) (@ndigits - (pos + 1) | error!)
+    index USize = if pos < @ndigits (@ndigits - (pos + 1) | error!)
 
     case (
     | index < 16 |
@@ -72,7 +72,7 @@
     :yields U8 for None
     high = @_high
     low = @_low
-    while (low.bit_and(0xF) != 0xF) (
+    while low.bit_and(0xF) != 0xF (
       yield low.bit_and(0xF).u8
       low = low.bit_shr(4).bit_or(high.bit_and(0xF).bit_shl(60))
       high = high.bit_shr(4)

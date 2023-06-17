@@ -17,7 +17,7 @@
   :fun ref remove_all(lowercase_byte U8)
     uppercase_byte = lowercase_byte - 'a' + 'A'
     @input.each_byte_with_index -> (byte, index |
-      if (byte == lowercase_byte || byte == uppercase_byte) (
+      if byte == lowercase_byte || byte == uppercase_byte (
         @skips[index] = None
       )
     )
@@ -30,7 +30,7 @@
       if !@skips.has_key(index) (
         no_reaction = True
 
-        if (last_byte != 0) (
+        if last_byte != 0 (
           // Look for a pair of bytes where one is an uppercase letter and
           // the other is the lowercase equivalent of the same letter.
           if (
@@ -53,7 +53,7 @@
         |
           // Find the most recent index that was not skipped.
           last_index -= 1
-          while (last_index > 0 && @skips.has_key(last_index)) (
+          while last_index > 0 && @skips.has_key(last_index) (
             last_index -= 1
           )
           // Set the last_byte to match the last_index we found.
@@ -83,7 +83,7 @@
     U8[26].times -> (number |
       letter_byte = number + 'a'
       this_size = Day5Polymer.new(input).remove_all(letter_byte).reduce.size
-      if (this_size < smallest_size) (smallest_size = this_size)
+      if this_size < smallest_size (smallest_size = this_size)
     )
     smallest_size
 

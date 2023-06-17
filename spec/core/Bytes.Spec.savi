@@ -298,8 +298,8 @@
     // If we did not guarantee this, then calling `reserve` could lead to
     // attempting to reallocate in the heap from an out-of-bounds pointer.
     buffer_a = Bytes.new_iso(8), buffer_b = Bytes.new_iso(8)
-    while (buffer_a.space > buffer_a.size) buffer_a.push('.')
-    while (buffer_b.space > buffer_b.size) buffer_b.push('.')
+    while buffer_a.space > buffer_a.size buffer_a.push('.')
+    while buffer_b.space > buffer_b.size buffer_b.push('.')
 
     buffer_a_left = buffer_a.chop_left(buffer_a.size)
     assert: buffer_a_left.cpointer.is_not_null

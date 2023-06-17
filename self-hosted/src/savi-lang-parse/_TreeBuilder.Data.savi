@@ -9,8 +9,8 @@
     parent_token = try (@[parent_index]! | return 0)
     sep = parent_token.start
     @tokens.each_with_index(parent_index + 1) -> (token, index |
-      break if (token.start >= parent_token.end)
-      next unless (token.start >= sep)
+      break if token.start >= parent_token.end
+      next unless token.start >= sep
       sep = token.end
       yield (token, index)
     )
@@ -43,7 +43,7 @@
     value U64 = 0
 
     @code.each_byte_with_index(token.start + 2, token.end) -> (byte, index |
-      next if (byte == '_')
+      next if byte == '_'
       byte_value = byte - '0'
       value = value *! 2 +! byte_value.u64
     )
@@ -54,7 +54,7 @@
     value U64 = 0
 
     @code.each_byte_with_index(token.start + 2, token.end) -> (byte, index |
-      next if (byte == '_')
+      next if byte == '_'
       byte_value = case byte >= (
       | 'a' | byte - 'a' + 10
       | 'A' | byte - 'A' + 10
@@ -70,8 +70,8 @@
     value U64 = 0
 
     @code.each_byte_with_index(token.start, token.end) -> (byte, index |
-      next if (byte == '_')
-      if (byte == '-' && index == token.start) (
+      next if byte == '_'
+      if byte == '-' && index == token.start (
         is_positive = False
         next
       )
@@ -86,5 +86,5 @@
     start_pointer = @code.cstring.offset(token.start)
     end_pointer = CPointer(U8).null
     value = _FFI.strtod(start_pointer, stack_address_of_variable end_pointer)
-    error! if (value == 0 && end_pointer.address == start_pointer.address)
+    error! if value == 0 && end_pointer.address == start_pointer.address
     value

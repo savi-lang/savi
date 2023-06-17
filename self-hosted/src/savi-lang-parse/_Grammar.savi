@@ -137,19 +137,19 @@
     ope_colon = @char(':').token(_Token.Operator)
 
     // Construct the nested possible relations for each group of operators.
-    tw = compound
-    t1 = ((tw >> (opw >> s >> tw).repeat(1)).token(_Token.GroupWhitespace) >> s) / tw
+    t1 = compound
     t2 = (t1 >> (sn >> op1 >> sn >> t1).repeat).token(_Token.Relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).token(_Token.Relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).token(_Token.Relate)
     te = (t4 >> (sn >> op4 >> sn >> t4).repeat).token(_Token.Relate)
+    tw = ((te >> (opw >> s >> te).repeat(1)).token(_Token.GroupWhitespace) >> s) / te
     t = (
-      te >> (
+      tw >> (
         // Newlines cannot precede the colon form of `ope`,
         // but any other `ope` can be preceded by a newline.
-        s >> (ope_colon / (sn >> ope)) >> sn >> te
+        s >> (ope_colon / (sn >> ope)) >> sn >> tw
       ).repeat
-    ).token(_Token.RelateRight) >> s
+    ).token(_Token.RelateAssign) >> s
 
     // Define what a comma/newline-separated sequence of terms looks like.
     decl = @declare

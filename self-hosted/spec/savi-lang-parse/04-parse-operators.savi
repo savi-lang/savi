@@ -1,12 +1,12 @@
 :module _Operators
   :fun example_ordered // in order of precedence, from "weakest" to "strongest"
-    y = x <<= x
+    y = x <<= x x
       && x || x
       === x == x !== x != x =~ x
       >= x <= x < x > x
       <|> x <~> x <<~ x ~>> x << x >> x <~ x ~> x
       + x - x
-      * x / x x.y
+      * x / x.y
 
   :fun example_mixed
     a != b && c > d / x + e / y || i.j > k << l
