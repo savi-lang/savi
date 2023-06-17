@@ -29,8 +29,7 @@ clean: PHONY
 	rm -rf $(BUILD) $(MAKE_VAR_CACHE) lib/libsavi_runtime
 
 # Run the full test suite.
-spec.all: PHONY spec.compiler.all spec.language spec.core spec.unit.all spec.integration.all
-# TODO: spec.all: PHONY spec.self-hosted.all spec.compiler.all spec.language spec.core spec.unit.all spec.integration.all
+spec.all: PHONY spec.self-hosted.all spec.compiler.all spec.language spec.core spec.unit.all spec.integration.all
 
 # Run the specs that are written in markdown (mostly compiler pass tests).
 # Run the given compiler-spec target (or all targets).
