@@ -2,7 +2,7 @@
   :fun call(count_remaining U64, array Array(String)) U64
     :yields U64 for String
     while count_remaining > 0 (
-      array << yield count_remaining
+      array << (yield count_remaining)
       count_remaining -= 1
     )
     array << "."
@@ -18,7 +18,7 @@
       array << "."
       return 0
     )
-    array << yield count_remaining
+    array << (yield count_remaining)
     @recursive_call(count_remaining - 1, array) -> (n | yield n)
 
 :module YieldingCallSpec
@@ -52,22 +52,24 @@
 
     test["yielding call; yielding twice, then disrupted by error"].pass = (
       total = 0, array = []
-      try (
+      (
+        try (
           Yielding.call(3, array) -> (n | if n == 1 error!, total += n, "yo")
         |
           U64[33]
         )
-        == 33 && total == 5 && array == ["yo", "yo"]
+      ) == 33 && total == 5 && array == ["yo", "yo"]
     )
 
     test["recursive yielding call; yielding twice, then disrupted by error"].pass = (
       total = 0, array = []
-      try (
+      (
+        try (
           Yielding.recursive_call(3, array) -> (n | if n == 1 error!, total += n, "yo")
         |
           U64[33]
         )
-        == 33 && total == 5 && array == ["yo", "yo"]
+      ) == 33 && total == 5 && array == ["yo", "yo"]
     )
 
     test["yielding call; yielding twice, then disrupted by break"].pass = (
