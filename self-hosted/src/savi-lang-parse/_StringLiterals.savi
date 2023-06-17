@@ -1,0 +1,37 @@
+:module _StringLiterals
+  :fun process_bracket_string_indentation(string String) String
+    // Look at the first few characters of the string to find the indentation.
+    first_non_space_index USize = 0
+    saw_newline = False
+    string.each_char_with_index_and_width -> (char, index, width |
+      case char == (
+      | ' ' |
+      | '\t' |
+      | '\r' |
+        if saw_newline (
+          first_non_space_index = index
+          break string // TODO: no need for break value here
+        )
+      | '\n' |
+        if saw_newline (
+          first_non_space_index = index
+          break string // TODO: no need for break value here
+        )
+        saw_newline = True
+      |
+        first_non_space_index = index
+        break string // TODO: no need for break value here
+      )
+    )
+
+    // If the string has no indentation, or is only whitespace, return as-is.
+    return string if (first_non_space_index == 0 || !saw_newline)
+
+    // Remove the indentation and trim remaining whitespace before and after.
+    initial_indentation = string.trim(0, first_non_space_index)
+    content = string.clone.replace_all(initial_indentation, "\n")
+    content.trim_in_place(
+      content.leading_whitespace_index
+      content.trailing_whitespace_index
+    )
+    --content

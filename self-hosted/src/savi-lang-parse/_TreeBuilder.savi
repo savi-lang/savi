@@ -233,6 +233,15 @@
         @error.at(token, _Error.ToDoComposeString)
       )
 
+    | _Token.BracketString |
+      if (children_count == 0) (
+        ast.init_string(
+          _StringLiterals.process_bracket_string_indentation(data.get_string(token))
+        )
+      |
+        @error.at(token, _Error.ToDoComposeString)
+      )
+
     | _Token.PrefixedString |
       try (
         error! if (children_count != 2)
