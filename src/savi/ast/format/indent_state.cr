@@ -81,13 +81,7 @@ class Savi::AST::Format::IndentState
       )
     when AST::Relate
       # Certain Relate operators may add indentation; all others never do.
-      return unless \
-        case node.op.value
-        when ".", "=", "<<=", "+=", "-=", ":"
-          true
-        else
-          false
-        end
+      return unless node.op.value == "." || node.is_assign
 
       # Relate and Qualify nodes nested inside each other don't add indentation.
       return \

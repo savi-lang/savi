@@ -58,9 +58,8 @@
 
     // Define what a string looks like.
     string_char = (
-      @str("\\'") / @str("\\\"") / @str("\\\\") /
-      @str("\\b") / @str("\\f") / @str("\\n") / @str("\\r") / @str("\\t") /
-      @str("\b")  / @str("\f")  / @str("\n")  / @str("\r")  / @str("\t") /
+      @str("\\'") / @str("\\\"") / @str("\\\\") / @str("\\0") /
+      @str("\\b") / @str("\\f") / @str("\\n") / @str("\\r") / @str("\\t") / @str("\\v") /
       (@str("\\x") >> digithex >> digithex) /
       (@str("\\u") >> digithex >> digithex >> digithex >> digithex) /
       (@str("\\U") >> digithex >> digithex >> digithex >> digithex >>
@@ -81,9 +80,8 @@
 
     // Define what a character string looks like.
     character_char =
-      @str("\\'") / @str("\\\"") / @str("\\\\") /
-      @str("\\b") / @str("\\f") / @str("\\n") / @str("\\r") / @str("\\t") /
-      @str("\b")  / @str("\f")  / @str("\n")  / @str("\r")  / @str("\t") /
+      @str("\\'") / @str("\\\"") / @str("\\\\") / @str("\\0") /
+      @str("\\b") / @str("\\f") / @str("\\n") / @str("\\r") / @str("\\t") / @str("\\v") /
       (@str("\\x") >> digithex >> digithex) /
       (@str("\\u") >> digithex >> digithex >> digithex >> digithex) /
       (@str("\\U") >> digithex >> digithex >> digithex >> digithex >>
@@ -133,7 +131,8 @@
       @str("===") / @str("==") / @str("!==") / @str("!=") /
       @str("=~")).token(_Token.Operator)
     op4 = (@str("&&") / @str("||")).token(_Token.Operator)
-    ope = (@str("+=") / @str("-=") / @str("<<=") / @char('=')).token(_Token.Operator)
+    ope = (@str("+=") / @str("-=") / @str("*=") / @str("/=") /
+      @str("<<=") / @char('=')).token(_Token.Operator)
     ope_colon = @char(':').token(_Token.Operator)
 
     // Construct the nested possible relations for each group of operators.

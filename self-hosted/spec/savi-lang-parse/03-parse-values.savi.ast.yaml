@@ -52,3 +52,15 @@
               string: "b"
               prefix: #31:
                 value: "bar"
+          17: #32:
+            string: "\x01\x02\x03"
+          18: #33:
+            string: "\xe2\x9d\xa4"
+          19: #34:
+            character: 102
+          20: #35:
+            character: 0
+          21: #36:
+            character: 1
+          22: #37:
+            character: 10084
