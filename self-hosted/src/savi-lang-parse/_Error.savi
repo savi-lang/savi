@@ -1,6 +1,8 @@
 :enum _Error
   :member IntegerTooBig 1
   :member FloatingPointInvalid 2
+  :member StringInvalid 3
+  :member CharacterInvalid 4
 
   :member BugNoTokens 100
   :member BugInitialTokenIsNotDocument 101

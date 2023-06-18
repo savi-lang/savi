@@ -228,7 +228,13 @@
 
     | _Token.String |
       if children_count == 0 (
-        ast.init_string(data.get_string(token))
+        try (
+          ast.init_string(
+            _StringLiterals.process_escapes!(data.get_string(token))
+          )
+        |
+          @error.at(token, _Error.StringInvalid)
+        )
       |
         @error.at(token, _Error.ToDoComposeString)
       )
@@ -236,7 +242,9 @@
     | _Token.BracketString |
       if children_count == 0 (
         ast.init_string(
-          _StringLiterals.process_bracket_string_indentation(data.get_string(token))
+          _StringLiterals.process_bracket_string_indentation(
+            data.get_string(token)
+          )
         )
       |
         @error.at(token, _Error.ToDoComposeString)
@@ -250,7 +258,8 @@
 
         child_info = try (data.nth_child_with_index_of!(index, 0) | return)
         child_token = child_info.head, child_index = child_info.tail
-        string_with_prefix.string = data.get_string(child_token)
+        string_with_prefix.string =
+          _StringLiterals.process_escapes!(data.get_string(child_token))
 
         child_info = try (data.nth_child_with_index_of!(index, 1) | return)
         child_token = child_info.head, child_index = child_info.tail
@@ -284,6 +293,18 @@
         )
       |
         @error.at(token, _Error.IntegerTooBig)
+      )
+
+    | _Token.Character |
+      try (
+        _StringLiterals.process_escapes!(
+          data.get_string(token)
+        ).each_char_with_index_and_width -> (char, index, width |
+          // We rely on the parser to have ensured there is exactly one character.
+          ast.init_character(char.u64)
+        )
+      |
+        @error.at(token, _Error.CharacterInvalid)
       )
 
     | _Token.FloatingPoint |

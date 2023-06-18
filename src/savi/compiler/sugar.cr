@@ -188,11 +188,13 @@ class Savi::Compiler::Sugar < Savi::AST::CopyOnMutateVisitor
     when "->", "'", " ", ":", "<:", "!<:", "===", "!==",
          "DEFAULTPARAM", "EXPLICITTYPE", "static_address_of_function"
       node # skip these special-case operators
-    when "+=", "-="
+    when "+=", "-=", "*=", "/="
       op =
         case node.op.value
         when "+=" then "+"
         when "-=" then "-"
+        when "*=" then "*"
+        when "/=" then "/"
         else raise NotImplementedError.new(node.op.value)
         end
 

@@ -51,8 +51,8 @@ module Savi::Parser
     # Define what a string looks like.
     string_char =
       str("\\'") | str("\\\"") | str("\\\\") |
-      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
-      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
+      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") | str("\\v") | str("\\0") |
+      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t")  | str("\v")  | str("\0") |
       (str("\\x") >> digithex >> digithex) |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (str("\\U") >> digithex >> digithex >> digithex >> digithex >>
@@ -70,8 +70,8 @@ module Savi::Parser
     # Define what a character string looks like.
     character_char =
       str("\\'") | str("\\\"") | str("\\\\") |
-      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
-      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
+      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") | str("\\v") | str("\\0") |
+      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t")  | str("\v")  | str("\0") |
       (str("\\x") >> digithex >> digithex) |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (str("\\U") >> digithex >> digithex >> digithex >> digithex >>
@@ -119,7 +119,8 @@ module Savi::Parser
             str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
     op4 = (str("&&") | str("||")).named(:op)
-    ope = (str("+=") | str("-=") | str("<<=") | char('=')).named(:op)
+    ope = (str("+=") | str("-=") | str("*=") | str("/=") |
+            str("<<=") | char('=')).named(:op)
     ope_colon = char(':').named(:op)
 
     # Construct the nested possible relations for each group of operators.

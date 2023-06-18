@@ -35,3 +35,85 @@
       content.trailing_whitespace_index
     )
     --content
+
+  :: Take the given string of string literal and process it into a string value,
+  :: handling any escape sequences found within the string literal.
+  :fun process_escapes!(source String) String
+    // Scan the characters of the string to see if it has an escape sequence.
+    source.each_char_with_index_and_width -> (char, index, width |
+      if char == '\\' (
+        // We found an escape sequence starting here, so we need to allocate
+        // a new string for the output and start writing into it.
+        // We know that up until this point, the string has no escape sequences,
+        // so we can copy everything up to this point without any processing.
+        output = String.new(source.size)
+        output << source.trim(0, index)
+        @process_escapes_starting_from!(index, source, output)
+        return output.take_buffer
+      )
+    )
+
+    // If we get here, we didn't find any escape sequences, so we can return
+    // the original source string without any more copying or allocation.
+    source
+
+  :fun process_escapes_starting_from!(start USize, source String, output String'ref)
+    at_escape = False
+    expecting_hex_digits USize = 0
+    escaped_char_in_progress U32 = 0
+
+    source.each_char_with_index_and_width(start) -> (char, index, width |
+      case (
+      // If we're at the start of an escape sequence, this char is what
+      // tells us what kind of an escape sequence it is.
+      | at_escape |
+        at_escape = False
+        case char == (
+        | '\\' | output.push_byte('\\')
+        | '\'' | output.push_byte('\'')
+        | '"'  | output.push_byte('"')
+        | 'b'  | output.push_byte('\b')
+        | 'f'  | output.push_byte('\f')
+        | 'n'  | output.push_byte('\n')
+        | 'r'  | output.push_byte('\r')
+        | 't'  | output.push_byte('\t')
+        | 'v'  | output.push_byte('\v')
+        | '0'  | output.push_byte(0)
+        | 'x'  | expecting_hex_digits = 2
+        | 'u'  | expecting_hex_digits = 4
+        | error!
+        )
+
+      // If we're expecting hex digits, process the char as one of those.
+      | expecting_hex_digits.is_nonzero |
+        digit_value = case (
+        | char >= '0' && char <= '9' | char - '0'
+        | char >= 'a' && char <= 'f' | char - 'a' + 10
+        | char >= 'A' && char <= 'F' | char - 'A' + 10
+        | error!
+        )
+
+        escaped_char_in_progress *= 0x10
+        escaped_char_in_progress += digit_value.u32
+
+        expecting_hex_digits -= 1
+        if expecting_hex_digits.is_zero (
+          output.push_utf8(escaped_char_in_progress <<= 0)
+        )
+
+      // A slash marks the start of an escape sequence.
+      | char == '\\' |
+        at_escape = True
+
+      |
+        // TODO: we can copy a whole chunk of non-escaped characters here,
+        // instead of copying them one at a time.
+        output.push_utf8(char)
+      )
+    )
+
+    // If we're in the middle of an escape sequence at the end of the string,
+    // it's an invalid string.
+    error! if at_escape || expecting_hex_digits.is_nonzero
+
+    output
