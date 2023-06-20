@@ -157,14 +157,13 @@
     terms = (termsl >> sn).repeat
 
     // Define groups that are pipe-partitioned sequences of terms.
-    pipesep = @char('/').token(_Token.Operator)
+    pipesep = @char('|')
     ptermsp =
       pipesep.maybe >> sn >>
-      (terms >> sn >> pipesep >> sn).repeat >>
-      terms >> sn >>
+      (terms.token(_Token.GroupPartition) >> sn >> pipesep >> sn).repeat >>
+      terms.token(_Token.GroupPartition) >> sn >>
       pipesep.maybe >> sn
     parens.define(
-      (@str("^(") >> sn >> ptermsp.maybe >> sn >> @char(')')).token(_Token.Group) /
       (@char('(') >> sn >> ptermsp.maybe >> sn >> @char(')')).token(_Token.Group) /
       (@char('[') >> sn >> ptermsp.maybe >> sn >> @char(']') >> @char('!').maybe).token(_Token.Group)
     )
