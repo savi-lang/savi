@@ -2,15 +2,15 @@
   :sources "src/savi-lang-parse/*.savi"
   :sources "src/SaviProto/*.savi"
 
-  :dependency PEG v0
-    :from "github:savi-lang/PEG"
-
   :dependency CapnProto v0
     :from "github:jemc-savi/CapnProto"
     :depends on ByteStream
 
-  :transitive dependency ByteStream v0
-    :from "github:savi-lang/ByteStream"
+  :dependency Map v0
+    :from "github:savi-lang/Map"
+
+  :dependency PEG v0
+    :from "github:savi-lang/PEG"
 
   :dependency Time v0
     :from "github:savi-lang/Time"
@@ -25,6 +25,9 @@
     :from "github:savi-lang/IO"
     :depends on ByteStream
     :depends on OSError
+
+  :transitive dependency ByteStream v0
+    :from "github:savi-lang/ByteStream"
 
   :transitive dependency OSError v0
     :from "github:savi-lang/OSError"

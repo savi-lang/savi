@@ -12,8 +12,7 @@
   :member BugInvalidGroupStyleByte 105
 
   :member ToDoTokenKind 200
-  :member ToDoAnnotations 201
-  :member ToDoComposeString 202
+  :member ToDoComposeString 201
 
 :struct _Error.Info
   :let at PEG.Token(_Token)

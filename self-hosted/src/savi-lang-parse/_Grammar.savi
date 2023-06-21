@@ -159,13 +159,12 @@
     // Define groups that are pipe-partitioned sequences of terms.
     pipesep = @char('|')
     ptermsp =
-      pipesep.maybe >> sn >>
-      (terms.token(_Token.GroupPartition) >> sn >> pipesep >> sn).repeat >>
-      terms.token(_Token.GroupPartition) >> sn >>
-      pipesep.maybe >> sn
+      (sn >> pipesep).maybe >> // silently swallow an empty partition at the start, if present
+      (sn >> terms >> sn).token(_Token.GroupPartition) >>
+      (pipesep >> (sn >> terms >> sn).token(_Token.GroupPartition)).repeat
     parens.define(
-      (@char('(') >> sn >> ptermsp.maybe >> sn >> @char(')')).token(_Token.Group) /
-      (@char('[') >> sn >> ptermsp.maybe >> sn >> @char(']') >> @char('!').maybe).token(_Token.Group)
+      (@char('(') >> ptermsp.maybe >> @char(')')).token(_Token.Group) /
+      (@char('[') >> ptermsp.maybe >> @char(']') >> @char('!').maybe).token(_Token.Group)
     )
 
     // Define what a declaration looks like.

@@ -8,6 +8,7 @@
 
   :const capn_proto_data_word_count U16: 1
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -32,6 +33,7 @@
 
   :const capn_proto_data_word_count U16: 2
   :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -64,6 +66,7 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -85,6 +88,7 @@
 
   :const capn_proto_data_word_count U16: 1
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -108,6 +112,7 @@
 
   :const capn_proto_data_word_count U16: 2
   :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -139,6 +144,7 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)

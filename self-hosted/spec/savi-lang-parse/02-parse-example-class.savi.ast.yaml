@@ -27,6 +27,7 @@
           name: "greeting"
         2: #20:
           name: "String"
+      main_annotation: "Return a friendly greeting string for this instance.\nThis always starts with a good, old-fashioned \"Hello\"."
       body: #21:
         terms: #22:
           0: #23:

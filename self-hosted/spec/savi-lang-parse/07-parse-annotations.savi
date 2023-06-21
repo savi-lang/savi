@@ -1,0 +1,22 @@
+:: 1st line of type-level annotation
+:: 2nd line of type-level annotation
+:module _Annotations
+  :: 1st line of function-level annotation
+  :: 2nd line of function-level annotation
+  :fun example
+    :: 1st block in function
+    (x = "foo") :: assignment-level annotation (combines with above)
+    (x = "foo") :: another assignment-level annotation
+    (x = "foo") :: yet another assignment-level annotation
+
+    :: 2nd block in function
+    x = "foo" :: value-level annotation
+
+    :: 4th block in function
+    (
+      :: 1st sub-block
+      (x = "foo") :: 1st nested assignment-level annotation (combines with above)
+
+      :: 2nd sub-block
+      (x = "foo") :: 2nd nested assignment-level annotation (combines with above)
+    )

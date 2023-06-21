@@ -1,15 +1,43 @@
 :class _TreeBuilder.State
-  :fun ref add_annotation(
-    annotation PEG.Token(_Token)
-    on_ast SaviProto.AST.Builder
-  )
-    None // TODO: Implement this
+  :var _main_annotation: String.new
+  :let _annotations: Map.Ordered(U64, String).new
 
-  :fun ref add_annotation_on_declare(
+  :fun ref add_main_annotation(
+    data _TreeBuilder.Data
     annotation PEG.Token(_Token)
-    on_declare SaviProto.AST.Declare.Builder
   )
-    None // TODO: Implement this
+    if @_main_annotation.is_not_empty @_main_annotation.push_byte('\n')
+    @_main_annotation << data.get_string(annotation)
+
+  :fun ref add_annotation(
+    data _TreeBuilder.Data
+    annotation PEG.Token(_Token)
+    capn_proto_address U64
+  )
+    @_annotations[capn_proto_address] = try (
+      existing = @_annotations[capn_proto_address]!
+      "\(existing)\n\(data.get_string(annotation))"
+    |
+      data.get_string(annotation)
+    )
+
+  :fun ref finish_annotations(declare SaviProto.AST.Declare.Builder)
+    if @_main_annotation.is_not_empty (
+      declare.main_annotation = @_main_annotation.take_buffer // TODO: no take_buffer - String'box should be enough
+      @_main_annotation = String.new
+    )
+    if @_annotations.is_not_empty (
+      declare_annotations = declare.init_body_annotations(@_annotations.size)
+      declare_annotations_index USize = 0
+      @_annotations.each -> (target, value |
+        try (
+          declare_annotations[declare_annotations_index]!.target = target
+          declare_annotations[declare_annotations_index]!.value = value
+        )
+        declare_annotations_index += 1
+      )
+      @_annotations.clear
+    )
 
 :class _TreeBuilder
   :is PEG.Parser.Builder(
@@ -80,9 +108,11 @@
         pending_annotations << child_token
 
       | _Token.Declare |
-        // Trim the body terms list to the count and reset the count.
+        // Finish capturing annotations for the previous declare, and
+        // trim the body terms list to the count and reset the count.
         // That's all the body terms we have for the prior declare,
         // and any future body terms will go into this new declare.
+        state.finish_annotations(declare)
         declare.body.trim_terms(0, body_term_count)
         body_term_count = 0
 
@@ -98,7 +128,7 @@
         // Add any pending annotations to the declare node.
         if pending_annotations.is_not_empty (
           pending_annotations.each_with_index -> (annotation_token, annotation_index |
-            state.add_annotation_on_declare(annotation_token, declare)
+            state.add_main_annotation(data, annotation_token)
           )
           pending_annotations.clear
         )
@@ -119,8 +149,9 @@
         // TODO: Add any pending annotations to the term node.
         if pending_annotations.is_not_empty (
           pending_annotations.each -> (annotation_token |
-            state.add_annotation(annotation_token, body_term)
+            state.add_annotation(data, annotation_token, body_term.capn_proto_address)
           )
+          pending_annotations.clear
         )
 
         @_build_ast(body_term, data, state, child_token, child_index)
@@ -129,9 +160,13 @@
 
     // TODO: Set body pos for each declare with a body.
 
-    // Trim the final declare, and also the list of declares, to the right size.
-    // This is the last step; we won't see any other content in the document.
+    // Capture annotations
+
+    // Finish the final declare - the last one we'll see in the document.
+    state.finish_annotations(declare)
     declare.body.trim_terms(0, body_term_count)
+
+    // Finish off the document itself.
     doc.trim_declares(0, declare_count)
 
     @
@@ -144,10 +179,12 @@
     index USize
   )
     // @_build_pos(declare.pos, token)
-    @_build_ast_list(
+
+    term_count = @_build_ast_list(
       declare.init_terms(data.count_children_of(index))
       data, state, token, index
     )
+    declare.trim_terms(0, term_count)
 
   :fun ref _build_operator(
     op SaviProto.AST.Operator.Builder
@@ -170,10 +207,11 @@
 
     group.style = SaviProto.AST.Group.Style.Space
 
-    @_build_ast_list(
+    term_count = @_build_ast_list(
       group.init_terms(data.count_children_of(index))
       data, state, token, index
     )
+    group.trim_terms(0, term_count)
 
   :fun ref _build_group(
     group SaviProto.AST.Group.Builder
@@ -202,10 +240,12 @@
         pair = data.first_child_with_index_of!(index)
         child_token = pair.head
         child_index = pair.tail
-        return @_build_ast_list(
+        term_count = @_build_ast_list(
           group.init_terms(data.count_children_of(child_index))
           data, state, child_token, child_index
         )
+        group.trim_terms(0, term_count)
+        return
       )
     )
 
@@ -220,15 +260,17 @@
       try (
         partition = partitions[partition_index]!.init_group
         partition.style = orig_style
-        @_build_ast_list(
+        term_count = @_build_ast_list(
           partition.init_terms(data.count_children_of(child_index))
           data, state, child_token, child_index
         )
+        partition.trim_terms(0, term_count)
         partition_index += 1
       |
         @error.at(child_token, _Error.BugFixedSizeListIsTooSmall)
       )
     )
+
 
   :fun ref _build_ast_list(
     list CapnProto.List.Builder(SaviProto.AST.Builder)
@@ -236,16 +278,38 @@
     state _TreeBuilder.State
     token PEG.Token(_Token)
     index USize
-  )
+  ) USize
+    pending_annotations Array(PEG.Token(_Token)) = []
     term_index USize = 0
+
     data.each_child_with_index_of(index) -> (child_token, child_index |
-      try (
-        @_build_ast(list[term_index]!, data, state, child_token, child_index)
-      |
-        @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+      // If this is an annotation, it's not a "real" term.
+      // Add it to the pending list for the next "real" term.
+      if child_token.kind == _Token.Annotation (
+        pending_annotations << child_token
+        next
       )
+
+      ast = try (list[term_index]! |
+        @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+        next
+      )
+
+      // Add any pending annotations to the term node.
+      pending_annotations.each -> (annotation_token |
+        state.add_annotation(data, annotation_token, ast.capn_proto_address)
+      )
+      pending_annotations.clear
+
+      // Build the term node.
+      @_build_ast(ast, data, state, child_token, child_index)
+
+      // Get ready to build the next term.
       term_index += 1
     )
+
+    // Return the total number of "real" terms.
+    term_index
 
   :fun ref _build_ast(
     ast SaviProto.AST.Builder
@@ -274,9 +338,6 @@
     )
 
     case token.kind == (
-    | _Token.Annotation |
-      @error.at(token, _Error.ToDoAnnotations)
-
     | _Token.Identifier |
       ast.init_name(data.get_string(token))
 
@@ -394,7 +455,7 @@
         remaining_children_count = children_count - child_number
         case (
         | child_token.kind == _Token.Annotation |
-          state.add_annotation(child_token, ast)
+          state.add_annotation(data, child_token, ast.capn_proto_address)
 
         | remaining_children_count > 2 |
           relate = ast.init_relate
@@ -430,7 +491,7 @@
 
         case (
         | child_token.kind == _Token.Annotation |
-          state.add_annotation(child_token, ast)
+          state.add_annotation(data, child_token, ast.capn_proto_address)
 
         | child_number > 1 |
           relate = ast.init_relate
@@ -464,7 +525,7 @@
 
         case (
         | child_token.kind == _Token.Annotation |
-          state.add_annotation(child_token, ast)
+          state.add_annotation(data, child_token, ast.capn_proto_address)
 
         | child_token.kind == _Token.Group && child_number > 0 |
           qualify = ast.init_qualify

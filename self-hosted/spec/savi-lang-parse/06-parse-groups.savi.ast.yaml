@@ -13,206 +13,216 @@
           name: "fun"
         1: #11:
           name: "example"
-      body: #12:
-        terms: #13:
-          0: #14:
-            group: #15:
+      body_annotations: #12:
+        0: #13:
+          target: 1016
+          value: "annotated to prevent `savi format` from removing parens"
+        1: #14:
+          target: 1048
+          value: "annotated to prevent `savi format` from removing parens"
+        2: #15:
+          target: 1240
+          value: "annotated to prevent `savi format` from removing parens"
+      body: #16:
+        terms: #17:
+          0: #18:
+            group: #19:
               style: SaviProto.AST.Group.Style.Space
-              terms: #16:
-                0: #17:
+              terms: #20:
+                0: #21:
                   name: "a"
-                1: #18:
+                1: #22:
                   name: "b"
-                2: #19:
+                2: #23:
                   name: "c"
-                3: #20:
+                3: #24:
                   name: "d"
-                4: #21:
+                4: #25:
                   name: "e"
-          1: #22:
-            group: #23:
+          1: #26:
+            group: #27:
               style: SaviProto.AST.Group.Style.Space
-              terms: #24:
-                0: #25:
+              terms: #28:
+                0: #29:
                   name: "a"
-                1: #26:
+                1: #30:
                   name: "b"
-                2: #27:
+                2: #31:
                   name: "c"
-                3: #28:
+                3: #32:
                   name: "d"
-                4: #29:
+                4: #33:
                   name: "e"
-          2: #30:
-            group: #31:
+          2: #34:
+            group: #35:
               style: SaviProto.AST.Group.Style.Paren
-              terms: #32:
-                0: #33:
+              terms: #36:
+                0: #37:
                   name: "a"
-                1: #34:
+                1: #38:
                   name: "b"
-                2: #35:
+                2: #39:
                   name: "c"
-                3: #36:
+                3: #40:
                   name: "d"
-                4: #37:
+                4: #41:
                   name: "e"
-          3: #38:
-            group: #39:
+          3: #42:
+            group: #43:
               style: SaviProto.AST.Group.Style.Paren
-              terms: #40:
-                0: #41:
+              terms: #44:
+                0: #45:
                   name: "a"
-                1: #42:
+                1: #46:
                   name: "b"
-                2: #43:
+                2: #47:
                   name: "c"
-                3: #44:
+                3: #48:
                   name: "d"
-                4: #45:
+                4: #49:
                   name: "e"
-          4: #46:
-            group: #47:
+          4: #50:
+            group: #51:
               style: SaviProto.AST.Group.Style.Pipe
-              terms: #48:
-                0: #49:
-                  group: #50:
-                    style: SaviProto.AST.Group.Style.Paren
-                    terms: #51:
-                      0: #52:
-                        name: "a"
-                1: #53:
+              terms: #52:
+                0: #53:
                   group: #54:
                     style: SaviProto.AST.Group.Style.Paren
                     terms: #55:
                       0: #56:
-                        name: "b"
-                2: #57:
+                        name: "a"
+                1: #57:
                   group: #58:
                     style: SaviProto.AST.Group.Style.Paren
                     terms: #59:
                       0: #60:
-                        name: "c"
-                3: #61:
+                        name: "b"
+                2: #61:
                   group: #62:
                     style: SaviProto.AST.Group.Style.Paren
                     terms: #63:
                       0: #64:
-                        name: "d"
-                4: #65:
+                        name: "c"
+                3: #65:
                   group: #66:
                     style: SaviProto.AST.Group.Style.Paren
                     terms: #67:
                       0: #68:
-                        name: "e"
-          5: #69:
-            group: #70:
-              style: SaviProto.AST.Group.Style.Pipe
-              terms: #71:
-                0: #72:
-                  group: #73:
+                        name: "d"
+                4: #69:
+                  group: #70:
                     style: SaviProto.AST.Group.Style.Paren
-                    terms: #74:
-                      0: #75:
-                        name: "a"
-                1: #76:
+                    terms: #71:
+                      0: #72:
+                        name: "e"
+          5: #73:
+            group: #74:
+              style: SaviProto.AST.Group.Style.Pipe
+              terms: #75:
+                0: #76:
                   group: #77:
                     style: SaviProto.AST.Group.Style.Paren
                     terms: #78:
                       0: #79:
-                        name: "b"
-                2: #80:
+                        name: "a"
+                1: #80:
                   group: #81:
                     style: SaviProto.AST.Group.Style.Paren
                     terms: #82:
                       0: #83:
-                        name: "c"
-                3: #84:
+                        name: "b"
+                2: #84:
                   group: #85:
                     style: SaviProto.AST.Group.Style.Paren
                     terms: #86:
                       0: #87:
-                        name: "d"
-                4: #88:
+                        name: "c"
+                3: #88:
                   group: #89:
                     style: SaviProto.AST.Group.Style.Paren
                     terms: #90:
                       0: #91:
-                        name: "e"
-          6: #92:
-            group: #93:
-              style: SaviProto.AST.Group.Style.Pipe
-              terms: #94:
-                0: #95:
-                  group: #96:
-                    style: SaviProto.AST.Group.Style.Paren
-                    terms: #97:
-                      0: #98:
-                        name: "a"
-                      1: #99:
-                        name: "b"
-                1: #100:
-                  group: #101:
-                    style: SaviProto.AST.Group.Style.Paren
-                    terms: #102:
-                      0: #103:
-                        name: "c"
-                      1: #104:
                         name: "d"
-                2: #105:
-                  group: #106:
+                4: #92:
+                  group: #93:
                     style: SaviProto.AST.Group.Style.Paren
-                3: #107:
-                  group: #108:
-                    style: SaviProto.AST.Group.Style.Paren
-                    terms: #109:
-                      0: #110:
+                    terms: #94:
+                      0: #95:
                         name: "e"
-          7: #111:
-            group: #112:
+          6: #96:
+            group: #97:
               style: SaviProto.AST.Group.Style.Pipe
-              terms: #113:
-                0: #114:
-                  group: #115:
+              terms: #98:
+                0: #99:
+                  group: #100:
                     style: SaviProto.AST.Group.Style.Paren
-                    terms: #116:
-                      0: #117:
+                    terms: #101:
+                      0: #102:
                         name: "a"
-                      1: #118:
+                      1: #103:
                         name: "b"
-                      2: #119:
-                        name: "c"
-                      3: #120:
-                        name: "d"
-                      4: #121:
-                        name: "e"
-                1: #122:
-                  group: #123:
+                1: #104:
+                  group: #105:
                     style: SaviProto.AST.Group.Style.Paren
-          8: #124:
-            group: #125:
+                    terms: #106:
+                      0: #107:
+                        name: "c"
+                      1: #108:
+                        name: "d"
+                2: #109:
+                  group: #110:
+                    style: SaviProto.AST.Group.Style.Paren
+                3: #111:
+                  group: #112:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #113:
+                      0: #114:
+                        name: "e"
+          7: #115:
+            group: #116:
               style: SaviProto.AST.Group.Style.Pipe
-              terms: #126:
-                0: #127:
-                  group: #128:
+              terms: #117:
+                0: #118:
+                  group: #119:
                     style: SaviProto.AST.Group.Style.Paren
-                    terms: #129:
-                      0: #130:
+                    terms: #120:
+                      0: #121:
                         name: "a"
-                      1: #131:
+                      1: #122:
                         name: "b"
-                      2: #132:
+                      2: #123:
                         name: "c"
-                      3: #133:
+                      3: #124:
                         name: "d"
-                      4: #134:
+                      4: #125:
                         name: "e"
-                1: #135:
-                  group: #136:
+                1: #126:
+                  group: #127:
                     style: SaviProto.AST.Group.Style.Paren
-                2: #137:
-                  group: #138:
+          8: #128:
+            group: #129:
+              style: SaviProto.AST.Group.Style.Pipe
+              terms: #130:
+                0: #131:
+                  group: #132:
                     style: SaviProto.AST.Group.Style.Paren
-          9: #139:
-            group: #140:
+                    terms: #133:
+                      0: #134:
+                        name: "a"
+                      1: #135:
+                        name: "b"
+                      2: #136:
+                        name: "c"
+                      3: #137:
+                        name: "d"
+                      4: #138:
+                        name: "e"
+                1: #139:
+                  group: #140:
+                    style: SaviProto.AST.Group.Style.Paren
+                2: #141:
+                  group: #142:
+                    style: SaviProto.AST.Group.Style.Paren
+          9: #143:
+            group: #144:
               style: SaviProto.AST.Group.Style.Paren
