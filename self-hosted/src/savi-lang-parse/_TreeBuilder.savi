@@ -527,7 +527,8 @@
         | child_token.kind == _Token.Annotation |
           state.add_annotation(data, child_token, ast.capn_proto_address)
 
-        | child_token.kind == _Token.Group && child_number > 0 |
+        | child_token.kind == _Token.Group && child_number > 0 &&
+          (try (data.nth_child_with_index_of!(index, child_number - 1).head.kind != _Token.Operator | True)) |
           qualify = ast.init_qualify
           @_build_group(qualify.group, data, state, child_token, child_index)
 

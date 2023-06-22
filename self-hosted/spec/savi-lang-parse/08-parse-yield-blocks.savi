@@ -1,0 +1,5 @@
+:module _YieldBlocks
+  :fun example
+    foo.bar.each -> (x, y |
+      x
+    )
