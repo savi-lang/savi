@@ -23,3 +23,10 @@
     '\0'
     '\x01'
     '\u2764'
+    "compose string a \(
+      99
+    ) \(100) final"
+    "compose string b \(
+      99
+    ) \(100)"
+    b"\(99)\(100)"

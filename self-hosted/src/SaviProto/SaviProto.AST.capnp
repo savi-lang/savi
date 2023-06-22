@@ -22,13 +22,13 @@ struct AST {
     string @6 :Text;
 
     stringWithPrefix :group {
-      string @7 :Text;
-      prefix @8 :AST.Name;
+      prefix @7 :AST.Name;
+      string @8 :Text;
     }
 
     stringCompose :group {
-      terms @9 :List(AST);
-      prefix @10 :AST.Name;
+      prefix @9 :AST.Name;
+      terms @10 :List(AST);
     }
 
     prefix :group {

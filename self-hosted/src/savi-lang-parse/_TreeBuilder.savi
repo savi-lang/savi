@@ -213,6 +213,70 @@
     )
     group.trim_terms(0, term_count)
 
+  :fun ref _build_string_compose_terms(
+    list CapnProto.List.Builder(SaviProto.AST.Builder)
+    data _TreeBuilder.Data
+    state _TreeBuilder.State
+    token PEG.Token(_Token)
+    index USize
+  ) USize
+    // @_build_pos(compose.pos, token)
+
+    term_index USize = 0
+    literal_start = token.start
+
+    data.each_child_with_index_of(index) -> (child_token, child_index |
+      // Build the literal part of the string prior to this composed part.
+      literal_end = child_token.start - 1
+      if literal_end > literal_start (
+        literal_part = try (list[term_index]! |
+          @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+          next
+        )
+        try (
+          literal_part.init_string(
+            _StringLiterals.process_escapes!(
+              data.code.trim(literal_start, literal_end)
+            )
+          )
+        |
+          @error.at(token, _Error.BugInvalidString)
+        )
+        term_index += 1
+      )
+      literal_start = child_token.end
+
+      // Build the composed part.
+      @_build_ast(
+        try (list[term_index]! |
+          @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+          next
+        )
+        data, state, child_token, child_index
+      )
+      term_index += 1
+    )
+
+    // Build the remaining literal part of the string after all other parts.
+    if literal_start < token.end (
+      literal_part = try (list[term_index]! |
+        @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+        return term_index
+      )
+      try (
+        literal_part.init_string(
+          _StringLiterals.process_escapes!(
+            data.code.trim(literal_start, token.end)
+          )
+        )
+      |
+        @error.at(token, _Error.BugInvalidString)
+      )
+      term_index += 1
+    )
+
+    term_index
+
   :fun ref _build_group(
     group SaviProto.AST.Group.Builder
     data _TreeBuilder.Data
@@ -342,45 +406,57 @@
       ast.init_name(data.get_string(token))
 
     | _Token.String |
-      if children_count == 0 (
+      if children_count.is_nonzero (
+        string_compose = ast.init_string_compose
+        term_count = @_build_string_compose_terms(
+          string_compose.init_terms(children_count * 2 + 1)
+          data, state, token, index
+        )
+        string_compose.trim_terms(0, term_count)
+      |
         try (
           ast.init_string(
             _StringLiterals.process_escapes!(data.get_string(token))
           )
         |
-          @error.at(token, _Error.StringInvalid)
+          @error.at(token, _Error.BugInvalidString)
         )
-      |
-        @error.at(token, _Error.ToDoComposeString)
       )
 
     | _Token.BracketString |
-      if children_count == 0 (
-        ast.init_string(
-          _StringLiterals.process_bracket_string_indentation(
-            data.get_string(token)
-          )
+      ast.init_string(
+        _StringLiterals.process_bracket_string_indentation(
+          data.get_string(token)
         )
-      |
-        @error.at(token, _Error.ToDoComposeString)
       )
 
     | _Token.PrefixedString |
       try (
         error! if children_count != 2
 
-        string_with_prefix = ast.init_string_with_prefix
+        prefix_info = try (data.nth_child_with_index_of!(index, 0) | return)
+        prefix_token = prefix_info.head, prefix_index = prefix_info.tail
 
-        child_info = try (data.nth_child_with_index_of!(index, 0) | return)
-        child_token = child_info.head, child_index = child_info.tail
-        string_with_prefix.string =
-          _StringLiterals.process_escapes!(data.get_string(child_token))
+        string_info = try (data.nth_child_with_index_of!(index, 1) | return)
+        string_token = string_info.head, string_index = string_info.tail
 
-        child_info = try (data.nth_child_with_index_of!(index, 1) | return)
-        child_token = child_info.head, child_index = child_info.tail
-        @_build_name(string_with_prefix.prefix, data, state, child_token, child_index)
+        string_children_count = data.count_children_of(string_index)
+        if (string_children_count == 0) (
+          string_with_prefix = ast.init_string_with_prefix
+          string_with_prefix.string =
+            _StringLiterals.process_escapes!(data.get_string(string_token))
+          @_build_name(string_with_prefix.prefix, data, state, prefix_token, prefix_index)
+        |
+          string_compose = ast.init_string_compose
+          term_count = @_build_string_compose_terms(
+            string_compose.init_terms(string_children_count * 2 + 1)
+            data, state, string_token, string_index
+          )
+          string_compose.trim_terms(0, term_count)
+          @_build_name(string_compose.prefix, data, state, prefix_token, prefix_index)
+        )
       |
-        @error.at(token, _Error.ToDoComposeString)
+        @error.at(token, _Error.BugInvalidPrefixedString)
       )
 
     | _Token.BinaryInteger |
@@ -419,7 +495,7 @@
           ast.init_character(char.u64)
         )
       |
-        @error.at(token, _Error.CharacterInvalid)
+        @error.at(token, _Error.BugInvalidCharacter)
       )
 
     | _Token.FloatingPoint |

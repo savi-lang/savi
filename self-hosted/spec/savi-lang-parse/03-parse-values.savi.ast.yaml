@@ -49,9 +49,9 @@
             string: "foo"
           16: #30:
             string_with_prefix: #
-              string: "b"
               prefix: #31:
-                value: "bar"
+                value: "b"
+              string: "bar"
           17: #32:
             string: "\x01\x02\x03"
           18: #33:
@@ -64,3 +64,60 @@
             character: 1
           22: #37:
             character: 10084
+          23: #38:
+            string_compose: #
+              terms: #39:
+                0: #40:
+                  string: "compose string a "
+                1: #41:
+                  group: #42:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #43:
+                      0: #44:
+                        positive_integer: 99
+                2: #45:
+                  string: " "
+                3: #46:
+                  group: #47:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #48:
+                      0: #49:
+                        positive_integer: 100
+                4: #50:
+                  string: " final"
+          24: #51:
+            string_compose: #
+              terms: #52:
+                0: #53:
+                  string: "compose string b "
+                1: #54:
+                  group: #55:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #56:
+                      0: #57:
+                        positive_integer: 99
+                2: #58:
+                  string: " "
+                3: #59:
+                  group: #60:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #61:
+                      0: #62:
+                        positive_integer: 100
+          25: #63:
+            string_compose: #
+              prefix: #64:
+                value: "b"
+              terms: #65:
+                0: #66:
+                  group: #67:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #68:
+                      0: #69:
+                        positive_integer: 99
+                1: #70:
+                  group: #71:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #72:
+                      0: #73:
+                        positive_integer: 100

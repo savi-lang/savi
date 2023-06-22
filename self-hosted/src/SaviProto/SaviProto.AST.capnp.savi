@@ -136,15 +136,15 @@
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(0) -> (
-      try trace.property("string", @string_if_set!)
       try trace.property("prefix", @prefix_if_set!)
+      try trace.property("string", @string_if_set!)
     )
 
-  :fun string: @_p.text(0)
-  :fun string_if_set!: @_p.text_if_set!(0)
+  :fun prefix: SaviProto.AST.Name.read_from_pointer(@_p.struct(0))
+  :fun prefix_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(0))
 
-  :fun prefix: SaviProto.AST.Name.read_from_pointer(@_p.struct(1))
-  :fun prefix_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(1))
+  :fun string: @_p.text(1)
+  :fun string_if_set!: @_p.text_if_set!(1)
 
 :struct box SaviProto.AST.AS_stringCompose
   :let _p CapnProto.Pointer.Struct
@@ -157,15 +157,15 @@
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(0) -> (
-      try trace.property("terms", @terms_if_set!)
       try trace.property("prefix", @prefix_if_set!)
+      try trace.property("terms", @terms_if_set!)
     )
 
-  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(0))
-  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(0))
+  :fun prefix: SaviProto.AST.Name.read_from_pointer(@_p.struct(0))
+  :fun prefix_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(0))
 
-  :fun prefix: SaviProto.AST.Name.read_from_pointer(@_p.struct(1))
-  :fun prefix_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(1))
+  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(1))
+  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(1))
 
 :struct box SaviProto.AST.AS_prefix
   :let _p CapnProto.Pointer.Struct
@@ -707,8 +707,8 @@
   :fun ref string_with_prefix!: @_p.assert_union!(0x0, 7), SaviProto.AST.AS_stringWithPrefix.Builder.from_pointer(@_p)
   :fun ref string_with_prefix_if_set!: @_p.assert_union!(0x0, 7), SaviProto.AST.AS_stringWithPrefix.Builder.from_pointer(@_p)
   :fun ref init_string_with_prefix
-    @_p.clear_pointer(0) // string
-    @_p.clear_pointer(1) // prefix
+    @_p.clear_pointer(0) // prefix
+    @_p.clear_pointer(1) // string
     @_p.mark_union(0x0, 7)
     SaviProto.AST.AS_stringWithPrefix.Builder.from_pointer(@_p)
 
@@ -716,8 +716,8 @@
   :fun ref string_compose!: @_p.assert_union!(0x0, 8), SaviProto.AST.AS_stringCompose.Builder.from_pointer(@_p)
   :fun ref string_compose_if_set!: @_p.assert_union!(0x0, 8), SaviProto.AST.AS_stringCompose.Builder.from_pointer(@_p)
   :fun ref init_string_compose
-    @_p.clear_pointer(0) // terms
-    @_p.clear_pointer(1) // prefix
+    @_p.clear_pointer(0) // prefix
+    @_p.clear_pointer(1) // terms
     @_p.mark_union(0x0, 8)
     SaviProto.AST.AS_stringCompose.Builder.from_pointer(@_p)
 
@@ -844,12 +844,12 @@
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref string: @_p.text(0)
-  :fun ref string_if_set!: @_p.text_if_set!(0)
-  :fun ref "string="(new_value): @_p.set_text(0, new_value, "")
+  :fun ref prefix: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(0, 0, 1))
+  :fun ref prefix_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(0, 0, 1))
 
-  :fun ref prefix: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(1, 0, 1))
-  :fun ref prefix_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(1, 0, 1))
+  :fun ref string: @_p.text(1)
+  :fun ref string_if_set!: @_p.text_if_set!(1)
+  :fun ref "string="(new_value): @_p.set_text(1, new_value, "")
 
 :struct SaviProto.AST.AS_stringCompose.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -864,15 +864,15 @@
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(0))
-  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(0))
-  :fun ref init_terms(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(0, 2, 2, new_count))
-  :fun ref trim_terms(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(0, 2, 2, new_start, new_finish))
+  :fun ref prefix: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(0, 0, 1))
+  :fun ref prefix_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(0, 0, 1))
 
-  :fun ref prefix: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(1, 0, 1))
-  :fun ref prefix_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(1, 0, 1))
+  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(1))
+  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(1))
+  :fun ref init_terms(new_count)
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(1, 2, 2, new_count))
+  :fun ref trim_terms(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(1, 2, 2, new_start, new_finish))
 
 :struct SaviProto.AST.AS_prefix.Builder
   :let _p CapnProto.Pointer.Struct.Builder
