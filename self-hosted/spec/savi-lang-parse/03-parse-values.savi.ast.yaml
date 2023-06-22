@@ -125,3 +125,10 @@
                     terms: #74:
                       0: #75:
                         positive_integer: 100
+          28: #76:
+            string: "Hello, World!"
+          29: #77:
+            string_with_prefix: #
+              prefix: #78:
+                value: "b"
+              string: "\x00\x11\"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff"

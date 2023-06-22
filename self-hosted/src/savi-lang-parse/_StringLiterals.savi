@@ -59,10 +59,24 @@
 
   :fun process_escapes_starting_from!(start USize, source String, output String'ref)
     at_escape = False
+    in_newline_escape = False
+    in_unicode_escape = False
     expecting_hex_digits USize = 0
     escaped_char_in_progress U32 = 0
 
     source.each_char_with_index_and_width(start) -> (char, index, width |
+      // If we're in a newline escape, silently swallow spaces and tabs,
+      // but break out of the escape if we see anything else.
+      // This is separate from the case below because if we see a
+      // non-whitespace character it needs to be processed in the case below.
+      if in_newline_escape (
+        case char == (
+        | ' '  | next
+        | '\t' | next
+        | in_newline_escape = False
+        )
+      )
+
       case (
       // If we're at the start of an escape sequence, this char is what
       // tells us what kind of an escape sequence it is.
@@ -80,8 +94,9 @@
         | 'v'  | output.push_byte('\v')
         | '0'  | output.push_byte(0)
         | 'x'  | expecting_hex_digits = 2
-        | 'u'  | expecting_hex_digits = 4
-        | 'U'  | expecting_hex_digits = 8
+        | 'u'  | expecting_hex_digits = 4, in_unicode_escape = True
+        | 'U'  | expecting_hex_digits = 8, in_unicode_escape = True
+        | '\n' | in_newline_escape = True
         | error!
         )
 
@@ -99,7 +114,12 @@
 
         expecting_hex_digits -= 1
         if expecting_hex_digits.is_zero (
-          output.push_utf8(escaped_char_in_progress <<= 0)
+          if in_unicode_escape (
+            output.push_utf8(escaped_char_in_progress <<= 0)
+          |
+            output.push_byte((escaped_char_in_progress <<= 0).u8)
+          )
+          in_unicode_escape = False
         )
 
       // A slash marks the start of an escape sequence.
