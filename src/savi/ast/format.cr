@@ -184,6 +184,10 @@ class Savi::AST::Format < Savi::AST::Visitor
       # Only consider a term that is a parens group.
       next unless term.is_a?(AST::Group) && term.style == "("
 
+      # A group that has annotations attached to it must remain a group,
+      # so if we see any annotations for it, we stop considering it here.
+      next if term.annotations.try(&.any?)
+
       if group.style == " "
         # Parens for readability are acceptable when they are multi-line.
         next unless term.pos.single_line?

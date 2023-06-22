@@ -27,72 +27,68 @@
           name: "greeting"
         2: #20:
           name: "String"
-      docs: #21:
-        0: #22:
-          value: "Return a friendly greeting string for this instance."
-        1: #23:
-          value: "This always starts with a good, old-fashioned \"Hello\"."
-      body: #24:
-        terms: #25:
-          0: #26:
+      main_annotation: "Return a friendly greeting string for this instance.\nThis always starts with a good, old-fashioned \"Hello\"."
+      body: #21:
+        terms: #22:
+          0: #23:
             relate: #
-              op: #27:
+              op: #24:
                 value: "+"
-              terms: #28:
-                left: #29:
+              terms: #25:
+                left: #26:
                   relate: #
-                    op: #30:
+                    op: #27:
                       value: "+"
-                    terms: #31:
-                      left: #32:
+                    terms: #28:
+                      left: #29:
                         string: "Hello, "
-                      right: #33:
+                      right: #30:
                         name: "@name"
-                right: #34:
+                right: #31:
                   string: "!"
-    3: #35:
-      terms: #36:
-        0: #37:
+    3: #32:
+      terms: #33:
+        0: #34:
           name: "fun"
-        1: #38:
+        1: #35:
           qualify: #
-            term: #39:
+            term: #36:
               name: "degreesF"
-            group: #40:
+            group: #37:
               style: SaviProto.AST.Group.Style.Paren
-              terms: #41:
-                0: #42:
-                  group: #43:
+              terms: #38:
+                0: #39:
+                  group: #40:
                     style: SaviProto.AST.Group.Style.Space
-                    terms: #44:
-                      0: #45:
+                    terms: #41:
+                      0: #42:
                         name: "c"
-                      1: #46:
+                      1: #43:
                         name: "F64"
-        2: #47:
+        2: #44:
           name: "F64"
-      body: #48:
-        terms: #49:
-          0: #50:
+      body: #45:
+        terms: #46:
+          0: #47:
             relate: #
-              op: #51:
+              op: #48:
                 value: "+"
-              terms: #52:
-                left: #53:
+              terms: #49:
+                left: #50:
                   relate: #
-                    op: #54:
+                    op: #51:
                       value: "/"
-                    terms: #55:
-                      left: #56:
+                    terms: #52:
+                      left: #53:
                         relate: #
-                          op: #57:
+                          op: #54:
                             value: "*"
-                          terms: #58:
-                            left: #59:
+                          terms: #55:
+                            left: #56:
                               name: "c"
-                            right: #60:
+                            right: #57:
                               positive_integer: 9
-                      right: #61:
+                      right: #58:
                         positive_integer: 5
-                right: #62:
+                right: #59:
                   floating_point: 32.0

@@ -1,3 +1,44 @@
+:class _TreeBuilder.State
+  :var _main_annotation: String.new
+  :let _annotations: Map.Ordered(U64, String).new
+
+  :fun ref add_main_annotation(
+    data _TreeBuilder.Data
+    annotation PEG.Token(_Token)
+  )
+    if @_main_annotation.is_not_empty @_main_annotation.push_byte('\n')
+    @_main_annotation << data.get_string(annotation)
+
+  :fun ref add_annotation(
+    data _TreeBuilder.Data
+    annotation PEG.Token(_Token)
+    capn_proto_address U64
+  )
+    @_annotations[capn_proto_address] = try (
+      existing = @_annotations[capn_proto_address]!
+      "\(existing)\n\(data.get_string(annotation))"
+    |
+      data.get_string(annotation)
+    )
+
+  :fun ref finish_annotations(declare SaviProto.AST.Declare.Builder)
+    if @_main_annotation.is_not_empty (
+      declare.main_annotation = @_main_annotation.take_buffer // TODO: no take_buffer - String'box should be enough
+      @_main_annotation = String.new
+    )
+    if @_annotations.is_not_empty (
+      declare_annotations = declare.init_body_annotations(@_annotations.size)
+      declare_annotations_index USize = 0
+      @_annotations.each -> (target, value |
+        try (
+          declare_annotations[declare_annotations_index]!.target = target
+          declare_annotations[declare_annotations_index]!.value = value
+        )
+        declare_annotations_index += 1
+      )
+      @_annotations.clear
+    )
+
 :class _TreeBuilder
   :is PEG.Parser.Builder(
     _Token
@@ -16,6 +57,8 @@
     doc SaviProto.AST.Document.Builder
     data _TreeBuilder.Data
   )
+    state = _TreeBuilder.State.new
+
     // Get the first token.
     // If there aren't any tokens in the stream, return early.
     index = 0
@@ -28,7 +71,7 @@
     )
 
     // Build the top-level document.
-    @_build_doc(doc, data, token, index)
+    @_build_doc(doc, data, state, token, index)
 
   :fun ref _build_pos(
     pos SaviProto.Source.Pos.Builder
@@ -39,6 +82,7 @@
   :fun ref _build_doc(
     doc SaviProto.AST.Document.Builder
     data _TreeBuilder.Data
+    state _TreeBuilder.State
     token PEG.Token(_Token)
     index USize
   )
@@ -64,9 +108,11 @@
         pending_annotations << child_token
 
       | _Token.Declare |
-        // Trim the body terms list to the count and reset the count.
+        // Finish capturing annotations for the previous declare, and
+        // trim the body terms list to the count and reset the count.
         // That's all the body terms we have for the prior declare,
         // and any future body terms will go into this new declare.
+        state.finish_annotations(declare)
         declare.body.trim_terms(0, body_term_count)
         body_term_count = 0
 
@@ -81,14 +127,13 @@
 
         // Add any pending annotations to the declare node.
         if pending_annotations.is_not_empty (
-          docs = declare.init_docs(pending_annotations.size)
           pending_annotations.each_with_index -> (annotation_token, annotation_index |
-            try @_build_annotation(docs[annotation_index]!, data, annotation_token)
+            state.add_main_annotation(data, annotation_token)
           )
           pending_annotations.clear
         )
 
-        @_build_declare(declare, data, child_token, child_index)
+        @_build_declare(declare, data, state, child_token, child_index)
       |
         declare.body.style = SaviProto.AST.Group.Style.Root
 
@@ -104,19 +149,24 @@
         // TODO: Add any pending annotations to the term node.
         if pending_annotations.is_not_empty (
           pending_annotations.each -> (annotation_token |
-            @error.at(annotation_token, _Error.ToDoAnnotations)
+            state.add_annotation(data, annotation_token, body_term.capn_proto_address)
           )
+          pending_annotations.clear
         )
 
-        @_build_ast(body_term, data, child_token, child_index)
+        @_build_ast(body_term, data, state, child_token, child_index)
       )
     )
 
     // TODO: Set body pos for each declare with a body.
 
-    // Trim the final declare, and also the list of declares, to the right size.
-    // This is the last step; we won't see any other content in the document.
+    // Capture annotations
+
+    // Finish the final declare - the last one we'll see in the document.
+    state.finish_annotations(declare)
     declare.body.trim_terms(0, body_term_count)
+
+    // Finish off the document itself.
     doc.trim_declares(0, declare_count)
 
     @
@@ -124,80 +174,211 @@
   :fun ref _build_declare(
     declare SaviProto.AST.Declare.Builder
     data _TreeBuilder.Data
+    state _TreeBuilder.State
     token PEG.Token(_Token)
     index USize
   )
     // @_build_pos(declare.pos, token)
-    @_build_ast_list(
+
+    term_count = @_build_ast_list(
       declare.init_terms(data.count_children_of(index))
-      data, token, index
+      data, state, token, index
     )
+    declare.trim_terms(0, term_count)
 
-  :fun ref _build_annotation(
-    annotation SaviProto.AST.Annotation.Builder
+  :fun ref _build_name(
+    op SaviProto.AST.Name.Builder
     data _TreeBuilder.Data
-    token PEG.Token(_Token)
-  )
-    // @_build_pos(annotation.pos, token)
-    annotation.value = data.get_string(token)
-
-  :fun ref _build_operator(
-    op SaviProto.AST.Operator.Builder
-    data _TreeBuilder.Data
+    state _TreeBuilder.State
     token PEG.Token(_Token)
     index USize
   )
     // @_build_pos(op.pos, token)
     op.value = data.get_string(token)
 
-  :fun ref _build_group(
+  :fun ref _build_group_whitespace(
     group SaviProto.AST.Group.Builder
     data _TreeBuilder.Data
+    state _TreeBuilder.State
     token PEG.Token(_Token)
     index USize
   )
     // @_build_pos(group.pos, token)
 
+    group.style = SaviProto.AST.Group.Style.Space
+
+    term_count = @_build_ast_list(
+      group.init_terms(data.count_children_of(index))
+      data, state, token, index
+    )
+    group.trim_terms(0, term_count)
+
+  :fun ref _build_string_compose_terms(
+    list CapnProto.List.Builder(SaviProto.AST.Builder)
+    data _TreeBuilder.Data
+    state _TreeBuilder.State
+    token PEG.Token(_Token)
+    index USize
+  ) USize
+    // @_build_pos(compose.pos, token)
+
+    term_index USize = 0
+    literal_start = token.start
+
+    data.each_child_with_index_of(index) -> (child_token, child_index |
+      // Build the literal part of the string prior to this composed part.
+      literal_end = child_token.start - 1
+      if literal_end > literal_start (
+        literal_part = try (list[term_index]! |
+          @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+          next
+        )
+        try (
+          literal_part.init_string(
+            _StringLiterals.process_escapes!(
+              data.code.trim(literal_start, literal_end)
+            )
+          )
+        |
+          @error.at(token, _Error.BugInvalidString)
+        )
+        term_index += 1
+      )
+      literal_start = child_token.end
+
+      // Build the composed part.
+      @_build_ast(
+        try (list[term_index]! |
+          @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+          next
+        )
+        data, state, child_token, child_index
+      )
+      term_index += 1
+    )
+
+    // Build the remaining literal part of the string after all other parts.
+    if literal_start < token.end (
+      literal_part = try (list[term_index]! |
+        @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+        return term_index
+      )
+      try (
+        literal_part.init_string(
+          _StringLiterals.process_escapes!(
+            data.code.trim(literal_start, token.end)
+          )
+        )
+      |
+        @error.at(token, _Error.BugInvalidString)
+      )
+      term_index += 1
+    )
+
+    term_index
+
+  :fun ref _build_group(
+    group SaviProto.AST.Group.Builder
+    data _TreeBuilder.Data
+    state _TreeBuilder.State
+    token PEG.Token(_Token)
+    index USize
+  )
+    // @_build_pos(group.pos, token)
+
+    // Determine what kind of group this is.
     first_byte = data.get_first_byte(token)
     last_byte = data.get_last_byte(token)
     group.has_exclamation = last_byte == '!'
-    group.style = if token.kind == _Token.GroupWhitespace (
-      SaviProto.AST.Group.Style.Space
-    |
-      case first_byte == (
-      | '(' | SaviProto.AST.Group.Style.Paren
-      | '[' | SaviProto.AST.Group.Style.Square
-      | '{' | SaviProto.AST.Group.Style.Curly
-      | @error.at(token, _Error.BugInvalidGroupStyleByte), return
+    group.style = case first_byte == (
+    | '(' | SaviProto.AST.Group.Style.Paren
+    | '[' | SaviProto.AST.Group.Style.Square
+    | '{' | SaviProto.AST.Group.Style.Curly
+    | @error.at(token, _Error.BugInvalidGroupStyleByte), return
+    )
+
+    // If there's only one partition in the group, build it as a simple group.
+    partition_count = data.count_children_of(index)
+    if partition_count == 1 (
+      try (
+        pair = data.first_child_with_index_of!(index)
+        child_token = pair.head
+        child_index = pair.tail
+        term_count = @_build_ast_list(
+          group.init_terms(data.count_children_of(child_index))
+          data, state, child_token, child_index
+        )
+        group.trim_terms(0, term_count)
+        return
       )
     )
 
-    // TODO: Handle `|` operator token to create a pipe-partitioned group.
+    // Otherwise, it's a partitioned group.
+    orig_style = group.style
+    group.style = SaviProto.AST.Group.Style.Pipe
+    partitions = group.init_terms(partition_count)
 
-    @_build_ast_list(
-      group.init_terms(data.count_children_of(index))
-      data, token, index
+    // Build each partition as an inner group of the original style.
+    partition_index USize = 0
+    data.each_child_with_index_of(index) -> (child_token, child_index |
+      try (
+        partition = partitions[partition_index]!.init_group
+        partition.style = orig_style
+        term_count = @_build_ast_list(
+          partition.init_terms(data.count_children_of(child_index))
+          data, state, child_token, child_index
+        )
+        partition.trim_terms(0, term_count)
+        partition_index += 1
+      |
+        @error.at(child_token, _Error.BugFixedSizeListIsTooSmall)
+      )
     )
+
 
   :fun ref _build_ast_list(
     list CapnProto.List.Builder(SaviProto.AST.Builder)
     data _TreeBuilder.Data
+    state _TreeBuilder.State
     token PEG.Token(_Token)
     index USize
-  )
-    term_count USize = 0
+  ) USize
+    pending_annotations Array(PEG.Token(_Token)) = []
+    term_index USize = 0
+
     data.each_child_with_index_of(index) -> (child_token, child_index |
-      try (
-        @_build_ast(list[term_count]!, data, child_token, child_index)
-      |
-        @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+      // If this is an annotation, it's not a "real" term.
+      // Add it to the pending list for the next "real" term.
+      if child_token.kind == _Token.Annotation (
+        pending_annotations << child_token
+        next
       )
-      term_count += 1
+
+      ast = try (list[term_index]! |
+        @error.at(token, _Error.BugFixedSizeListIsTooSmall)
+        next
+      )
+
+      // Add any pending annotations to the term node.
+      pending_annotations.each -> (annotation_token |
+        state.add_annotation(data, annotation_token, ast.capn_proto_address)
+      )
+      pending_annotations.clear
+
+      // Build the term node.
+      @_build_ast(ast, data, state, child_token, child_index)
+
+      // Get ready to build the next term.
+      term_index += 1
     )
+
+    // Return the total number of "real" terms.
+    term_index
 
   :fun ref _build_ast(
     ast SaviProto.AST.Builder
     data _TreeBuilder.Data
+    state _TreeBuilder.State
     token PEG.Token(_Token)
     index USize
   )
@@ -208,64 +389,74 @@
     // requires us to generate a lot of false positive relates in the grammar
     // (child-carrying tokens that end up with only one child).
     // When that happens, the outer token disappears and we keep only the child.
-    if (children_count == 1 && (
+    while (children_count == 1 && (
       token.kind == _Token.Relate ||
       token.kind == _Token.RelateAssign ||
       token.kind == _Token.Compound
     )) (
       data.each_child_with_index_of(index) -> (child_token, child_index |
-        @_build_ast(ast, data, child_token, child_index)
+        token = child_token
+        index = child_index
+        children_count = data.count_children_of(index)
       )
-      return
     )
 
     case token.kind == (
-    | _Token.Annotation |
-      @error.at(token, _Error.ToDoAnnotations)
-
     | _Token.Identifier |
       ast.init_name(data.get_string(token))
 
     | _Token.String |
-      if children_count == 0 (
+      if children_count.is_nonzero (
+        string_compose = ast.init_string_compose
+        term_count = @_build_string_compose_terms(
+          string_compose.init_terms(children_count * 2 + 1)
+          data, state, token, index
+        )
+        string_compose.trim_terms(0, term_count)
+      |
         try (
           ast.init_string(
             _StringLiterals.process_escapes!(data.get_string(token))
           )
         |
-          @error.at(token, _Error.StringInvalid)
+          @error.at(token, _Error.BugInvalidString)
         )
-      |
-        @error.at(token, _Error.ToDoComposeString)
       )
 
     | _Token.BracketString |
-      if children_count == 0 (
-        ast.init_string(
-          _StringLiterals.process_bracket_string_indentation(
-            data.get_string(token)
-          )
+      ast.init_string(
+        _StringLiterals.process_bracket_string_indentation(
+          data.get_string(token)
         )
-      |
-        @error.at(token, _Error.ToDoComposeString)
       )
 
     | _Token.PrefixedString |
       try (
         error! if children_count != 2
 
-        string_with_prefix = ast.init_string_with_prefix
+        prefix_info = try (data.nth_child_with_index_of!(index, 0) | return)
+        prefix_token = prefix_info.head, prefix_index = prefix_info.tail
 
-        child_info = try (data.nth_child_with_index_of!(index, 0) | return)
-        child_token = child_info.head, child_index = child_info.tail
-        string_with_prefix.string =
-          _StringLiterals.process_escapes!(data.get_string(child_token))
+        string_info = try (data.nth_child_with_index_of!(index, 1) | return)
+        string_token = string_info.head, string_index = string_info.tail
 
-        child_info = try (data.nth_child_with_index_of!(index, 1) | return)
-        child_token = child_info.head, child_index = child_info.tail
-        @_build_operator(string_with_prefix.prefix, data, child_token, child_index)
+        string_children_count = data.count_children_of(string_index)
+        if string_children_count == 0 (
+          string_with_prefix = ast.init_string_with_prefix
+          string_with_prefix.string =
+            _StringLiterals.process_escapes!(data.get_string(string_token))
+          @_build_name(string_with_prefix.prefix, data, state, prefix_token, prefix_index)
+        |
+          string_compose = ast.init_string_compose
+          term_count = @_build_string_compose_terms(
+            string_compose.init_terms(string_children_count * 2 + 1)
+            data, state, string_token, string_index
+          )
+          string_compose.trim_terms(0, term_count)
+          @_build_name(string_compose.prefix, data, state, prefix_token, prefix_index)
+        )
       |
-        @error.at(token, _Error.ToDoComposeString)
+        @error.at(token, _Error.BugInvalidPrefixedString)
       )
 
     | _Token.BinaryInteger |
@@ -304,7 +495,7 @@
           ast.init_character(char.u64)
         )
       |
-        @error.at(token, _Error.CharacterInvalid)
+        @error.at(token, _Error.BugInvalidCharacter)
       )
 
     | _Token.FloatingPoint |
@@ -315,21 +506,21 @@
       )
 
     | _Token.Group |
-      @_build_group(ast.init_group, data, token, index)
+      @_build_group(ast.init_group, data, state, token, index)
 
     | _Token.GroupWhitespace |
-      @_build_group(ast.init_group, data, token, index)
+      @_build_group_whitespace(ast.init_group, data, state, token, index)
 
     | _Token.Prefix |
       prefix = ast.init_prefix
 
       child_info = try (data.nth_child_with_index_of!(index, 0) | return)
       child_token = child_info.head, child_index = child_info.tail
-      @_build_operator(prefix.op, data, child_token, child_index)
+      @_build_name(prefix.op, data, state, child_token, child_index)
 
       child_info = try (data.nth_child_with_index_of!(index, 1) | return)
       child_token = child_info.head, child_index = child_info.tail
-      @_build_ast(prefix.term, data, child_token, child_index)
+      @_build_ast(prefix.term, data, state, child_token, child_index)
 
     | _Token.RelateAssign |
       child_number USize = 0
@@ -340,12 +531,11 @@
         remaining_children_count = children_count - child_number
         case (
         | child_token.kind == _Token.Annotation |
-          @error.at(child_token, _Error.ToDoAnnotations)
-          return
+          state.add_annotation(data, child_token, ast.capn_proto_address)
 
         | remaining_children_count > 2 |
           relate = ast.init_relate
-          @_build_ast(relate.terms.left, data, child_token, child_index)
+          @_build_ast(relate.terms.left, data, state, child_token, child_index)
 
           child_number += 1
           child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
@@ -354,12 +544,12 @@
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )
-          @_build_operator(relate.op, data, child_token, child_index)
+          @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.right
 
         | remaining_children_count == 1 |
-          @_build_ast(ast, data, child_token, child_index)
+          @_build_ast(ast, data, state, child_token, child_index)
 
         |
           @error.at(child_token, _Error.BugUnexpectedGrammarToken)
@@ -377,12 +567,11 @@
 
         case (
         | child_token.kind == _Token.Annotation |
-          @error.at(child_token, _Error.ToDoAnnotations)
-          return
+          state.add_annotation(data, child_token, ast.capn_proto_address)
 
         | child_number > 1 |
           relate = ast.init_relate
-          @_build_ast(relate.terms.right, data, child_token, child_index)
+          @_build_ast(relate.terms.right, data, state, child_token, child_index)
 
           child_number -= 1
           child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
@@ -391,12 +580,12 @@
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )
-          @_build_operator(relate.op, data, child_token, child_index)
+          @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.left
 
         | child_number == 0 |
-          @_build_ast(ast, data, child_token, child_index)
+          @_build_ast(ast, data, state, child_token, child_index)
 
         |
           @error.at(child_token, _Error.BugUnexpectedGrammarToken)
@@ -412,18 +601,18 @@
 
         case (
         | child_token.kind == _Token.Annotation |
-          @error.at(child_token, _Error.ToDoAnnotations)
-          return
+          state.add_annotation(data, child_token, ast.capn_proto_address)
 
-        | child_token.kind == _Token.Group && child_number > 0 |
+        | child_token.kind == _Token.Group && child_number > 0 &&
+          (try (data.nth_child_with_index_of!(index, child_number - 1).head.kind != _Token.Operator | True)) |
           qualify = ast.init_qualify
-          @_build_group(qualify.group, data, child_token, child_index)
+          @_build_group(qualify.group, data, state, child_token, child_index)
 
           ast = qualify.term
 
         | child_number > 1 |
           relate = ast.init_relate
-          @_build_ast(relate.terms.right, data, child_token, child_index)
+          @_build_ast(relate.terms.right, data, state, child_token, child_index)
 
           child_number -= 1
           child_info = try (data.nth_child_with_index_of!(index, child_number) | next)
@@ -432,19 +621,19 @@
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )
-          @_build_operator(relate.op, data, child_token, child_index)
+          @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.left
 
         | child_number == 0 |
-          @_build_ast(ast, data, child_token, child_index)
+          @_build_ast(ast, data, state, child_token, child_index)
 
         |
           @error.at(child_token, _Error.BugUnexpectedGrammarToken)
         )
       )
     |
-      @error.at(token, _Error.ToDoAnnotations)
+      @error.at(token, _Error.ToDoTokenKind)
     )
 
     @

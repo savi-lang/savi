@@ -1,8 +1,6 @@
 :enum _Error
   :member IntegerTooBig 1
   :member FloatingPointInvalid 2
-  :member StringInvalid 3
-  :member CharacterInvalid 4
 
   :member BugNoTokens 100
   :member BugInitialTokenIsNotDocument 101
@@ -10,10 +8,11 @@
   :member BugASTListNeedsLargerInitSize 103
   :member BugUnexpectedGrammarToken 104
   :member BugInvalidGroupStyleByte 105
+  :member BugInvalidString 106
+  :member BugInvalidPrefixedString 107
+  :member BugInvalidCharacter 108
 
   :member ToDoTokenKind 200
-  :member ToDoAnnotations 201
-  :member ToDoComposeString 202
 
 :struct _Error.Info
   :let at PEG.Token(_Token)

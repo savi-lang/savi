@@ -49,18 +49,86 @@
             string: "foo"
           16: #30:
             string_with_prefix: #
-              string: "b"
               prefix: #31:
-                value: "bar"
+                value: "b"
+              string: "bar"
           17: #32:
             string: "\x01\x02\x03"
           18: #33:
             string: "\xe2\x9d\xa4"
           19: #34:
-            character: 102
+            string: "\xf0\x9f\xa8\x81"
           20: #35:
-            character: 0
+            character: 102
           21: #36:
-            character: 1
+            character: 0
           22: #37:
+            character: 1
+          23: #38:
             character: 10084
+          24: #39:
+            character: 129537
+          25: #40:
+            string_compose: #
+              terms: #41:
+                0: #42:
+                  string: "compose string a "
+                1: #43:
+                  group: #44:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #45:
+                      0: #46:
+                        positive_integer: 99
+                2: #47:
+                  string: " "
+                3: #48:
+                  group: #49:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #50:
+                      0: #51:
+                        positive_integer: 100
+                4: #52:
+                  string: " final"
+          26: #53:
+            string_compose: #
+              terms: #54:
+                0: #55:
+                  string: "compose string b "
+                1: #56:
+                  group: #57:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #58:
+                      0: #59:
+                        positive_integer: 99
+                2: #60:
+                  string: " "
+                3: #61:
+                  group: #62:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #63:
+                      0: #64:
+                        positive_integer: 100
+          27: #65:
+            string_compose: #
+              prefix: #66:
+                value: "b"
+              terms: #67:
+                0: #68:
+                  group: #69:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #70:
+                      0: #71:
+                        positive_integer: 99
+                1: #72:
+                  group: #73:
+                    style: SaviProto.AST.Group.Style.Paren
+                    terms: #74:
+                      0: #75:
+                        positive_integer: 100
+          28: #76:
+            string: "Hello, World!"
+          29: #77:
+            string_with_prefix: #
+              prefix: #78:
+                value: "b"
+              string: "\x00\x11\"3DUfw\x88\x99\xaa\xbb\xcc\xdd\xee\xff"

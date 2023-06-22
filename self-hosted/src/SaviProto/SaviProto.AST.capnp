@@ -6,92 +6,89 @@ $Savi.namespace("SaviProto");
 using Source = import "SaviProto.Source.capnp".Source;
 
 struct AST {
-  pos @0 :Source.Pos;
-
   union {
-    none @1 :Void;
+    none @0 :Void;
 
-    character @2 :UInt64;
+    character @1 :UInt64;
 
-    positiveInteger @3 :UInt64;
+    positiveInteger @2 :UInt64;
 
-    negativeInteger @4 :UInt64;
+    negativeInteger @3 :UInt64;
 
-    floatingPoint @5 :Float64;
+    floatingPoint @4 :Float64;
 
-    name @6 :Text;
+    name @5 :Text;
 
-    string @7 :Text;
+    string @6 :Text;
 
     stringWithPrefix :group {
+      prefix @7 :AST.Name;
       string @8 :Text;
-      prefix @9 :AST.Operator;
     }
 
     stringCompose :group {
+      prefix @9 :AST.Name;
       terms @10 :List(AST);
-      prefix @11 :AST.Operator;
     }
 
     prefix :group {
-      op @12 :AST.Operator;
-      term @13 :AST;
+      op @11 :AST.Name;
+      term @12 :AST;
     }
 
     qualify :group {
-      term @14 :AST;
-      group @15 :AST.Group;
+      term @13 :AST;
+      group @14 :AST.Group;
     }
 
-    group @16 :AST.Group;
+    group @15 :AST.Group;
 
     relate :group {
-      op @17 :AST.Operator;
-      terms @18 :AST.Pair;
+      op @16 :AST.Name;
+      terms @17 :AST.Pair;
     }
 
     fieldRead :group {
-      field @19 :Text;
+      field @18 :Text;
     }
 
     fieldWrite :group {
-      field @20 :Text;
-      value @21 :AST;
+      field @19 :Text;
+      value @20 :AST;
     }
 
     fieldDisplace :group {
-      field @22 :Text;
-      value @23 :AST;
+      field @21 :Text;
+      value @22 :AST;
     }
 
-    call @24 :AST.Call;
+    call @23 :AST.Call;
 
     choice :group {
-      branches @25 :List(AST.ChoiceBranch);
+      branches @24 :List(AST.ChoiceBranch);
     }
 
-    loop @26 :AST.Loop;
+    loop @25 :AST.Loop;
 
-    try @27 :AST.Try;
+    try @26 :AST.Try;
 
     jump :group {
-      term @28 :AST;
-      kind @29 :AST.JumpKind;
+      term @27 :AST;
+      kind @28 :AST.JumpKind;
     }
 
     yield :group {
-      terms @30 :List(AST);
+      terms @29 :List(AST);
     }
   }
 
   struct Annotation {
-    pos   @0 :Source.Pos;
+    target @0 :UInt64;
     value @1 :Text;
   }
 
-  struct Operator {
-    pos   @0 :Source.Pos;
-    value @1 :Text;
+  struct Name {
+    value @0 :Text;
   }
 
   struct Pair {
@@ -100,11 +97,10 @@ struct AST {
   }
 
   struct Group {
-    pos   @0 :Source.Pos;
-    style @1 :AST.Group.Style;
-    terms @2 :List(AST);
+    style @0 :AST.Group.Style;
+    terms @1 :List(AST);
 
-    hasExclamation @3 :Bool;
+    hasExclamation @2 :Bool;
 
     enum Style {
       root   @0; # root declaration body
@@ -116,19 +112,16 @@ struct AST {
     }
   }
 
-  struct Call
-  {
+  struct Call {
     receiver @0 :AST;
-    name @1 :Text;
-    namePos @2 :Source.Pos;
-    args @3 :List(AST);
-    yield @4 :AST.CallYield;
+    name @1 :Name;
+    args @2 :List(AST);
+    yield @3 :AST.CallYield;
   }
 
   struct CallYield {
-    pos    @0 :Source.Pos;
-    params @1 :AST.Group;
-    block  @2 :AST.Group;
+    params @0 :AST.Group;
+    block  @1 :AST.Group;
   }
 
   struct ChoiceBranch {
@@ -157,15 +150,14 @@ struct AST {
   }
 
   struct Declare {
-    pos   @0 :Source.Pos;
-    terms @1 :List(AST);
-    docs  @2 :List(AST.Annotation);
-    body  @3 :AST.Group;
+    terms @0 :List(AST);
+    mainAnnotation @1 :Text;
+    bodyAnnotations @2 :List(AST.Annotation);
+    body @3 :AST.Group;
   }
 
   struct Document {
-    source @0 :Source;
-    declares @1 :List(AST.Declare);
-    bodies @2 :List(AST.Group);
+    declares @0 :List(AST.Declare);
+    bodies @1 :List(AST.Group);
   }
 }

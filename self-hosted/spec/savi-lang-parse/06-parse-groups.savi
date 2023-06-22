@@ -1,0 +1,21 @@
+:module _Groups
+  :fun example
+    a b c d e
+    a b c \
+      d e
+    (a, b, c, d, e) :: annotated to prevent `savi format` from removing parens
+    (
+      a, b
+      c, d
+      e
+    ) :: annotated to prevent `savi format` from removing parens
+    (a | b | c | d | e)
+    (
+    | a | b
+    | c | d
+    | e
+    )
+    (a, b | c, d | | e)
+    (a, b, c, d, e | )
+    (a, b, c, d, e | | )
+    () :: annotated to prevent `savi format` from removing parens

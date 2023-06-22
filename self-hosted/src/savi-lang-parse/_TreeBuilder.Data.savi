@@ -28,6 +28,9 @@
     )
     error!
 
+  :fun first_child_with_index_of!(parent_index USize)
+    @nth_child_with_index_of!(parent_index, 0)
+
   :fun count_children_of(parent_index USize) USize
     count USize = 0
     @each_child_with_index_of(parent_index) -> (token, index |

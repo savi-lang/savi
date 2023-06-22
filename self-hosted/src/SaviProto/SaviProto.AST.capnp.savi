@@ -7,12 +7,12 @@
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(@_p.absolute_address) -> (
-      try trace.property("pos", @pos_if_set!)
       try trace.property("none", @none!)
       try trace.property("character", @character!)
       try trace.property("positive_integer", @positive_integer!)
@@ -37,9 +37,6 @@
       try trace.property("yield", @yield!)
     )
 
-  :fun pos: SaviProto.Source.Pos.read_from_pointer(@_p.struct(0))
-  :fun pos_if_set!: SaviProto.Source.Pos.read_from_pointer(@_p.struct_if_set!(0))
-
   :fun is_none: @_p.check_union(0x0, 0)
   :fun none!: @_p.assert_union!(0x0, 0), None
   :fun none_if_set!: @_p.assert_union!(0x0, 0), None
@@ -61,12 +58,12 @@
   :fun floating_point_if_set!: @_p.assert_union!(0x0, 4), @_p.f64_if_set!(0x8)
 
   :fun is_name: @_p.check_union(0x0, 5)
-  :fun name!: @_p.assert_union!(0x0, 5), @_p.text(1)
-  :fun name_if_set!: @_p.assert_union!(0x0, 5), @_p.text_if_set!(1)
+  :fun name!: @_p.assert_union!(0x0, 5), @_p.text(0)
+  :fun name_if_set!: @_p.assert_union!(0x0, 5), @_p.text_if_set!(0)
 
   :fun is_string: @_p.check_union(0x0, 6)
-  :fun string!: @_p.assert_union!(0x0, 6), @_p.text(1)
-  :fun string_if_set!: @_p.assert_union!(0x0, 6), @_p.text_if_set!(1)
+  :fun string!: @_p.assert_union!(0x0, 6), @_p.text(0)
+  :fun string_if_set!: @_p.assert_union!(0x0, 6), @_p.text_if_set!(0)
 
   :fun is_string_with_prefix: @_p.check_union(0x0, 7)
   :fun string_with_prefix!: @_p.assert_union!(0x0, 7), SaviProto.AST.AS_stringWithPrefix.read_from_pointer(@_p)
@@ -85,8 +82,8 @@
   :fun qualify_if_set!: @_p.assert_union!(0x0, 10), SaviProto.AST.AS_qualify.read_from_pointer(@_p)
 
   :fun is_group: @_p.check_union(0x0, 11)
-  :fun group!: @_p.assert_union!(0x0, 11), SaviProto.AST.Group.read_from_pointer(@_p.struct(1))
-  :fun group_if_set!: @_p.assert_union!(0x0, 11), SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(1))
+  :fun group!: @_p.assert_union!(0x0, 11), SaviProto.AST.Group.read_from_pointer(@_p.struct(0))
+  :fun group_if_set!: @_p.assert_union!(0x0, 11), SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(0))
 
   :fun is_relate: @_p.check_union(0x0, 12)
   :fun relate!: @_p.assert_union!(0x0, 12), SaviProto.AST.AS_relate.read_from_pointer(@_p)
@@ -105,20 +102,20 @@
   :fun field_displace_if_set!: @_p.assert_union!(0x0, 15), SaviProto.AST.AS_fieldDisplace.read_from_pointer(@_p)
 
   :fun is_call: @_p.check_union(0x0, 16)
-  :fun call!: @_p.assert_union!(0x0, 16), SaviProto.AST.Call.read_from_pointer(@_p.struct(1))
-  :fun call_if_set!: @_p.assert_union!(0x0, 16), SaviProto.AST.Call.read_from_pointer(@_p.struct_if_set!(1))
+  :fun call!: @_p.assert_union!(0x0, 16), SaviProto.AST.Call.read_from_pointer(@_p.struct(0))
+  :fun call_if_set!: @_p.assert_union!(0x0, 16), SaviProto.AST.Call.read_from_pointer(@_p.struct_if_set!(0))
 
   :fun is_choice: @_p.check_union(0x0, 17)
   :fun choice!: @_p.assert_union!(0x0, 17), SaviProto.AST.AS_choice.read_from_pointer(@_p)
   :fun choice_if_set!: @_p.assert_union!(0x0, 17), SaviProto.AST.AS_choice.read_from_pointer(@_p)
 
   :fun is_loop: @_p.check_union(0x0, 18)
-  :fun loop!: @_p.assert_union!(0x0, 18), SaviProto.AST.Loop.read_from_pointer(@_p.struct(1))
-  :fun loop_if_set!: @_p.assert_union!(0x0, 18), SaviProto.AST.Loop.read_from_pointer(@_p.struct_if_set!(1))
+  :fun loop!: @_p.assert_union!(0x0, 18), SaviProto.AST.Loop.read_from_pointer(@_p.struct(0))
+  :fun loop_if_set!: @_p.assert_union!(0x0, 18), SaviProto.AST.Loop.read_from_pointer(@_p.struct_if_set!(0))
 
   :fun is_try: @_p.check_union(0x0, 19)
-  :fun try!: @_p.assert_union!(0x0, 19), SaviProto.AST.Try.read_from_pointer(@_p.struct(1))
-  :fun try_if_set!: @_p.assert_union!(0x0, 19), SaviProto.AST.Try.read_from_pointer(@_p.struct_if_set!(1))
+  :fun try!: @_p.assert_union!(0x0, 19), SaviProto.AST.Try.read_from_pointer(@_p.struct(0))
+  :fun try_if_set!: @_p.assert_union!(0x0, 19), SaviProto.AST.Try.read_from_pointer(@_p.struct_if_set!(0))
 
   :fun is_jump: @_p.check_union(0x0, 20)
   :fun jump!: @_p.assert_union!(0x0, 20), SaviProto.AST.AS_jump.read_from_pointer(@_p)
@@ -133,47 +130,50 @@
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(0) -> (
-      try trace.property("string", @string_if_set!)
       try trace.property("prefix", @prefix_if_set!)
+      try trace.property("string", @string_if_set!)
     )
+
+  :fun prefix: SaviProto.AST.Name.read_from_pointer(@_p.struct(0))
+  :fun prefix_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(0))
 
   :fun string: @_p.text(1)
   :fun string_if_set!: @_p.text_if_set!(1)
-
-  :fun prefix: SaviProto.AST.Operator.read_from_pointer(@_p.struct(2))
-  :fun prefix_if_set!: SaviProto.AST.Operator.read_from_pointer(@_p.struct_if_set!(2))
 
 :struct box SaviProto.AST.AS_stringCompose
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(0) -> (
-      try trace.property("terms", @terms_if_set!)
       try trace.property("prefix", @prefix_if_set!)
+      try trace.property("terms", @terms_if_set!)
     )
+
+  :fun prefix: SaviProto.AST.Name.read_from_pointer(@_p.struct(0))
+  :fun prefix_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(0))
 
   :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(1))
   :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(1))
-
-  :fun prefix: SaviProto.AST.Operator.read_from_pointer(@_p.struct(2))
-  :fun prefix_if_set!: SaviProto.AST.Operator.read_from_pointer(@_p.struct_if_set!(2))
 
 :struct box SaviProto.AST.AS_prefix
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -182,18 +182,19 @@
       try trace.property("term", @term_if_set!)
     )
 
-  :fun op: SaviProto.AST.Operator.read_from_pointer(@_p.struct(1))
-  :fun op_if_set!: SaviProto.AST.Operator.read_from_pointer(@_p.struct_if_set!(1))
+  :fun op: SaviProto.AST.Name.read_from_pointer(@_p.struct(0))
+  :fun op_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(0))
 
-  :fun term: SaviProto.AST.read_from_pointer(@_p.struct(2))
-  :fun term_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(2))
+  :fun term: SaviProto.AST.read_from_pointer(@_p.struct(1))
+  :fun term_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(1))
 
 :struct box SaviProto.AST.AS_qualify
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -202,18 +203,19 @@
       try trace.property("group", @group_if_set!)
     )
 
-  :fun term: SaviProto.AST.read_from_pointer(@_p.struct(1))
-  :fun term_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(1))
+  :fun term: SaviProto.AST.read_from_pointer(@_p.struct(0))
+  :fun term_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(0))
 
-  :fun group: SaviProto.AST.Group.read_from_pointer(@_p.struct(2))
-  :fun group_if_set!: SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(2))
+  :fun group: SaviProto.AST.Group.read_from_pointer(@_p.struct(1))
+  :fun group_if_set!: SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(1))
 
 :struct box SaviProto.AST.AS_relate
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -222,18 +224,19 @@
       try trace.property("terms", @terms_if_set!)
     )
 
-  :fun op: SaviProto.AST.Operator.read_from_pointer(@_p.struct(1))
-  :fun op_if_set!: SaviProto.AST.Operator.read_from_pointer(@_p.struct_if_set!(1))
+  :fun op: SaviProto.AST.Name.read_from_pointer(@_p.struct(0))
+  :fun op_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(0))
 
-  :fun terms: SaviProto.AST.Pair.read_from_pointer(@_p.struct(2))
-  :fun terms_if_set!: SaviProto.AST.Pair.read_from_pointer(@_p.struct_if_set!(2))
+  :fun terms: SaviProto.AST.Pair.read_from_pointer(@_p.struct(1))
+  :fun terms_if_set!: SaviProto.AST.Pair.read_from_pointer(@_p.struct_if_set!(1))
 
 :struct box SaviProto.AST.AS_fieldRead
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -241,15 +244,16 @@
       try trace.property("field", @field_if_set!)
     )
 
-  :fun field: @_p.text(1)
-  :fun field_if_set!: @_p.text_if_set!(1)
+  :fun field: @_p.text(0)
+  :fun field_if_set!: @_p.text_if_set!(0)
 
 :struct box SaviProto.AST.AS_fieldWrite
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -258,18 +262,19 @@
       try trace.property("value", @value_if_set!)
     )
 
-  :fun field: @_p.text(1)
-  :fun field_if_set!: @_p.text_if_set!(1)
+  :fun field: @_p.text(0)
+  :fun field_if_set!: @_p.text_if_set!(0)
 
-  :fun value: SaviProto.AST.read_from_pointer(@_p.struct(2))
-  :fun value_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(2))
+  :fun value: SaviProto.AST.read_from_pointer(@_p.struct(1))
+  :fun value_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(1))
 
 :struct box SaviProto.AST.AS_fieldDisplace
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -278,18 +283,19 @@
       try trace.property("value", @value_if_set!)
     )
 
-  :fun field: @_p.text(1)
-  :fun field_if_set!: @_p.text_if_set!(1)
+  :fun field: @_p.text(0)
+  :fun field_if_set!: @_p.text_if_set!(0)
 
-  :fun value: SaviProto.AST.read_from_pointer(@_p.struct(2))
-  :fun value_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(2))
+  :fun value: SaviProto.AST.read_from_pointer(@_p.struct(1))
+  :fun value_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(1))
 
 :struct box SaviProto.AST.AS_choice
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -297,15 +303,16 @@
       try trace.property("branches", @branches_if_set!)
     )
 
-  :fun branches: CapnProto.List(SaviProto.AST.ChoiceBranch).read_from_pointer(@_p.list(1))
-  :fun branches_if_set!: CapnProto.List(SaviProto.AST.ChoiceBranch).read_from_pointer(@_p.list_if_set!(1))
+  :fun branches: CapnProto.List(SaviProto.AST.ChoiceBranch).read_from_pointer(@_p.list(0))
+  :fun branches_if_set!: CapnProto.List(SaviProto.AST.ChoiceBranch).read_from_pointer(@_p.list_if_set!(0))
 
 :struct box SaviProto.AST.AS_jump
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -314,8 +321,8 @@
       try trace.property("kind", @kind_if_set!)
     )
 
-  :fun term: SaviProto.AST.read_from_pointer(@_p.struct(1))
-  :fun term_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(1))
+  :fun term: SaviProto.AST.read_from_pointer(@_p.struct(0))
+  :fun term_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(0))
 
   :fun kind: SaviProto.AST.JumpKind._new(@_p.u16(0x8))
   :fun kind_if_set!: SaviProto.AST.JumpKind._new(@_p.u16_if_set!(0x8))
@@ -325,7 +332,8 @@
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -333,48 +341,46 @@
       try trace.property("terms", @terms_if_set!)
     )
 
-  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(1))
-  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(1))
+  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(0))
+  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(0))
 
 :struct box SaviProto.AST.Annotation
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
-  :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 2
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(@_p.absolute_address) -> (
-      try trace.property("pos", @pos_if_set!)
+      try trace.property("target", @target_if_set!)
       try trace.property("value", @value_if_set!)
     )
 
-  :fun pos: SaviProto.Source.Pos.read_from_pointer(@_p.struct(0))
-  :fun pos_if_set!: SaviProto.Source.Pos.read_from_pointer(@_p.struct_if_set!(0))
+  :fun target: @_p.u64(0x0)
+  :fun target_if_set!: @_p.u64_if_set!(0x0)
 
-  :fun value: @_p.text(1)
-  :fun value_if_set!: @_p.text_if_set!(1)
+  :fun value: @_p.text(0)
+  :fun value_if_set!: @_p.text_if_set!(0)
 
-:struct box SaviProto.AST.Operator
+:struct box SaviProto.AST.Name
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 2
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(@_p.absolute_address) -> (
-      try trace.property("pos", @pos_if_set!)
       try trace.property("value", @value_if_set!)
     )
 
-  :fun pos: SaviProto.Source.Pos.read_from_pointer(@_p.struct(0))
-  :fun pos_if_set!: SaviProto.Source.Pos.read_from_pointer(@_p.struct_if_set!(0))
-
-  :fun value: @_p.text(1)
-  :fun value_if_set!: @_p.text_if_set!(1)
+  :fun value: @_p.text(0)
+  :fun value_if_set!: @_p.text_if_set!(0)
 
 :struct box SaviProto.AST.Pair
   :let _p CapnProto.Pointer.Struct
@@ -382,6 +388,7 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -401,25 +408,22 @@
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 1
-  :const capn_proto_pointer_count U16: 2
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(@_p.absolute_address) -> (
-      try trace.property("pos", @pos_if_set!)
       try trace.property("style", @style_if_set!)
       try trace.property("terms", @terms_if_set!)
       try trace.property("has_exclamation", @has_exclamation_if_set!)
     )
 
-  :fun pos: SaviProto.Source.Pos.read_from_pointer(@_p.struct(0))
-  :fun pos_if_set!: SaviProto.Source.Pos.read_from_pointer(@_p.struct_if_set!(0))
-
   :fun style: SaviProto.AST.Group.Style._new(@_p.u16(0x0))
   :fun style_if_set!: SaviProto.AST.Group.Style._new(@_p.u16_if_set!(0x0))
 
-  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(1))
-  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(1))
+  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(0))
+  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(0))
 
   :fun has_exclamation: @_p.bool(0x2, 0b00000001)
   :fun has_exclamation_if_set!: @_p.bool_if_set!(0x2, 0b00000001)
@@ -446,14 +450,14 @@
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 5
+  :const capn_proto_pointer_count U16: 4
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(@_p.absolute_address) -> (
       try trace.property("receiver", @receiver_if_set!)
       try trace.property("name", @name_if_set!)
-      try trace.property("name_pos", @name_pos_if_set!)
       try trace.property("args", @args_if_set!)
       try trace.property("yield", @yield_if_set!)
     )
@@ -461,41 +465,35 @@
   :fun receiver: SaviProto.AST.read_from_pointer(@_p.struct(0))
   :fun receiver_if_set!: SaviProto.AST.read_from_pointer(@_p.struct_if_set!(0))
 
-  :fun name: @_p.text(1)
-  :fun name_if_set!: @_p.text_if_set!(1)
+  :fun name: SaviProto.AST.Name.read_from_pointer(@_p.struct(1))
+  :fun name_if_set!: SaviProto.AST.Name.read_from_pointer(@_p.struct_if_set!(1))
 
-  :fun name_pos: SaviProto.Source.Pos.read_from_pointer(@_p.struct(2))
-  :fun name_pos_if_set!: SaviProto.Source.Pos.read_from_pointer(@_p.struct_if_set!(2))
+  :fun args: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(2))
+  :fun args_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(2))
 
-  :fun args: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(3))
-  :fun args_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(3))
-
-  :fun yield: SaviProto.AST.CallYield.read_from_pointer(@_p.struct(4))
-  :fun yield_if_set!: SaviProto.AST.CallYield.read_from_pointer(@_p.struct_if_set!(4))
+  :fun yield: SaviProto.AST.CallYield.read_from_pointer(@_p.struct(3))
+  :fun yield_if_set!: SaviProto.AST.CallYield.read_from_pointer(@_p.struct_if_set!(3))
 
 :struct box SaviProto.AST.CallYield
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(@_p.absolute_address) -> (
-      try trace.property("pos", @pos_if_set!)
       try trace.property("params", @params_if_set!)
       try trace.property("block", @block_if_set!)
     )
 
-  :fun pos: SaviProto.Source.Pos.read_from_pointer(@_p.struct(0))
-  :fun pos_if_set!: SaviProto.Source.Pos.read_from_pointer(@_p.struct_if_set!(0))
+  :fun params: SaviProto.AST.Group.read_from_pointer(@_p.struct(0))
+  :fun params_if_set!: SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(0))
 
-  :fun params: SaviProto.AST.Group.read_from_pointer(@_p.struct(1))
-  :fun params_if_set!: SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(1))
-
-  :fun block: SaviProto.AST.Group.read_from_pointer(@_p.struct(2))
-  :fun block_if_set!: SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(2))
+  :fun block: SaviProto.AST.Group.read_from_pointer(@_p.struct(1))
+  :fun block_if_set!: SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(1))
 
 :struct box SaviProto.AST.ChoiceBranch
   :let _p CapnProto.Pointer.Struct
@@ -503,6 +501,7 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -523,6 +522,7 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 4
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -551,6 +551,7 @@
 
   :const capn_proto_data_word_count U16: 1
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
@@ -590,24 +591,25 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 4
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(@_p.absolute_address) -> (
-      try trace.property("pos", @pos_if_set!)
       try trace.property("terms", @terms_if_set!)
-      try trace.property("docs", @docs_if_set!)
+      try trace.property("main_annotation", @main_annotation_if_set!)
+      try trace.property("body_annotations", @body_annotations_if_set!)
       try trace.property("body", @body_if_set!)
     )
 
-  :fun pos: SaviProto.Source.Pos.read_from_pointer(@_p.struct(0))
-  :fun pos_if_set!: SaviProto.Source.Pos.read_from_pointer(@_p.struct_if_set!(0))
+  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(0))
+  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(0))
 
-  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(1))
-  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(1))
+  :fun main_annotation: @_p.text(1)
+  :fun main_annotation_if_set!: @_p.text_if_set!(1)
 
-  :fun docs: CapnProto.List(SaviProto.AST.Annotation).read_from_pointer(@_p.list(2))
-  :fun docs_if_set!: CapnProto.List(SaviProto.AST.Annotation).read_from_pointer(@_p.list_if_set!(2))
+  :fun body_annotations: CapnProto.List(SaviProto.AST.Annotation).read_from_pointer(@_p.list(2))
+  :fun body_annotations_if_set!: CapnProto.List(SaviProto.AST.Annotation).read_from_pointer(@_p.list_if_set!(2))
 
   :fun body: SaviProto.AST.Group.read_from_pointer(@_p.struct(3))
   :fun body_if_set!: SaviProto.AST.Group.read_from_pointer(@_p.struct_if_set!(3))
@@ -617,24 +619,21 @@
   :new box read_from_pointer(@_p)
 
   :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     trace.object(@_p.absolute_address) -> (
-      try trace.property("source", @source_if_set!)
       try trace.property("declares", @declares_if_set!)
       try trace.property("bodies", @bodies_if_set!)
     )
 
-  :fun source: SaviProto.Source.read_from_pointer(@_p.struct(0))
-  :fun source_if_set!: SaviProto.Source.read_from_pointer(@_p.struct_if_set!(0))
+  :fun declares: CapnProto.List(SaviProto.AST.Declare).read_from_pointer(@_p.list(0))
+  :fun declares_if_set!: CapnProto.List(SaviProto.AST.Declare).read_from_pointer(@_p.list_if_set!(0))
 
-  :fun declares: CapnProto.List(SaviProto.AST.Declare).read_from_pointer(@_p.list(1))
-  :fun declares_if_set!: CapnProto.List(SaviProto.AST.Declare).read_from_pointer(@_p.list_if_set!(1))
-
-  :fun bodies: CapnProto.List(SaviProto.AST.Group).read_from_pointer(@_p.list(2))
-  :fun bodies_if_set!: CapnProto.List(SaviProto.AST.Group).read_from_pointer(@_p.list_if_set!(2))
+  :fun bodies: CapnProto.List(SaviProto.AST.Group).read_from_pointer(@_p.list(1))
+  :fun bodies_if_set!: CapnProto.List(SaviProto.AST.Group).read_from_pointer(@_p.list_if_set!(1))
 
 :struct SaviProto.AST.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -642,14 +641,12 @@
   :fun as_reader: SaviProto.AST.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
-
-  :fun ref pos: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct(0, 2, 1))
-  :fun ref pos_if_set!: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct_if_set!(0, 2, 1))
 
   :fun is_none: @_p.check_union(0x0, 0)
   :fun none!: @_p.assert_union!(0x0, 0), None
@@ -691,27 +688,27 @@
     @_p.f64(0x8)
 
   :fun is_name: @_p.check_union(0x0, 5)
-  :fun ref name!: @_p.assert_union!(0x0, 5), @_p.text(1)
-  :fun ref name_if_set!: @_p.assert_union!(0x0, 5), @_p.text_if_set!(1)
+  :fun ref name!: @_p.assert_union!(0x0, 5), @_p.text(0)
+  :fun ref name_if_set!: @_p.assert_union!(0x0, 5), @_p.text_if_set!(0)
   :fun ref init_name(new_value)
-    @_p.set_text(1, new_value, "")
+    @_p.set_text(0, new_value, "")
     @_p.mark_union(0x0, 5)
-    @_p.text(1)
+    @_p.text(0)
 
   :fun is_string: @_p.check_union(0x0, 6)
-  :fun ref string!: @_p.assert_union!(0x0, 6), @_p.text(1)
-  :fun ref string_if_set!: @_p.assert_union!(0x0, 6), @_p.text_if_set!(1)
+  :fun ref string!: @_p.assert_union!(0x0, 6), @_p.text(0)
+  :fun ref string_if_set!: @_p.assert_union!(0x0, 6), @_p.text_if_set!(0)
   :fun ref init_string(new_value)
-    @_p.set_text(1, new_value, "")
+    @_p.set_text(0, new_value, "")
     @_p.mark_union(0x0, 6)
-    @_p.text(1)
+    @_p.text(0)
 
   :fun is_string_with_prefix: @_p.check_union(0x0, 7)
   :fun ref string_with_prefix!: @_p.assert_union!(0x0, 7), SaviProto.AST.AS_stringWithPrefix.Builder.from_pointer(@_p)
   :fun ref string_with_prefix_if_set!: @_p.assert_union!(0x0, 7), SaviProto.AST.AS_stringWithPrefix.Builder.from_pointer(@_p)
   :fun ref init_string_with_prefix
+    @_p.clear_pointer(0) // prefix
     @_p.clear_pointer(1) // string
-    @_p.clear_pointer(2) // prefix
     @_p.mark_union(0x0, 7)
     SaviProto.AST.AS_stringWithPrefix.Builder.from_pointer(@_p)
 
@@ -719,8 +716,8 @@
   :fun ref string_compose!: @_p.assert_union!(0x0, 8), SaviProto.AST.AS_stringCompose.Builder.from_pointer(@_p)
   :fun ref string_compose_if_set!: @_p.assert_union!(0x0, 8), SaviProto.AST.AS_stringCompose.Builder.from_pointer(@_p)
   :fun ref init_string_compose
+    @_p.clear_pointer(0) // prefix
     @_p.clear_pointer(1) // terms
-    @_p.clear_pointer(2) // prefix
     @_p.mark_union(0x0, 8)
     SaviProto.AST.AS_stringCompose.Builder.from_pointer(@_p)
 
@@ -728,8 +725,8 @@
   :fun ref prefix!: @_p.assert_union!(0x0, 9), SaviProto.AST.AS_prefix.Builder.from_pointer(@_p)
   :fun ref prefix_if_set!: @_p.assert_union!(0x0, 9), SaviProto.AST.AS_prefix.Builder.from_pointer(@_p)
   :fun ref init_prefix
-    @_p.clear_pointer(1) // op
-    @_p.clear_pointer(2) // term
+    @_p.clear_pointer(0) // op
+    @_p.clear_pointer(1) // term
     @_p.mark_union(0x0, 9)
     SaviProto.AST.AS_prefix.Builder.from_pointer(@_p)
 
@@ -737,25 +734,25 @@
   :fun ref qualify!: @_p.assert_union!(0x0, 10), SaviProto.AST.AS_qualify.Builder.from_pointer(@_p)
   :fun ref qualify_if_set!: @_p.assert_union!(0x0, 10), SaviProto.AST.AS_qualify.Builder.from_pointer(@_p)
   :fun ref init_qualify
-    @_p.clear_pointer(1) // term
-    @_p.clear_pointer(2) // group
+    @_p.clear_pointer(0) // term
+    @_p.clear_pointer(1) // group
     @_p.mark_union(0x0, 10)
     SaviProto.AST.AS_qualify.Builder.from_pointer(@_p)
 
   :fun is_group: @_p.check_union(0x0, 11)
-  :fun ref group!: @_p.assert_union!(0x0, 11), SaviProto.AST.Group.Builder.from_pointer(@_p.struct(1, 1, 2))
-  :fun ref group_if_set!: @_p.assert_union!(0x0, 11), SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(1, 1, 2))
+  :fun ref group!: @_p.assert_union!(0x0, 11), SaviProto.AST.Group.Builder.from_pointer(@_p.struct(0, 1, 1))
+  :fun ref group_if_set!: @_p.assert_union!(0x0, 11), SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(0, 1, 1))
   :fun ref init_group
-    @_p.clear_pointer(1) // group
+    @_p.clear_pointer(0) // group
     @_p.mark_union(0x0, 11)
-    SaviProto.AST.Group.Builder.from_pointer(@_p.struct(1, 1, 2))
+    SaviProto.AST.Group.Builder.from_pointer(@_p.struct(0, 1, 1))
 
   :fun is_relate: @_p.check_union(0x0, 12)
   :fun ref relate!: @_p.assert_union!(0x0, 12), SaviProto.AST.AS_relate.Builder.from_pointer(@_p)
   :fun ref relate_if_set!: @_p.assert_union!(0x0, 12), SaviProto.AST.AS_relate.Builder.from_pointer(@_p)
   :fun ref init_relate
-    @_p.clear_pointer(1) // op
-    @_p.clear_pointer(2) // terms
+    @_p.clear_pointer(0) // op
+    @_p.clear_pointer(1) // terms
     @_p.mark_union(0x0, 12)
     SaviProto.AST.AS_relate.Builder.from_pointer(@_p)
 
@@ -763,7 +760,7 @@
   :fun ref field_read!: @_p.assert_union!(0x0, 13), SaviProto.AST.AS_fieldRead.Builder.from_pointer(@_p)
   :fun ref field_read_if_set!: @_p.assert_union!(0x0, 13), SaviProto.AST.AS_fieldRead.Builder.from_pointer(@_p)
   :fun ref init_field_read
-    @_p.clear_pointer(1) // field
+    @_p.clear_pointer(0) // field
     @_p.mark_union(0x0, 13)
     SaviProto.AST.AS_fieldRead.Builder.from_pointer(@_p)
 
@@ -771,8 +768,8 @@
   :fun ref field_write!: @_p.assert_union!(0x0, 14), SaviProto.AST.AS_fieldWrite.Builder.from_pointer(@_p)
   :fun ref field_write_if_set!: @_p.assert_union!(0x0, 14), SaviProto.AST.AS_fieldWrite.Builder.from_pointer(@_p)
   :fun ref init_field_write
-    @_p.clear_pointer(1) // field
-    @_p.clear_pointer(2) // value
+    @_p.clear_pointer(0) // field
+    @_p.clear_pointer(1) // value
     @_p.mark_union(0x0, 14)
     SaviProto.AST.AS_fieldWrite.Builder.from_pointer(@_p)
 
@@ -780,48 +777,48 @@
   :fun ref field_displace!: @_p.assert_union!(0x0, 15), SaviProto.AST.AS_fieldDisplace.Builder.from_pointer(@_p)
   :fun ref field_displace_if_set!: @_p.assert_union!(0x0, 15), SaviProto.AST.AS_fieldDisplace.Builder.from_pointer(@_p)
   :fun ref init_field_displace
-    @_p.clear_pointer(1) // field
-    @_p.clear_pointer(2) // value
+    @_p.clear_pointer(0) // field
+    @_p.clear_pointer(1) // value
     @_p.mark_union(0x0, 15)
     SaviProto.AST.AS_fieldDisplace.Builder.from_pointer(@_p)
 
   :fun is_call: @_p.check_union(0x0, 16)
-  :fun ref call!: @_p.assert_union!(0x0, 16), SaviProto.AST.Call.Builder.from_pointer(@_p.struct(1, 0, 5))
-  :fun ref call_if_set!: @_p.assert_union!(0x0, 16), SaviProto.AST.Call.Builder.from_pointer(@_p.struct_if_set!(1, 0, 5))
+  :fun ref call!: @_p.assert_union!(0x0, 16), SaviProto.AST.Call.Builder.from_pointer(@_p.struct(0, 0, 4))
+  :fun ref call_if_set!: @_p.assert_union!(0x0, 16), SaviProto.AST.Call.Builder.from_pointer(@_p.struct_if_set!(0, 0, 4))
   :fun ref init_call
-    @_p.clear_pointer(1) // call
+    @_p.clear_pointer(0) // call
     @_p.mark_union(0x0, 16)
-    SaviProto.AST.Call.Builder.from_pointer(@_p.struct(1, 0, 5))
+    SaviProto.AST.Call.Builder.from_pointer(@_p.struct(0, 0, 4))
 
   :fun is_choice: @_p.check_union(0x0, 17)
   :fun ref choice!: @_p.assert_union!(0x0, 17), SaviProto.AST.AS_choice.Builder.from_pointer(@_p)
   :fun ref choice_if_set!: @_p.assert_union!(0x0, 17), SaviProto.AST.AS_choice.Builder.from_pointer(@_p)
   :fun ref init_choice
-    @_p.clear_pointer(1) // branches
+    @_p.clear_pointer(0) // branches
     @_p.mark_union(0x0, 17)
     SaviProto.AST.AS_choice.Builder.from_pointer(@_p)
 
   :fun is_loop: @_p.check_union(0x0, 18)
-  :fun ref loop!: @_p.assert_union!(0x0, 18), SaviProto.AST.Loop.Builder.from_pointer(@_p.struct(1, 0, 4))
-  :fun ref loop_if_set!: @_p.assert_union!(0x0, 18), SaviProto.AST.Loop.Builder.from_pointer(@_p.struct_if_set!(1, 0, 4))
+  :fun ref loop!: @_p.assert_union!(0x0, 18), SaviProto.AST.Loop.Builder.from_pointer(@_p.struct(0, 0, 4))
+  :fun ref loop_if_set!: @_p.assert_union!(0x0, 18), SaviProto.AST.Loop.Builder.from_pointer(@_p.struct_if_set!(0, 0, 4))
   :fun ref init_loop
-    @_p.clear_pointer(1) // loop
+    @_p.clear_pointer(0) // loop
     @_p.mark_union(0x0, 18)
-    SaviProto.AST.Loop.Builder.from_pointer(@_p.struct(1, 0, 4))
+    SaviProto.AST.Loop.Builder.from_pointer(@_p.struct(0, 0, 4))
 
   :fun is_try: @_p.check_union(0x0, 19)
-  :fun ref try!: @_p.assert_union!(0x0, 19), SaviProto.AST.Try.Builder.from_pointer(@_p.struct(1, 1, 2))
-  :fun ref try_if_set!: @_p.assert_union!(0x0, 19), SaviProto.AST.Try.Builder.from_pointer(@_p.struct_if_set!(1, 1, 2))
+  :fun ref try!: @_p.assert_union!(0x0, 19), SaviProto.AST.Try.Builder.from_pointer(@_p.struct(0, 1, 2))
+  :fun ref try_if_set!: @_p.assert_union!(0x0, 19), SaviProto.AST.Try.Builder.from_pointer(@_p.struct_if_set!(0, 1, 2))
   :fun ref init_try
-    @_p.clear_pointer(1) // try
+    @_p.clear_pointer(0) // try
     @_p.mark_union(0x0, 19)
-    SaviProto.AST.Try.Builder.from_pointer(@_p.struct(1, 1, 2))
+    SaviProto.AST.Try.Builder.from_pointer(@_p.struct(0, 1, 2))
 
   :fun is_jump: @_p.check_union(0x0, 20)
   :fun ref jump!: @_p.assert_union!(0x0, 20), SaviProto.AST.AS_jump.Builder.from_pointer(@_p)
   :fun ref jump_if_set!: @_p.assert_union!(0x0, 20), SaviProto.AST.AS_jump.Builder.from_pointer(@_p)
   :fun ref init_jump
-    @_p.clear_pointer(1) // term
+    @_p.clear_pointer(0) // term
     @_p.clear_16(0x8) // kind
     @_p.mark_union(0x0, 20)
     SaviProto.AST.AS_jump.Builder.from_pointer(@_p)
@@ -830,7 +827,7 @@
   :fun ref yield!: @_p.assert_union!(0x0, 21), SaviProto.AST.AS_yield.Builder.from_pointer(@_p)
   :fun ref yield_if_set!: @_p.assert_union!(0x0, 21), SaviProto.AST.AS_yield.Builder.from_pointer(@_p)
   :fun ref init_yield
-    @_p.clear_pointer(1) // terms
+    @_p.clear_pointer(0) // terms
     @_p.mark_union(0x0, 21)
     SaviProto.AST.AS_yield.Builder.from_pointer(@_p)
 
@@ -840,18 +837,19 @@
   :fun as_reader: SaviProto.AST.AS_stringWithPrefix.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
+  :fun ref prefix: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(0, 0, 1))
+  :fun ref prefix_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(0, 0, 1))
+
   :fun ref string: @_p.text(1)
   :fun ref string_if_set!: @_p.text_if_set!(1)
   :fun ref "string="(new_value): @_p.set_text(1, new_value, "")
-
-  :fun ref prefix: SaviProto.AST.Operator.Builder.from_pointer(@_p.struct(2, 0, 2))
-  :fun ref prefix_if_set!: SaviProto.AST.Operator.Builder.from_pointer(@_p.struct_if_set!(2, 0, 2))
 
 :struct SaviProto.AST.AS_stringCompose.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -859,21 +857,22 @@
   :fun as_reader: SaviProto.AST.AS_stringCompose.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
+  :fun ref prefix: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(0, 0, 1))
+  :fun ref prefix_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(0, 0, 1))
+
   :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(1))
   :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(1))
   :fun ref init_terms(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(1, 2, 3, new_count))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(1, 2, 2, new_count))
   :fun ref trim_terms(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(1, 2, 3, new_start, new_finish))
-
-  :fun ref prefix: SaviProto.AST.Operator.Builder.from_pointer(@_p.struct(2, 0, 2))
-  :fun ref prefix_if_set!: SaviProto.AST.Operator.Builder.from_pointer(@_p.struct_if_set!(2, 0, 2))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(1, 2, 2, new_start, new_finish))
 
 :struct SaviProto.AST.AS_prefix.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -881,17 +880,18 @@
   :fun as_reader: SaviProto.AST.AS_prefix.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref op: SaviProto.AST.Operator.Builder.from_pointer(@_p.struct(1, 0, 2))
-  :fun ref op_if_set!: SaviProto.AST.Operator.Builder.from_pointer(@_p.struct_if_set!(1, 0, 2))
+  :fun ref op: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(0, 0, 1))
+  :fun ref op_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(0, 0, 1))
 
-  :fun ref term: SaviProto.AST.Builder.from_pointer(@_p.struct(2, 2, 3))
-  :fun ref term_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(2, 2, 3))
+  :fun ref term: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 2))
+  :fun ref term_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 2))
 
 :struct SaviProto.AST.AS_qualify.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -899,17 +899,18 @@
   :fun as_reader: SaviProto.AST.AS_qualify.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref term: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 3))
-  :fun ref term_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 3))
+  :fun ref term: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 2))
+  :fun ref term_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 2))
 
-  :fun ref group: SaviProto.AST.Group.Builder.from_pointer(@_p.struct(2, 1, 2))
-  :fun ref group_if_set!: SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(2, 1, 2))
+  :fun ref group: SaviProto.AST.Group.Builder.from_pointer(@_p.struct(1, 1, 1))
+  :fun ref group_if_set!: SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(1, 1, 1))
 
 :struct SaviProto.AST.AS_relate.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -917,17 +918,18 @@
   :fun as_reader: SaviProto.AST.AS_relate.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref op: SaviProto.AST.Operator.Builder.from_pointer(@_p.struct(1, 0, 2))
-  :fun ref op_if_set!: SaviProto.AST.Operator.Builder.from_pointer(@_p.struct_if_set!(1, 0, 2))
+  :fun ref op: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(0, 0, 1))
+  :fun ref op_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(0, 0, 1))
 
-  :fun ref terms: SaviProto.AST.Pair.Builder.from_pointer(@_p.struct(2, 0, 2))
-  :fun ref terms_if_set!: SaviProto.AST.Pair.Builder.from_pointer(@_p.struct_if_set!(2, 0, 2))
+  :fun ref terms: SaviProto.AST.Pair.Builder.from_pointer(@_p.struct(1, 0, 2))
+  :fun ref terms_if_set!: SaviProto.AST.Pair.Builder.from_pointer(@_p.struct_if_set!(1, 0, 2))
 
 :struct SaviProto.AST.AS_fieldRead.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -935,15 +937,16 @@
   :fun as_reader: SaviProto.AST.AS_fieldRead.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref field: @_p.text(1)
-  :fun ref field_if_set!: @_p.text_if_set!(1)
-  :fun ref "field="(new_value): @_p.set_text(1, new_value, "")
+  :fun ref field: @_p.text(0)
+  :fun ref field_if_set!: @_p.text_if_set!(0)
+  :fun ref "field="(new_value): @_p.set_text(0, new_value, "")
 
 :struct SaviProto.AST.AS_fieldWrite.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -951,18 +954,19 @@
   :fun as_reader: SaviProto.AST.AS_fieldWrite.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref field: @_p.text(1)
-  :fun ref field_if_set!: @_p.text_if_set!(1)
-  :fun ref "field="(new_value): @_p.set_text(1, new_value, "")
+  :fun ref field: @_p.text(0)
+  :fun ref field_if_set!: @_p.text_if_set!(0)
+  :fun ref "field="(new_value): @_p.set_text(0, new_value, "")
 
-  :fun ref value: SaviProto.AST.Builder.from_pointer(@_p.struct(2, 2, 3))
-  :fun ref value_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(2, 2, 3))
+  :fun ref value: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 2))
+  :fun ref value_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 2))
 
 :struct SaviProto.AST.AS_fieldDisplace.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -970,18 +974,19 @@
   :fun as_reader: SaviProto.AST.AS_fieldDisplace.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref field: @_p.text(1)
-  :fun ref field_if_set!: @_p.text_if_set!(1)
-  :fun ref "field="(new_value): @_p.set_text(1, new_value, "")
+  :fun ref field: @_p.text(0)
+  :fun ref field_if_set!: @_p.text_if_set!(0)
+  :fun ref "field="(new_value): @_p.set_text(0, new_value, "")
 
-  :fun ref value: SaviProto.AST.Builder.from_pointer(@_p.struct(2, 2, 3))
-  :fun ref value_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(2, 2, 3))
+  :fun ref value: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 2))
+  :fun ref value_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 2))
 
 :struct SaviProto.AST.AS_choice.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -989,18 +994,19 @@
   :fun as_reader: SaviProto.AST.AS_choice.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref branches: CapnProto.List.Builder(SaviProto.AST.ChoiceBranch.Builder).from_pointer(@_p.list(1))
-  :fun ref branches_if_set!: CapnProto.List.Builder(SaviProto.AST.ChoiceBranch.Builder).from_pointer(@_p.list_if_set!(1))
+  :fun ref branches: CapnProto.List.Builder(SaviProto.AST.ChoiceBranch.Builder).from_pointer(@_p.list(0))
+  :fun ref branches_if_set!: CapnProto.List.Builder(SaviProto.AST.ChoiceBranch.Builder).from_pointer(@_p.list_if_set!(0))
   :fun ref init_branches(new_count)
-    CapnProto.List.Builder(SaviProto.AST.ChoiceBranch.Builder).from_pointer(@_p.init_list(1, 0, 2, new_count))
+    CapnProto.List.Builder(SaviProto.AST.ChoiceBranch.Builder).from_pointer(@_p.init_list(0, 0, 2, new_count))
   :fun ref trim_branches(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.ChoiceBranch.Builder).from_pointer(@_p.trim_list(1, 0, 2, new_start, new_finish))
+    CapnProto.List.Builder(SaviProto.AST.ChoiceBranch.Builder).from_pointer(@_p.trim_list(0, 0, 2, new_start, new_finish))
 
 :struct SaviProto.AST.AS_jump.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -1008,14 +1014,15 @@
   :fun as_reader: SaviProto.AST.AS_jump.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref term: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 3))
-  :fun ref term_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 3))
+  :fun ref term: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 2))
+  :fun ref term_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 2))
 
   :fun kind: SaviProto.AST.JumpKind._new(@_p.u16(0x8))
   :fun kind_if_set!: SaviProto.AST.JumpKind._new(@_p.u16_if_set!(0x8))
@@ -1027,56 +1034,57 @@
   :fun as_reader: SaviProto.AST.AS_yield.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 2
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(1))
-  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(1))
+  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(0))
+  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(0))
   :fun ref init_terms(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(1, 2, 3, new_count))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(0, 2, 2, new_count))
   :fun ref trim_terms(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(1, 2, 3, new_start, new_finish))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(0, 2, 2, new_start, new_finish))
 
 :struct SaviProto.AST.Annotation.Builder
   :let _p CapnProto.Pointer.Struct.Builder
   :new from_pointer(@_p)
   :fun as_reader: SaviProto.AST.Annotation.read_from_pointer(@_p.as_reader)
 
-  :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 2
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref pos: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct(0, 2, 1))
-  :fun ref pos_if_set!: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct_if_set!(0, 2, 1))
+  :fun target: @_p.u64(0x0)
+  :fun target_if_set!: @_p.u64_if_set!(0x0)
+  :fun ref "target="(new_value): @_p.set_u64(0x0, new_value, 0)
 
-  :fun ref value: @_p.text(1)
-  :fun ref value_if_set!: @_p.text_if_set!(1)
-  :fun ref "value="(new_value): @_p.set_text(1, new_value, "")
+  :fun ref value: @_p.text(0)
+  :fun ref value_if_set!: @_p.text_if_set!(0)
+  :fun ref "value="(new_value): @_p.set_text(0, new_value, "")
 
-:struct SaviProto.AST.Operator.Builder
+:struct SaviProto.AST.Name.Builder
   :let _p CapnProto.Pointer.Struct.Builder
   :new from_pointer(@_p)
-  :fun as_reader: SaviProto.AST.Operator.read_from_pointer(@_p.as_reader)
+  :fun as_reader: SaviProto.AST.Name.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 2
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref pos: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct(0, 2, 1))
-  :fun ref pos_if_set!: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct_if_set!(0, 2, 1))
-
-  :fun ref value: @_p.text(1)
-  :fun ref value_if_set!: @_p.text_if_set!(1)
-  :fun ref "value="(new_value): @_p.set_text(1, new_value, "")
+  :fun ref value: @_p.text(0)
+  :fun ref value_if_set!: @_p.text_if_set!(0)
+  :fun ref "value="(new_value): @_p.set_text(0, new_value, "")
 
 :struct SaviProto.AST.Pair.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -1085,16 +1093,17 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref left: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 3))
-  :fun ref left_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 3))
+  :fun ref left: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 2))
+  :fun ref left_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 2))
 
-  :fun ref right: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 3))
-  :fun ref right_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 3))
+  :fun ref right: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 2))
+  :fun ref right_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 2))
 
 :struct SaviProto.AST.Group.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -1102,25 +1111,23 @@
   :fun as_reader: SaviProto.AST.Group.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 1
-  :const capn_proto_pointer_count U16: 2
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref pos: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct(0, 2, 1))
-  :fun ref pos_if_set!: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct_if_set!(0, 2, 1))
-
   :fun style: SaviProto.AST.Group.Style._new(@_p.u16(0x0))
   :fun style_if_set!: SaviProto.AST.Group.Style._new(@_p.u16_if_set!(0x0))
   :fun ref "style="(new_value): @_p.set_u16(0x0, SaviProto.AST.Group.Style[new_value].u16, 0)
 
-  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(1))
-  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(1))
+  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(0))
+  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(0))
   :fun ref init_terms(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(1, 2, 3, new_count))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(0, 2, 2, new_count))
   :fun ref trim_terms(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(1, 2, 3, new_start, new_finish))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(0, 2, 2, new_start, new_finish))
 
   :fun has_exclamation: @_p.bool(0x2, 0b00000001)
   :fun has_exclamation_if_set!: @_p.bool_if_set!(0x2, 0b00000001)
@@ -1132,31 +1139,28 @@
   :fun as_reader: SaviProto.AST.Call.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 5
+  :const capn_proto_pointer_count U16: 4
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref receiver: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 3))
-  :fun ref receiver_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 3))
+  :fun ref receiver: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 2))
+  :fun ref receiver_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 2))
 
-  :fun ref name: @_p.text(1)
-  :fun ref name_if_set!: @_p.text_if_set!(1)
-  :fun ref "name="(new_value): @_p.set_text(1, new_value, "")
+  :fun ref name: SaviProto.AST.Name.Builder.from_pointer(@_p.struct(1, 0, 1))
+  :fun ref name_if_set!: SaviProto.AST.Name.Builder.from_pointer(@_p.struct_if_set!(1, 0, 1))
 
-  :fun ref name_pos: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct(2, 2, 1))
-  :fun ref name_pos_if_set!: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct_if_set!(2, 2, 1))
-
-  :fun ref args: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(3))
-  :fun ref args_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(3))
+  :fun ref args: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(2))
+  :fun ref args_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(2))
   :fun ref init_args(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(3, 2, 3, new_count))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(2, 2, 2, new_count))
   :fun ref trim_args(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(3, 2, 3, new_start, new_finish))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(2, 2, 2, new_start, new_finish))
 
-  :fun ref yield: SaviProto.AST.CallYield.Builder.from_pointer(@_p.struct(4, 0, 3))
-  :fun ref yield_if_set!: SaviProto.AST.CallYield.Builder.from_pointer(@_p.struct_if_set!(4, 0, 3))
+  :fun ref yield: SaviProto.AST.CallYield.Builder.from_pointer(@_p.struct(3, 0, 2))
+  :fun ref yield_if_set!: SaviProto.AST.CallYield.Builder.from_pointer(@_p.struct_if_set!(3, 0, 2))
 
 :struct SaviProto.AST.CallYield.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -1164,20 +1168,18 @@
   :fun as_reader: SaviProto.AST.CallYield.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref pos: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct(0, 2, 1))
-  :fun ref pos_if_set!: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct_if_set!(0, 2, 1))
+  :fun ref params: SaviProto.AST.Group.Builder.from_pointer(@_p.struct(0, 1, 1))
+  :fun ref params_if_set!: SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(0, 1, 1))
 
-  :fun ref params: SaviProto.AST.Group.Builder.from_pointer(@_p.struct(1, 1, 2))
-  :fun ref params_if_set!: SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(1, 1, 2))
-
-  :fun ref block: SaviProto.AST.Group.Builder.from_pointer(@_p.struct(2, 1, 2))
-  :fun ref block_if_set!: SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(2, 1, 2))
+  :fun ref block: SaviProto.AST.Group.Builder.from_pointer(@_p.struct(1, 1, 1))
+  :fun ref block_if_set!: SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(1, 1, 1))
 
 :struct SaviProto.AST.ChoiceBranch.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -1186,16 +1188,17 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref cond: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 3))
-  :fun ref cond_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 3))
+  :fun ref cond: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 2))
+  :fun ref cond_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 2))
 
-  :fun ref body: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 3))
-  :fun ref body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 3))
+  :fun ref body: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 2))
+  :fun ref body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 2))
 
 :struct SaviProto.AST.Loop.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -1204,22 +1207,23 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 4
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref initial_cond: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 3))
-  :fun ref initial_cond_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 3))
+  :fun ref initial_cond: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 2))
+  :fun ref initial_cond_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 2))
 
-  :fun ref body: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 3))
-  :fun ref body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 3))
+  :fun ref body: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 2))
+  :fun ref body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 2))
 
-  :fun ref repeat_cond: SaviProto.AST.Builder.from_pointer(@_p.struct(2, 2, 3))
-  :fun ref repeat_cond_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(2, 2, 3))
+  :fun ref repeat_cond: SaviProto.AST.Builder.from_pointer(@_p.struct(2, 2, 2))
+  :fun ref repeat_cond_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(2, 2, 2))
 
-  :fun ref else_body: SaviProto.AST.Builder.from_pointer(@_p.struct(3, 2, 3))
-  :fun ref else_body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(3, 2, 3))
+  :fun ref else_body: SaviProto.AST.Builder.from_pointer(@_p.struct(3, 2, 2))
+  :fun ref else_body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(3, 2, 2))
 
 :struct SaviProto.AST.Try.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -1228,16 +1232,17 @@
 
   :const capn_proto_data_word_count U16: 1
   :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref body: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 3))
-  :fun ref body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 3))
+  :fun ref body: SaviProto.AST.Builder.from_pointer(@_p.struct(0, 2, 2))
+  :fun ref body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(0, 2, 2))
 
-  :fun ref else_body: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 3))
-  :fun ref else_body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 3))
+  :fun ref else_body: SaviProto.AST.Builder.from_pointer(@_p.struct(1, 2, 2))
+  :fun ref else_body_if_set!: SaviProto.AST.Builder.from_pointer(@_p.struct_if_set!(1, 2, 2))
 
   :fun allow_non_partial_body: @_p.bool(0x0, 0b00000001)
   :fun allow_non_partial_body_if_set!: @_p.bool_if_set!(0x0, 0b00000001)
@@ -1250,30 +1255,32 @@
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 4
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref pos: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct(0, 2, 1))
-  :fun ref pos_if_set!: SaviProto.Source.Pos.Builder.from_pointer(@_p.struct_if_set!(0, 2, 1))
-
-  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(1))
-  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(1))
+  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(0))
+  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(0))
   :fun ref init_terms(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(1, 2, 3, new_count))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(0, 2, 2, new_count))
   :fun ref trim_terms(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(1, 2, 3, new_start, new_finish))
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(0, 2, 2, new_start, new_finish))
 
-  :fun ref docs: CapnProto.List.Builder(SaviProto.AST.Annotation.Builder).from_pointer(@_p.list(2))
-  :fun ref docs_if_set!: CapnProto.List.Builder(SaviProto.AST.Annotation.Builder).from_pointer(@_p.list_if_set!(2))
-  :fun ref init_docs(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Annotation.Builder).from_pointer(@_p.init_list(2, 0, 2, new_count))
-  :fun ref trim_docs(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Annotation.Builder).from_pointer(@_p.trim_list(2, 0, 2, new_start, new_finish))
+  :fun ref main_annotation: @_p.text(1)
+  :fun ref main_annotation_if_set!: @_p.text_if_set!(1)
+  :fun ref "main_annotation="(new_value): @_p.set_text(1, new_value, "")
 
-  :fun ref body: SaviProto.AST.Group.Builder.from_pointer(@_p.struct(3, 1, 2))
-  :fun ref body_if_set!: SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(3, 1, 2))
+  :fun ref body_annotations: CapnProto.List.Builder(SaviProto.AST.Annotation.Builder).from_pointer(@_p.list(2))
+  :fun ref body_annotations_if_set!: CapnProto.List.Builder(SaviProto.AST.Annotation.Builder).from_pointer(@_p.list_if_set!(2))
+  :fun ref init_body_annotations(new_count)
+    CapnProto.List.Builder(SaviProto.AST.Annotation.Builder).from_pointer(@_p.init_list(2, 1, 1, new_count))
+  :fun ref trim_body_annotations(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.AST.Annotation.Builder).from_pointer(@_p.trim_list(2, 1, 1, new_start, new_finish))
+
+  :fun ref body: SaviProto.AST.Group.Builder.from_pointer(@_p.struct(3, 1, 1))
+  :fun ref body_if_set!: SaviProto.AST.Group.Builder.from_pointer(@_p.struct_if_set!(3, 1, 1))
 
 :struct SaviProto.AST.Document.Builder
   :let _p CapnProto.Pointer.Struct.Builder
@@ -1281,25 +1288,23 @@
   :fun as_reader: SaviProto.AST.Document.read_from_pointer(@_p.as_reader)
 
   :const capn_proto_data_word_count U16: 0
-  :const capn_proto_pointer_count U16: 3
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
 
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
-  :fun ref source: SaviProto.Source.Builder.from_pointer(@_p.struct(0, 1, 2))
-  :fun ref source_if_set!: SaviProto.Source.Builder.from_pointer(@_p.struct_if_set!(0, 1, 2))
-
-  :fun ref declares: CapnProto.List.Builder(SaviProto.AST.Declare.Builder).from_pointer(@_p.list(1))
-  :fun ref declares_if_set!: CapnProto.List.Builder(SaviProto.AST.Declare.Builder).from_pointer(@_p.list_if_set!(1))
+  :fun ref declares: CapnProto.List.Builder(SaviProto.AST.Declare.Builder).from_pointer(@_p.list(0))
+  :fun ref declares_if_set!: CapnProto.List.Builder(SaviProto.AST.Declare.Builder).from_pointer(@_p.list_if_set!(0))
   :fun ref init_declares(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Declare.Builder).from_pointer(@_p.init_list(1, 0, 4, new_count))
+    CapnProto.List.Builder(SaviProto.AST.Declare.Builder).from_pointer(@_p.init_list(0, 0, 4, new_count))
   :fun ref trim_declares(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Declare.Builder).from_pointer(@_p.trim_list(1, 0, 4, new_start, new_finish))
+    CapnProto.List.Builder(SaviProto.AST.Declare.Builder).from_pointer(@_p.trim_list(0, 0, 4, new_start, new_finish))
 
-  :fun ref bodies: CapnProto.List.Builder(SaviProto.AST.Group.Builder).from_pointer(@_p.list(2))
-  :fun ref bodies_if_set!: CapnProto.List.Builder(SaviProto.AST.Group.Builder).from_pointer(@_p.list_if_set!(2))
+  :fun ref bodies: CapnProto.List.Builder(SaviProto.AST.Group.Builder).from_pointer(@_p.list(1))
+  :fun ref bodies_if_set!: CapnProto.List.Builder(SaviProto.AST.Group.Builder).from_pointer(@_p.list_if_set!(1))
   :fun ref init_bodies(new_count)
-    CapnProto.List.Builder(SaviProto.AST.Group.Builder).from_pointer(@_p.init_list(2, 1, 2, new_count))
+    CapnProto.List.Builder(SaviProto.AST.Group.Builder).from_pointer(@_p.init_list(1, 1, 1, new_count))
   :fun ref trim_bodies(new_start, new_finish)
-    CapnProto.List.Builder(SaviProto.AST.Group.Builder).from_pointer(@_p.trim_list(2, 1, 2, new_start, new_finish))
+    CapnProto.List.Builder(SaviProto.AST.Group.Builder).from_pointer(@_p.trim_list(1, 1, 1, new_start, new_finish))

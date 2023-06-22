@@ -19,7 +19,25 @@
     b"bar"
     "\x01\x02\x03"
     "\u2764"
+    "\U0001fa01"
     'f'
     '\0'
     '\x01'
     '\u2764'
+    '\U0001fa01'
+    "compose string a \(
+      99
+    ) \(100) final"
+    "compose string b \(
+      99
+    ) \(100)"
+    b"\(99)\(100)"
+    "\
+        Hello, \
+      World\
+    !\
+    "
+    b"\
+      \x00\x11\x22\x33\x44\x55\x66\x77\
+      \x88\x99\xaa\xbb\xcc\xdd\xee\xff\
+    "
