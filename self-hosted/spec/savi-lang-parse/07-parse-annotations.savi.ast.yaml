@@ -33,7 +33,7 @@
           value: "value-level annotation"
         5: #18:
           target: 1280
-          value: "4th block in function"
+          value: "4th block in function\ntrailing 4th-block annotation (combines with above)"
         6: #19:
           target: 2328
           value: "1st sub-block\n1st nested assignment-level annotation (combines with above)"

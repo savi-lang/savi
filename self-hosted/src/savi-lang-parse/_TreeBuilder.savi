@@ -441,7 +441,7 @@
         string_token = string_info.head, string_index = string_info.tail
 
         string_children_count = data.count_children_of(string_index)
-        if (string_children_count == 0) (
+        if string_children_count == 0 (
           string_with_prefix = ast.init_string_with_prefix
           string_with_prefix.string =
             _StringLiterals.process_escapes!(data.get_string(string_token))

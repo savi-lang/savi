@@ -19,4 +19,4 @@
 
       :: 2nd sub-block
       (x = "foo") :: 2nd nested assignment-level annotation (combines with above)
-    )
+    ) :: trailing 4th-block annotation (combines with above)
