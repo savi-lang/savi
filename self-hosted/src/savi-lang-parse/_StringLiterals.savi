@@ -81,6 +81,7 @@
         | '0'  | output.push_byte(0)
         | 'x'  | expecting_hex_digits = 2
         | 'u'  | expecting_hex_digits = 4
+        | 'U'  | expecting_hex_digits = 8
         | error!
         )
 
