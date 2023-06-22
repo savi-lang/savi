@@ -23,16 +23,16 @@ struct AST {
 
     stringWithPrefix :group {
       string @7 :Text;
-      prefix @8 :AST.Operator;
+      prefix @8 :AST.Name;
     }
 
     stringCompose :group {
       terms @9 :List(AST);
-      prefix @10 :AST.Operator;
+      prefix @10 :AST.Name;
     }
 
     prefix :group {
-      op @11 :AST.Operator;
+      op @11 :AST.Name;
       term @12 :AST;
     }
 
@@ -44,7 +44,7 @@ struct AST {
     group @15 :AST.Group;
 
     relate :group {
-      op @16 :AST.Operator;
+      op @16 :AST.Name;
       terms @17 :AST.Pair;
     }
 
@@ -87,7 +87,7 @@ struct AST {
     value @1 :Text;
   }
 
-  struct Operator {
+  struct Name {
     value @0 :Text;
   }
 
@@ -114,10 +114,9 @@ struct AST {
 
   struct Call {
     receiver @0 :AST;
-    name @1 :Text;
-    namePos @2 :Source.Pos;
-    args @3 :List(AST);
-    yield @4 :AST.CallYield;
+    name @1 :Name;
+    args @2 :List(AST);
+    yield @3 :AST.CallYield;
   }
 
   struct CallYield {
@@ -158,8 +157,7 @@ struct AST {
   }
 
   struct Document {
-    source @0 :Source;
-    declares @1 :List(AST.Declare);
-    bodies @2 :List(AST.Group);
+    declares @0 :List(AST.Declare);
+    bodies @1 :List(AST.Group);
   }
 }

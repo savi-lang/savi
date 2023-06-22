@@ -186,8 +186,8 @@
     )
     declare.trim_terms(0, term_count)
 
-  :fun ref _build_operator(
-    op SaviProto.AST.Operator.Builder
+  :fun ref _build_name(
+    op SaviProto.AST.Name.Builder
     data _TreeBuilder.Data
     state _TreeBuilder.State
     token PEG.Token(_Token)
@@ -378,7 +378,7 @@
 
         child_info = try (data.nth_child_with_index_of!(index, 1) | return)
         child_token = child_info.head, child_index = child_info.tail
-        @_build_operator(string_with_prefix.prefix, data, state, child_token, child_index)
+        @_build_name(string_with_prefix.prefix, data, state, child_token, child_index)
       |
         @error.at(token, _Error.ToDoComposeString)
       )
@@ -440,7 +440,7 @@
 
       child_info = try (data.nth_child_with_index_of!(index, 0) | return)
       child_token = child_info.head, child_index = child_info.tail
-      @_build_operator(prefix.op, data, state, child_token, child_index)
+      @_build_name(prefix.op, data, state, child_token, child_index)
 
       child_info = try (data.nth_child_with_index_of!(index, 1) | return)
       child_token = child_info.head, child_index = child_info.tail
@@ -468,7 +468,7 @@
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )
-          @_build_operator(relate.op, data, state, child_token, child_index)
+          @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.right
 
@@ -504,7 +504,7 @@
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )
-          @_build_operator(relate.op, data, state, child_token, child_index)
+          @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.left
 
@@ -545,7 +545,7 @@
             @error.at(child_token, _Error.BugUnexpectedGrammarToken)
             next
           )
-          @_build_operator(relate.op, data, state, child_token, child_index)
+          @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.left
 

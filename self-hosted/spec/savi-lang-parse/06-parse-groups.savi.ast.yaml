@@ -15,13 +15,13 @@
           name: "example"
       body_annotations: #12:
         0: #13:
-          target: 1016
+          target: 1008
           value: "annotated to prevent `savi format` from removing parens"
         1: #14:
-          target: 1048
+          target: 1040
           value: "annotated to prevent `savi format` from removing parens"
         2: #15:
-          target: 1240
+          target: 1232
           value: "annotated to prevent `savi format` from removing parens"
       body: #16:
         terms: #17:
