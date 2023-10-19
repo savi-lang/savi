@@ -9,6 +9,7 @@ task:
     MAKE: make
     CC: clang
     CXX: clang++
+    CRYSTAL_VERSION: "1.8.0"
 
   matrix:
     - name: x86_64-unknown-linux-gnu
@@ -18,8 +19,11 @@ task:
           apt-get update && \
           apt-get install -y --no-install-recommends \
             apt-transport-https ca-certificates curl clang make \
-            libgc-dev libevent-dev libpcre3-dev llvm-10-dev && \
-          curl -fsSL https://crystal-lang.org/install.sh | bash"
+            zlib1g-dev libgc-dev libevent-dev libpcre3-dev llvm-10-dev && \
+          curl -L --fail --retry 10 https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal-${CRYSTAL_VERSION}-1-linux-x86_64-bundled.tar.gz | tar -xvzf - -C /tmp && \
+          echo $PATH && \
+          ln -s /tmp/crystal-${CRYSTAL_VERSION}-1/bin/crystal /usr/local/bin/crystal && \
+          crystal --version"
         # Without this next environment var, apt-get will try to ask us
         # interactive questions, to which we will be unable to respond...
         DEBIAN_FRONTEND: noninteractive
@@ -81,7 +85,11 @@ task:
     - name: arm64-apple-macosx
       environment:
         TRIPLE: arm64-apple-macosx
-        DEPS_INSTALL: brew update --preinstall && brew install libiconv crystal && brew cleanup
+        DEPS_INSTALL: "
+          brew update --preinstall && brew install libiconv libgc libevent pcre && brew cleanup && \
+          curl -L --fail --retry 10 https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal-${CRYSTAL_VERSION}-1-darwin-universal.tar.gz | tar -xvzf - -C /tmp && \
+          sudo ln -s /tmp/crystal-${CRYSTAL_VERSION}-1/bin/crystal /usr/local/bin/crystal && \
+          crystal --version"
         # Set up the SDKROOT path specific to the present XCode version.
         SDKROOT: /Applications/Xcode-14.2.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
@@ -101,7 +109,10 @@ task:
         IS_CROSS_COMPILE: "1"
         # Download x86_64 versions of the libraries needed by Crystal runtime.
         DEPS_INSTALL: "
-          brew update --preinstall && brew install crystal && brew cleanup && \
+          brew update --preinstall && brew cleanup && \
+          curl -L --fail --retry 10 https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal-${CRYSTAL_VERSION}-1-darwin-universal.tar.gz | tar -xvzf - -C /tmp && \
+          sudo ln -s /tmp/crystal-${CRYSTAL_VERSION}-1/bin/crystal /usr/local/bin/crystal && \
+          crystal --version && \
           mkdir /tmp/x86_64 && \
           brew fetch --bottle-tag=ventura libgc && \
           brew fetch --bottle-tag=ventura libevent && \

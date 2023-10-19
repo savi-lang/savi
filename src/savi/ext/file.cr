@@ -43,7 +43,13 @@ class File
       from_path = File.expand_path("..", from_path)
       up_levels += 1
 
-      raise "This is probably an infinite loop" if up_levels > 10_000
+      # If we've gone up the maximum number of levels, that means the best
+      # we can do is just return the absolute path.
+      return to_path if from_path == "/"
+
+      # If for some reason our from_path is not resolving to the root path,
+      # it's better to return the absolute path than do an infinite loop.
+      return to_path if up_levels > 10_000
     }
   end
 end
