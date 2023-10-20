@@ -641,6 +641,7 @@ module Savi::Program::Intrinsic
       declare_numeric_copies(ctx, scope, declarator)
       declare_enum_member_name(ctx, scope, declarator)
       declare_enum_from_u64(ctx, scope, declarator)
+      declare_enum_each_enum_member(ctx, scope, declarator)
 
       scope.current_package.types << scope.current_type
       scope.current_type = nil
@@ -773,6 +774,32 @@ module Savi::Program::Intrinsic
       member_name_body,
     )
     scope.current_type.functions << member_name_func
+  end
+
+  def self.declare_enum_each_enum_member(
+    ctx : Compiler::Context,
+    scope : Declarator::Scope,
+    declarator : Declarator,
+  )
+    type = scope.current_type
+
+    # Each member gets a yield in the body.
+    each_enum_member_body = AST::Group.new(":").from(type.ident)
+    scope.current_members.each do |member|
+      each_enum_member_body.terms << AST::Yield.new([
+        AST::Identifier.new(member.ident.value).from(member.ident)
+      ] of AST::Term).from(member.ident)
+    end
+
+    # Create a function with that body.
+    each_enum_member_func = Program::Function.new(
+      AST::Identifier.new("non").from(type.ident),
+      AST::Identifier.new("each_enum_member").from(type.ident),
+      nil,
+      AST::Identifier.new("None").from(type.ident),
+      each_enum_member_body,
+    )
+    scope.current_type.functions << each_enum_member_func
   end
 
   # An enum type gets a method for converting from U64.

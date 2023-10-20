@@ -19,3 +19,15 @@
 
     test["can interpolate into a string with the member name"].pass =
       "\(EnumExample.Integer48)" == "EnumExample.Integer48"
+
+    test["can iterate over each member of the enum"].pass = (
+      members Array(EnumExample) = []
+      EnumExample.each_enum_member -> (member |
+        members << member
+      )
+      members == [
+        EnumExample.Integer48
+        EnumExample.Hexadecimal49
+        EnumExample.Char50
+      ]
+    )
