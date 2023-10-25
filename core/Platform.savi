@@ -52,6 +52,18 @@
   :: It is mutually exclusive with `is_posix`.
   :const is_windows Bool: compiler intrinsic
 
+  :: SECTION: CPU Architecture
+
+  :: Returns `True` if the target platform uses an ARM-based CPU architecture.
+  ::
+  :: This is mutually exclusive with `is_x86`.
+  :const is_arm Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses an x86-based CPU architecture.
+  ::
+  :: This is mutually exclusive with `is_arm`.
+  :const is_x86 Bool: compiler intrinsic
+
   :: SECTION: Data Type Sizes
 
   :: Returns `True` if the target platform uses ILP32 data type sizes.
