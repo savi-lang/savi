@@ -1028,6 +1028,10 @@ class Savi::Compiler::CodeGen
         gen_bool(!target.windows?)
       when "is_windows"
         gen_bool(target.windows?)
+      when "is_arm"
+        gen_bool(target.any_arm?)
+      when "is_x86"
+        gen_bool(target.any_x86?)
       when "is_ilp32"
         gen_bool(abi_size_of(@isize) == 4)
       when "is_lp64"

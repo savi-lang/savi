@@ -9,6 +9,11 @@
       (if Platform.is_macos   (1 | 0)) +
       (if Platform.is_windows (1 | 0))
 
+  :it "returns True for exactly one of {is_arm, is_x86}"
+    assert: U8[1] == U8[0] +
+      (if Platform.is_arm (1 | 0)) +
+      (if Platform.is_x86 (1 | 0))
+
   :it "returns True for is_posix on POSIX platforms"
     if Platform.is_linux   (assert: Platform.is_posix)
     if Platform.is_bsd     (assert: Platform.is_posix)
