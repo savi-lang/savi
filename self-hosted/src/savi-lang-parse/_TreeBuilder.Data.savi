@@ -1,7 +1,14 @@
 :struct val _TreeBuilder.Data
   :let code String
   :let tokens Array(PEG.Token(_Token))'val
+  :let _line_breaks Array(USize): []
+
   :new (@code, @tokens)
+    @code.each_byte_with_index -> (byte, index |
+      if byte == '\n' (
+        @_line_breaks << index
+      )
+    )
 
   :fun "[]!"(index USize): @tokens[index]!
 
@@ -37,6 +44,17 @@
       count += 1
     )
     count
+
+  :fun get_row_and_column(token PEG.Token(_Token)) Pair(USize, USize)
+    row USize = 1
+    row_offset USize = 0
+    @_line_breaks.each_with_index -> (line_break, offset |
+      break if line_break >= token.start
+      row += 1
+      row_offset = line_break + 1
+    )
+    column = token.start - row_offset + 1
+    Pair(USize, USize).new(row, column)
 
   :fun get_string(token PEG.Token(_Token)): @code.trim(token.start, token.end)
   :fun get_first_byte(token PEG.Token(_Token)): try (@code[token.start]! | 0)

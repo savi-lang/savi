@@ -174,7 +174,7 @@ $(eval $(call MAKE_VAR_CACHE_FOR,RUNTIME_BITCODE_RELEASE_URL))
 
 # Specify where to download the CapnProto compiler plugin for Savi code gen.
 # This needs to get bumped explicitly here when we do a new CapnProto release.
-CAPNPC_SAVI_DOWNLOAD_URL?=https://github.com/jemc-savi/CapnProto/releases/download/v0.20230621.0/capnpc-savi-v0.20230621.0-$(TARGET_PLATFORM).tar.gz
+CAPNPC_SAVI_DOWNLOAD_URL?=https://github.com/jemc-savi/CapnProto/releases/download/v0.20240421.0/capnpc-savi-v0.20240421.0-$(TARGET_PLATFORM).tar.gz
 $(eval $(call MAKE_VAR_CACHE_FOR,CAPNPC_SAVI_DOWNLOAD_URL))
 
 # This is the path where we look for the LLVM pre-built static libraries to be,

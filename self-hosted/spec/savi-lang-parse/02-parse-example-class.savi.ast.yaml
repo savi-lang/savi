@@ -1,94 +1,306 @@
 #1:
-  declares: #2:
-    0: #3:
-      terms: #4:
-        0: #5:
+  source: #2:
+    content_for_non_file: ":class Example\n  :let name String: \"World\"\n\n  :: Return a friendly greeting string for this instance.\n  :: This always starts with a good, old-fashioned \"Hello\".\n  :fun greeting String\n    \"Hello, \" + @name + \"!\"\n\n  :fun degreesF(c F64) F64\n    c * 9 / 5 + 32.0\n"
+  declares: #3:
+    0: #4:
+      terms: #5:
+        0: #6:
+          position: #7:
+            source: #2...
+            offset: 1
+            size: 5
+            row: 1
+            column: 2
           name: "class"
-        1: #6:
+        1: #8:
+          position: #9:
+            source: #2...
+            offset: 7
+            size: 7
+            row: 1
+            column: 8
           name: "Example"
-      body: #7:
-    1: #8:
-      terms: #9:
-        0: #10:
+      body: #10:
+    1: #11:
+      terms: #12:
+        0: #13:
+          position: #14:
+            source: #2...
+            offset: 18
+            size: 3
+            row: 2
+            column: 4
           name: "let"
-        1: #11:
+        1: #15:
+          position: #16:
+            source: #2...
+            offset: 22
+            size: 4
+            row: 2
+            column: 8
           name: "name"
-        2: #12:
+        2: #17:
+          position: #18:
+            source: #2...
+            offset: 27
+            size: 6
+            row: 2
+            column: 13
           name: "String"
-      body: #13:
-        terms: #14:
-          0: #15:
+      body: #19:
+        terms: #20:
+          0: #21:
+            position: #22:
+              source: #2...
+              offset: 35
+              size: 7
+              row: 2
+              column: 21
             string: "World"
-    2: #16:
-      terms: #17:
-        0: #18:
+    2: #23:
+      terms: #24:
+        0: #25:
+          position: #26:
+            source: #2...
+            offset: 165
+            size: 3
+            row: 6
+            column: 4
           name: "fun"
-        1: #19:
+        1: #27:
+          position: #28:
+            source: #2...
+            offset: 169
+            size: 8
+            row: 6
+            column: 8
           name: "greeting"
-        2: #20:
+        2: #29:
+          position: #30:
+            source: #2...
+            offset: 178
+            size: 6
+            row: 6
+            column: 17
           name: "String"
       main_annotation: "Return a friendly greeting string for this instance.\nThis always starts with a good, old-fashioned \"Hello\"."
-      body: #21:
-        terms: #22:
-          0: #23:
+      body: #31:
+        terms: #32:
+          0: #33:
+            position: #34:
+              source: #2...
+              offset: 189
+              size: 23
+              row: 7
+              column: 5
             relate: #
-              op: #24:
+              op: #35:
+                position: #36:
+                  source: #2...
+                  offset: 207
+                  size: 1
+                  row: 7
+                  column: 23
                 value: "+"
-              terms: #25:
-                left: #26:
+              terms: #37:
+                left: #38:
+                  position: #39:
+                    source: #2...
+                    offset: 207
+                    size: 1
+                    row: 7
+                    column: 23
                   relate: #
-                    op: #27:
+                    op: #40:
+                      position: #41:
+                        source: #2...
+                        offset: 199
+                        size: 1
+                        row: 7
+                        column: 15
                       value: "+"
-                    terms: #28:
-                      left: #29:
+                    terms: #42:
+                      left: #43:
+                        position: #44:
+                          source: #2...
+                          offset: 189
+                          size: 9
+                          row: 7
+                          column: 5
                         string: "Hello, "
-                      right: #30:
+                      right: #45:
+                        position: #46:
+                          source: #2...
+                          offset: 201
+                          size: 5
+                          row: 7
+                          column: 17
                         name: "@name"
-                right: #31:
+                right: #47:
+                  position: #48:
+                    source: #2...
+                    offset: 209
+                    size: 3
+                    row: 7
+                    column: 25
                   string: "!"
-    3: #32:
-      terms: #33:
-        0: #34:
+    3: #49:
+      terms: #50:
+        0: #51:
+          position: #52:
+            source: #2...
+            offset: 217
+            size: 3
+            row: 9
+            column: 4
           name: "fun"
-        1: #35:
+        1: #53:
+          position: #54:
+            source: #2...
+            offset: 221
+            size: 15
+            row: 9
+            column: 8
           qualify: #
-            term: #36:
+            term: #55:
+              position: #56:
+                source: #2...
+                offset: 221
+                size: 8
+                row: 9
+                column: 8
               name: "degreesF"
-            group: #37:
+            group: #57:
+              position: #58:
+                source: #2...
+                offset: 229
+                size: 7
+                row: 9
+                column: 16
               style: SaviProto.AST.Group.Style.Paren
-              terms: #38:
-                0: #39:
-                  group: #40:
+              terms: #59:
+                0: #60:
+                  position: #61:
+                    source: #2...
+                    offset: 230
+                    size: 5
+                    row: 9
+                    column: 17
+                  group: #62:
+                    position: #63:
+                      source: #2...
+                      offset: 230
+                      size: 5
+                      row: 9
+                      column: 17
                     style: SaviProto.AST.Group.Style.Space
-                    terms: #41:
-                      0: #42:
+                    terms: #64:
+                      0: #65:
+                        position: #66:
+                          source: #2...
+                          offset: 230
+                          size: 1
+                          row: 9
+                          column: 17
                         name: "c"
-                      1: #43:
+                      1: #67:
+                        position: #68:
+                          source: #2...
+                          offset: 232
+                          size: 3
+                          row: 9
+                          column: 19
                         name: "F64"
-        2: #44:
+        2: #69:
+          position: #70:
+            source: #2...
+            offset: 237
+            size: 3
+            row: 9
+            column: 24
           name: "F64"
-      body: #45:
-        terms: #46:
-          0: #47:
+      body: #71:
+        terms: #72:
+          0: #73:
+            position: #74:
+              source: #2...
+              offset: 245
+              size: 16
+              row: 10
+              column: 5
             relate: #
-              op: #48:
+              op: #75:
+                position: #76:
+                  source: #2...
+                  offset: 255
+                  size: 1
+                  row: 10
+                  column: 15
                 value: "+"
-              terms: #49:
-                left: #50:
+              terms: #77:
+                left: #78:
+                  position: #79:
+                    source: #2...
+                    offset: 245
+                    size: 9
+                    row: 10
+                    column: 5
                   relate: #
-                    op: #51:
+                    op: #80:
+                      position: #81:
+                        source: #2...
+                        offset: 251
+                        size: 1
+                        row: 10
+                        column: 11
                       value: "/"
-                    terms: #52:
-                      left: #53:
+                    terms: #82:
+                      left: #83:
+                        position: #84:
+                          source: #2...
+                          offset: 251
+                          size: 1
+                          row: 10
+                          column: 11
                         relate: #
-                          op: #54:
+                          op: #85:
+                            position: #86:
+                              source: #2...
+                              offset: 247
+                              size: 1
+                              row: 10
+                              column: 7
                             value: "*"
-                          terms: #55:
-                            left: #56:
+                          terms: #87:
+                            left: #88:
+                              position: #89:
+                                source: #2...
+                                offset: 245
+                                size: 1
+                                row: 10
+                                column: 5
                               name: "c"
-                            right: #57:
+                            right: #90:
+                              position: #91:
+                                source: #2...
+                                offset: 249
+                                size: 1
+                                row: 10
+                                column: 9
                               positive_integer: 9
-                      right: #58:
+                      right: #92:
+                        position: #93:
+                          source: #2...
+                          offset: 253
+                          size: 1
+                          row: 10
+                          column: 13
                         positive_integer: 5
-                right: #59:
+                right: #94:
+                  position: #95:
+                    source: #2...
+                    offset: 257
+                    size: 4
+                    row: 10
+                    column: 17
                   floating_point: 32.0

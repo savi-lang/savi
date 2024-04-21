@@ -66,6 +66,9 @@
   :fun ref _show_recurse_id(recurse_id USize) None
     recurse_id.format.hex.into_string(@_out)
 
+  :fun ref _should_show_object(recurse_id USize) Bool
+    True
+
   :fun ref object(recurse_id USize) None
     :yields None for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
     orig_index = @_index <<= 0
@@ -75,15 +78,19 @@
     if recurse_id.is_zero (
       yield None
     |
+      should_show =
+        @_should_show_object(recurse_id) &&
+        !@_recurse_stack.includes(recurse_id)
+
       @_show_recurse_id(recurse_id)
 
-      if @_recurse_stack.includes(recurse_id) (
-        @_out << "..."
-      |
+      if should_show (
         @_out.push_byte(':')
         @_recurse_stack << recurse_id
         yield None
         try @_recurse_stack.pop!
+      |
+        @_out << "..."
       )
     )
 
@@ -143,3 +150,6 @@
     )
 
     number.into_string(@_out)
+
+  :fun ref _should_show_object(recurse_id USize) Bool
+    !@_seen_ids.has_any -> (id | id == recurse_id)

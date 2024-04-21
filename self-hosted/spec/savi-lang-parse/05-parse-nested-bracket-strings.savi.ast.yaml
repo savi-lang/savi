@@ -1,23 +1,67 @@
 #1:
-  declares: #2:
-    0: #3:
-      terms: #4:
-        0: #5:
+  source: #2:
+    content_for_non_file: ":actor Main\n  :new\n    <<<FOO>>>\n    <<<FOO<<<BAR>>>BAZ>>>\n    <<<\n      FOO\n      BAR\n      BAZ\n    >>>\n    <<<\n      FOO\n      <<<\n        BAR\n      >>>\n      BAZ\n    >>>\n"
+  declares: #3:
+    0: #4:
+      terms: #5:
+        0: #6:
+          position: #7:
+            source: #2...
+            offset: 1
+            size: 5
+            row: 1
+            column: 2
           name: "actor"
-        1: #6:
+        1: #8:
+          position: #9:
+            source: #2...
+            offset: 7
+            size: 4
+            row: 1
+            column: 8
           name: "Main"
-      body: #7:
-    1: #8:
-      terms: #9:
-        0: #10:
+      body: #10:
+    1: #11:
+      terms: #12:
+        0: #13:
+          position: #14:
+            source: #2...
+            offset: 15
+            size: 3
+            row: 2
+            column: 4
           name: "new"
-      body: #11:
-        terms: #12:
-          0: #13:
+      body: #15:
+        terms: #16:
+          0: #17:
+            position: #18:
+              source: #2...
+              offset: 23
+              size: 9
+              row: 3
+              column: 5
             string: "FOO"
-          1: #14:
+          1: #19:
+            position: #20:
+              source: #2...
+              offset: 37
+              size: 21
+              row: 4
+              column: 5
             string: "FOO<<<BAR>>>BAZ"
-          2: #15:
+          2: #21:
+            position: #22:
+              source: #2...
+              offset: 63
+              size: 41
+              row: 5
+              column: 5
             string: "FOO\nBAR\nBAZ"
-          3: #16:
+          3: #23:
+            position: #24:
+              source: #2...
+              offset: 109
+              size: 63
+              row: 10
+              column: 5
             string: "FOO\n<<<\n  BAR\n>>>\nBAZ"

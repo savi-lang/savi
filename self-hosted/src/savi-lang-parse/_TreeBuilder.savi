@@ -1,6 +1,9 @@
 :class _TreeBuilder.State
   :var _main_annotation: String.new
   :let _annotations: Map.Ordered(U64, String).new
+  :let source SaviProto.Source.Builder
+
+  :new (@source)
 
   :fun ref add_main_annotation(
     data _TreeBuilder.Data
@@ -57,7 +60,8 @@
     doc SaviProto.AST.Document.Builder
     data _TreeBuilder.Data
   )
-    state = _TreeBuilder.State.new
+    doc.source.content_for_non_file = data.code // TODO: set absolute file path and skip this one
+    state = _TreeBuilder.State.new(doc.source)
 
     // Get the first token.
     // If there aren't any tokens in the stream, return early.
@@ -73,11 +77,18 @@
     // Build the top-level document.
     @_build_doc(doc, data, state, token, index)
 
-  :fun ref _build_pos(
-    pos SaviProto.Source.Pos.Builder
+  :fun ref _build_position(
+    position SaviProto.Source.Position.Builder
+    data _TreeBuilder.Data
+    state _TreeBuilder.State
     token PEG.Token(_Token)
   )
-    None // TODO: Fill in the source position information.
+    position.set_source_to_point_to_existing(state.source)
+    position.offset = token.start.u32
+    position.size = token.end.u32 - token.start.u32
+    pair = data.get_row_and_column(token)
+    position.row = pair.first.u32
+    position.column = pair.second.u32
 
   :fun ref _build_doc(
     doc SaviProto.AST.Document.Builder
@@ -178,8 +189,6 @@
     token PEG.Token(_Token)
     index USize
   )
-    // @_build_pos(declare.pos, token)
-
     term_count = @_build_ast_list(
       declare.init_terms(data.count_children_of(index))
       data, state, token, index
@@ -193,7 +202,8 @@
     token PEG.Token(_Token)
     index USize
   )
-    // @_build_pos(op.pos, token)
+    @_build_position(op.position, data, state, token)
+
     op.value = data.get_string(token)
 
   :fun ref _build_group_whitespace(
@@ -203,7 +213,7 @@
     token PEG.Token(_Token)
     index USize
   )
-    // @_build_pos(group.pos, token)
+    @_build_position(group.position, data, state, token)
 
     group.style = SaviProto.AST.Group.Style.Space
 
@@ -220,8 +230,6 @@
     token PEG.Token(_Token)
     index USize
   ) USize
-    // @_build_pos(compose.pos, token)
-
     term_index USize = 0
     literal_start = token.start
 
@@ -233,6 +241,7 @@
           @error.at(token, _Error.BugFixedSizeListIsTooSmall)
           next
         )
+        @_build_position(literal_part.position, data, state, child_token)
         try (
           literal_part.init_string(
             _StringLiterals.process_escapes!(
@@ -263,6 +272,7 @@
         @error.at(token, _Error.BugFixedSizeListIsTooSmall)
         return term_index
       )
+      @_build_position(literal_part.position, data, state, token)
       try (
         literal_part.init_string(
           _StringLiterals.process_escapes!(
@@ -284,7 +294,7 @@
     token PEG.Token(_Token)
     index USize
   )
-    // @_build_pos(group.pos, token)
+    @_build_position(group.position, data, state, token)
 
     // Determine what kind of group this is.
     first_byte = data.get_first_byte(token)
@@ -382,7 +392,8 @@
     token PEG.Token(_Token)
     index USize
   )
-    // @_build_pos(ast.pos, token)
+    @_build_position(ast.position, data, state, token)
+
     children_count = data.count_children_of(index)
 
     // Parsing operator precedeence without too much nested backtracking
@@ -547,6 +558,7 @@
           @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.right
+          @_build_position(ast.position, data, state, child_token)
 
         | remaining_children_count == 1 |
           @_build_ast(ast, data, state, child_token, child_index)
@@ -583,6 +595,7 @@
           @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.left
+          @_build_position(ast.position, data, state, child_token)
 
         | child_number == 0 |
           @_build_ast(ast, data, state, child_token, child_index)
@@ -609,6 +622,7 @@
           @_build_group(qualify.group, data, state, child_token, child_index)
 
           ast = qualify.term
+          @_build_position(ast.position, data, state, child_token)
 
         | child_number > 1 |
           relate = ast.init_relate
@@ -624,6 +638,7 @@
           @_build_name(relate.op, data, state, child_token, child_index)
 
           ast = relate.terms.left
+          @_build_position(ast.position, data, state, child_token)
 
         | child_number == 0 |
           @_build_ast(ast, data, state, child_token, child_index)
