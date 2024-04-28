@@ -13,3 +13,6 @@ shards:
   clang:
     git: https://github.com/crystal-lang/clang.cr.git
     version: 0.3.0
+  capnproto:
+    git: https://github.com/jemc/crystal-capnproto.git
+    version: 1.0.0+git.commit.61c3cf19167eb71398a1f36da2032c4560ebcdc9

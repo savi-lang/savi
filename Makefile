@@ -97,8 +97,8 @@ example.compile: PHONY SAVI
 example.deps: PHONY SAVI
 	echo && $(SAVI) deps update --cd "$(dir)" $(extra_args)
 
-# Generate Savi source code from CapnProto definitions.
-gen.capnp: PHONY self-hosted.deps $(BUILD)/capnpc-savi
+# Generate Savi and Crystal source code from CapnProto definitions.
+gen.capnp: PHONY self-hosted.deps $(BUILD)/capnpc-savi $(BUILD)/capnpc-crystal
 	capnp compile \
 		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
 		self-hosted/src/SaviProto/SaviProto.AST.capnp --output=- \
@@ -107,6 +107,14 @@ gen.capnp: PHONY self-hosted.deps $(BUILD)/capnpc-savi
 		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
 		self-hosted/src/SaviProto/SaviProto.Source.capnp --output=- \
 		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.Source.capnp.savi
+	capnp compile \
+		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+		self-hosted/src/SaviProto/SaviProto.AST.capnp --output=- \
+		| $(BUILD)/capnpc-crystal > self-hosted/src/SaviProto/SaviProto.AST.capnp.cr
+	capnp compile \
+		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+		self-hosted/src/SaviProto/SaviProto.Source.capnp --output=- \
+		| $(BUILD)/capnpc-crystal > self-hosted/src/SaviProto/SaviProto.Source.capnp.cr
 gen.capnp.check: gen.capnp
 	git diff --exit-code self-hosted/src/SaviProto
 
@@ -271,6 +279,11 @@ $(BUILD)/capnpc-savi: $(MAKE_VAR_CACHE)/CAPNPC_SAVI_DOWNLOAD_URL
 	curl -L --fail --retry 10 -sS "${CAPNPC_SAVI_DOWNLOAD_URL}" | tar -C $(BUILD) -xzvf -
 	chmod a+x $@
 	touch $@
+
+# Build the CapnProto compiler plugin for Crystal code gen.
+# See github.com/jemc/crystal-capnproto for more info.
+$(BUILD)/capnpc-crystal: $(shell find lib/capnproto/src -name '*.cr')
+	crystal build lib/capnproto/src/capnpc-crystal/main.cr -o $@
 
 # Build the Crystal LLVM C bindings extensions as LLVM bitcode.
 # This bitcode needs to get linked into our Savi compiler executable.

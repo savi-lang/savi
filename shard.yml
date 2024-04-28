@@ -13,6 +13,8 @@ dependencies:
     github: jemc/crystal-pegmatite
   lsp:
     github: jemc/crystal-lsp
+  capnproto:
+    github: jemc/crystal-capnproto
   clang:
     github: crystal-lang/clang.cr
   clim:
