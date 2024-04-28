@@ -19,7 +19,10 @@ class Savi::Compiler::CodeGen
       filename = "(main)"
       dirname = ""
 
-      @di.create_compile_unit(LANGUAGE_ID, filename, dirname, "Savi", false, "", 0)
+      @di.create_compile_unit(
+        LLVM::DwarfSourceLanguage.new(LANGUAGE_ID - 1),
+        filename, dirname, "Savi", false, "", 0
+      )
     end
 
     def finish
@@ -87,7 +90,8 @@ class Savi::Compiler::CodeGen
       )
       expr = @di.create_expression(nil, 0)
 
-      @di.insert_declare_at_end(storage, info, expr, @builder.current_debug_location, @builder.insert_block.not_nil!)
+      dl = LibLLVM.value_as_metadata(@builder.current_debug_location)
+      @di.insert_declare_at_end(storage, info, expr, dl, @builder.insert_block.not_nil!)
     end
 
     def metadata(args)
@@ -234,17 +238,15 @@ class Savi::Compiler::CodeGen
         @target_data.abi_alignment(llvm_type) * 8,
         LLVM::DIFlags::Zero,
         nil,
-        @di.get_or_create_type_array(
-          member_infos.map do |index, (member_name, member_llvm_type, member_di_type)|
-            @di.create_member_type(nil, member_name, nil, 1,
-              @target_data.abi_size(member_llvm_type) * 8,
-              @target_data.abi_alignment(member_llvm_type) * 8,
-              @target_data.offset_of_element(llvm_type, index) * 8,
-              LLVM::DIFlags::Zero,
-              member_di_type,
-            )
-          end.compact
-        )
+        member_infos.map do |index, (member_name, member_llvm_type, member_di_type)|
+          @di.create_member_type(nil, member_name, nil, 1,
+            @target_data.abi_size(member_llvm_type) * 8,
+            @target_data.abi_alignment(member_llvm_type) * 8,
+            @target_data.offset_of_element(llvm_type, index) * 8,
+            LLVM::DIFlags::Zero,
+            member_di_type,
+          )
+        end.compact
       )
     end
 
@@ -259,11 +261,9 @@ class Savi::Compiler::CodeGen
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Unsigned)
         end
 
-      di_members = @di.get_or_create_array(
-        t.find_enum_members!(ctx).map { |member|
-          @di.create_enumerator(member.ident.value, member.value)
-        }
-      )
+      di_members = t.find_enum_members!(ctx).map { |member|
+        @di.create_enumerator(member.ident.value, member.value)
+      }
 
       @di.create_enumeration_type(
         pos.try { |pos| di_file(pos.source) },
@@ -320,8 +320,7 @@ class Savi::Compiler::CodeGen
     def di_func_type(gfunc : GenFunc, file : LibLLVM::MetadataRef)
       # This is just a stub that pretends there is just one int parameter.
       int = @di.create_basic_type("int", 32, 32, LLVM::DwarfTypeEncoding::Signed)
-      param_types = @di.get_or_create_type_array([int])
-      @di.create_subroutine_type(file, param_types)
+      @di.create_subroutine_type(file, [int])
     end
   end
 end

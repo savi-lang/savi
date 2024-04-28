@@ -9,7 +9,7 @@ task:
     MAKE: make
     CC: clang
     CXX: clang++
-    CRYSTAL_VERSION: "1.8.0"
+    CRYSTAL_VERSION: "1.10.1"
 
   matrix:
     - name: x86_64-unknown-linux-gnu
@@ -44,7 +44,7 @@ task:
         # in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
         MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=x86_64-alpine-linux-musl
       container:
-        image: alpine:3.18
+        image: alpine:3.19
         cpu: 2
         memory: 8G
 
@@ -61,7 +61,7 @@ task:
         # We also need to use `aarch64` instead of `arm64` here...
         MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=aarch64-alpine-linux-musl
       arm_container:
-        image: alpine:3.18
+        image: alpine:3.19
         cpu: 2
         memory: 8G
 
@@ -88,6 +88,8 @@ task:
         DEPS_INSTALL: "
           brew update --preinstall && brew install libiconv libgc libevent pcre && brew cleanup && \
           curl -L --fail --retry 10 https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal-${CRYSTAL_VERSION}-1-darwin-universal.tar.gz | tar -xvzf - -C /tmp && \
+          echo $PATH && \
+          sudo mkdir -p /usr/local/bin && \
           sudo ln -s /tmp/crystal-${CRYSTAL_VERSION}-1/bin/crystal /usr/local/bin/crystal && \
           crystal --version"
         # Set up the SDKROOT path specific to the present XCode version.
@@ -111,6 +113,8 @@ task:
         DEPS_INSTALL: "
           brew update --preinstall && brew cleanup && \
           curl -L --fail --retry 10 https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal-${CRYSTAL_VERSION}-1-darwin-universal.tar.gz | tar -xvzf - -C /tmp && \
+          echo $PATH && \
+          sudo mkdir -p /usr/local/bin && \
           sudo ln -s /tmp/crystal-${CRYSTAL_VERSION}-1/bin/crystal /usr/local/bin/crystal && \
           crystal --version && \
           mkdir /tmp/x86_64 && \
