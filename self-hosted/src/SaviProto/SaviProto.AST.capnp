@@ -4,103 +4,110 @@ using Savi = import "/CapnProto.Savi.Meta.capnp";
 $Savi.namespace("SaviProto");
 
 using Source = import "SaviProto.Source.capnp".Source;
+using Position = Source.Position;
 
 struct AST {
+  position @0 :Position;
+
   union {
-    none @0 :Void;
+    none @1 :Void;
 
-    character @1 :UInt64;
+    character @2 :UInt64;
 
-    positiveInteger @2 :UInt64;
+    positiveInteger @3 :UInt64;
 
-    negativeInteger @3 :UInt64;
+    negativeInteger @4 :UInt64;
 
-    floatingPoint @4 :Float64;
+    floatingPoint @5 :Float64;
 
-    name @5 :Text;
+    name @6 :Text;
 
-    string @6 :Text;
+    string @7 :Text;
 
     stringWithPrefix :group {
-      prefix @7 :AST.Name;
-      string @8 :Text;
+      prefix @8 :AST.Name;
+      string @9 :Text;
     }
 
     stringCompose :group {
-      prefix @9 :AST.Name;
-      terms @10 :List(AST);
+      prefix @10 :AST.Name;
+      terms @11 :List(AST);
     }
 
     prefix :group {
-      op @11 :AST.Name;
-      term @12 :AST;
+      op @12 :AST.Name;
+      term @13 :AST;
     }
 
     qualify :group {
-      term @13 :AST;
-      group @14 :AST.Group;
+      term @14 :AST;
+      group @15 :AST.Group;
     }
 
-    group @15 :AST.Group;
+    group @16 :AST.Group;
 
     relate :group {
-      op @16 :AST.Name;
-      terms @17 :AST.Pair;
+      op @17 :AST.Name;
+      terms @18 :AST.Pair;
     }
 
     fieldRead :group {
-      field @18 :Text;
+      field @19 :Text;
     }
 
     fieldWrite :group {
-      field @19 :Text;
-      value @20 :AST;
+      field @20 :Text;
+      value @21 :AST;
     }
 
     fieldDisplace :group {
-      field @21 :Text;
-      value @22 :AST;
+      field @22 :Text;
+      value @23 :AST;
     }
 
-    call @23 :AST.Call;
+    call @24 :AST.Call;
 
     choice :group {
-      branches @24 :List(AST.ChoiceBranch);
+      branches @25 :List(AST.ChoiceBranch);
     }
 
-    loop @25 :AST.Loop;
+    loop @26 :AST.Loop;
 
-    try @26 :AST.Try;
+    try @27 :AST.Try;
 
     jump :group {
-      term @27 :AST;
-      kind @28 :AST.JumpKind;
+      term @28 :AST;
+      kind @29 :AST.JumpKind;
     }
 
     yield :group {
-      terms @29 :List(AST);
+      terms @30 :List(AST);
     }
   }
 
   struct Annotation {
-    target @0 :UInt64;
-    value @1 :Text;
+    position @0 :Position;
+    target @1 :UInt64;
+    value @2 :Text;
   }
 
   struct Name {
-    value @0 :Text;
+    position @0 :Position;
+    value @1 :Text;
   }
 
   struct Pair {
-    left @0 :AST;
-    right @1 :AST;
+    position @0 :Position;
+    left @1 :AST;
+    right @2 :AST;
   }
 
   struct Group {
-    style @0 :AST.Group.Style;
-    terms @1 :List(AST);
+    position @0 :Position;
+    style @1 :AST.Group.Style;
+    terms @2 :List(AST);
 
-    hasExclamation @2 :Bool;
+    hasExclamation @3 :Bool;
 
     enum Style {
       root   @0; # root declaration body
@@ -157,7 +164,8 @@ struct AST {
   }
 
   struct Document {
-    declares @0 :List(AST.Declare);
-    bodies @1 :List(AST.Group);
+    source @0 :Source;
+    declares @1 :List(AST.Declare);
+    bodies @2 :List(AST.Group);
   }
 }

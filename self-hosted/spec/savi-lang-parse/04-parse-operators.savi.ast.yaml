@@ -1,301 +1,1047 @@
 #1:
-  declares: #2:
-    0: #3:
-      terms: #4:
-        0: #5:
+  source: #2:
+    content_for_non_file: ":module _Operators\n  :fun example_ordered // in order of precedence, from \"weakest\" to \"strongest\"\n    y = x <<= x x\n      && x || x\n      === x == x !== x != x =~ x\n      >= x <= x < x > x\n      <|> x <~> x <<~ x ~>> x << x >> x <~ x ~> x\n      + x - x\n      * x / x.y\n\n  :fun example_mixed\n    a != b && c > d / x + e / y || i.j > k << l\n\n  :fun example_prefix\n    ~x\n"
+  declares: #3:
+    0: #4:
+      terms: #5:
+        0: #6:
+          position: #7:
+            source: #2...
+            offset: 1
+            size: 6
+            row: 1
+            column: 2
           name: "module"
-        1: #6:
+        1: #8:
+          position: #9:
+            source: #2...
+            offset: 8
+            size: 10
+            row: 1
+            column: 9
           name: "_Operators"
-      body: #7:
-    1: #8:
-      terms: #9:
-        0: #10:
+      body: #10:
+    1: #11:
+      terms: #12:
+        0: #13:
+          position: #14:
+            source: #2...
+            offset: 22
+            size: 3
+            row: 2
+            column: 4
           name: "fun"
-        1: #11:
+        1: #15:
+          position: #16:
+            source: #2...
+            offset: 26
+            size: 15
+            row: 2
+            column: 8
           name: "example_ordered"
-      body: #12:
-        terms: #13:
-          0: #14:
+      body: #17:
+        terms: #18:
+          0: #19:
+            position: #20:
+              source: #2...
+              offset: 103
+              size: 166
+              row: 3
+              column: 5
             relate: #
-              op: #15:
+              op: #21:
+                position: #22:
+                  source: #2...
+                  offset: 105
+                  size: 1
+                  row: 3
+                  column: 7
                 value: "="
-              terms: #16:
-                left: #17:
+              terms: #23:
+                left: #24:
+                  position: #25:
+                    source: #2...
+                    offset: 103
+                    size: 1
+                    row: 3
+                    column: 5
                   name: "y"
-                right: #18:
+                right: #26:
+                  position: #27:
+                    source: #2...
+                    offset: 105
+                    size: 1
+                    row: 3
+                    column: 7
                   relate: #
-                    op: #19:
+                    op: #28:
+                      position: #29:
+                        source: #2...
+                        offset: 109
+                        size: 3
+                        row: 3
+                        column: 11
                       value: "<<="
-                    terms: #20:
-                      left: #21:
+                    terms: #30:
+                      left: #31:
+                        position: #32:
+                          source: #2...
+                          offset: 107
+                          size: 1
+                          row: 3
+                          column: 9
                         name: "x"
-                      right: #22:
-                        group: #23:
+                      right: #33:
+                        position: #34:
+                          source: #2...
+                          offset: 113
+                          size: 156
+                          row: 3
+                          column: 15
+                        group: #35:
+                          position: #36:
+                            source: #2...
+                            offset: 113
+                            size: 156
+                            row: 3
+                            column: 15
                           style: SaviProto.AST.Group.Style.Space
-                          terms: #24:
-                            0: #25:
+                          terms: #37:
+                            0: #38:
+                              position: #39:
+                                source: #2...
+                                offset: 113
+                                size: 1
+                                row: 3
+                                column: 15
                               name: "x"
-                            1: #26:
+                            1: #40:
+                              position: #41:
+                                source: #2...
+                                offset: 115
+                                size: 154
+                                row: 3
+                                column: 17
                               relate: #
-                                op: #27:
+                                op: #42:
+                                  position: #43:
+                                    source: #2...
+                                    offset: 128
+                                    size: 2
+                                    row: 4
+                                    column: 12
                                   value: "||"
-                                terms: #28:
-                                  left: #29:
+                                terms: #44:
+                                  left: #45:
+                                    position: #46:
+                                      source: #2...
+                                      offset: 128
+                                      size: 2
+                                      row: 4
+                                      column: 12
                                     relate: #
-                                      op: #30:
+                                      op: #47:
+                                        position: #48:
+                                          source: #2...
+                                          offset: 123
+                                          size: 2
+                                          row: 4
+                                          column: 7
                                         value: "&&"
-                                      terms: #31:
-                                        left: #32:
+                                      terms: #49:
+                                        left: #50:
+                                          position: #51:
+                                            source: #2...
+                                            offset: 115
+                                            size: 1
+                                            row: 3
+                                            column: 17
                                           name: "x"
-                                        right: #33:
+                                        right: #52:
+                                          position: #53:
+                                            source: #2...
+                                            offset: 126
+                                            size: 1
+                                            row: 4
+                                            column: 10
                                           name: "x"
-                                  right: #34:
+                                  right: #54:
+                                    position: #55:
+                                      source: #2...
+                                      offset: 131
+                                      size: 138
+                                      row: 4
+                                      column: 15
                                     relate: #
-                                      op: #35:
+                                      op: #56:
+                                        position: #57:
+                                          source: #2...
+                                          offset: 235
+                                          size: 2
+                                          row: 7
+                                          column: 46
                                         value: "~>"
-                                      terms: #36:
-                                        left: #37:
+                                      terms: #58:
+                                        left: #59:
+                                          position: #60:
+                                            source: #2...
+                                            offset: 235
+                                            size: 2
+                                            row: 7
+                                            column: 46
                                           relate: #
-                                            op: #38:
+                                            op: #61:
+                                              position: #62:
+                                                source: #2...
+                                                offset: 230
+                                                size: 2
+                                                row: 7
+                                                column: 41
                                               value: "<~"
-                                            terms: #39:
-                                              left: #40:
+                                            terms: #63:
+                                              left: #64:
+                                                position: #65:
+                                                  source: #2...
+                                                  offset: 230
+                                                  size: 2
+                                                  row: 7
+                                                  column: 41
                                                 relate: #
-                                                  op: #41:
+                                                  op: #66:
+                                                    position: #67:
+                                                      source: #2...
+                                                      offset: 225
+                                                      size: 2
+                                                      row: 7
+                                                      column: 36
                                                     value: ">>"
-                                                  terms: #42:
-                                                    left: #43:
+                                                  terms: #68:
+                                                    left: #69:
+                                                      position: #70:
+                                                        source: #2...
+                                                        offset: 225
+                                                        size: 2
+                                                        row: 7
+                                                        column: 36
                                                       relate: #
-                                                        op: #44:
+                                                        op: #71:
+                                                          position: #72:
+                                                            source: #2...
+                                                            offset: 220
+                                                            size: 2
+                                                            row: 7
+                                                            column: 31
                                                           value: "<<"
-                                                        terms: #45:
-                                                          left: #46:
+                                                        terms: #73:
+                                                          left: #74:
+                                                            position: #75:
+                                                              source: #2...
+                                                              offset: 220
+                                                              size: 2
+                                                              row: 7
+                                                              column: 31
                                                             relate: #
-                                                              op: #47:
+                                                              op: #76:
+                                                                position: #77:
+                                                                  source: #2...
+                                                                  offset: 214
+                                                                  size: 3
+                                                                  row: 7
+                                                                  column: 25
                                                                 value: "~>>"
-                                                              terms: #48:
-                                                                left: #49:
+                                                              terms: #78:
+                                                                left: #79:
+                                                                  position: #80:
+                                                                    source: #2...
+                                                                    offset: 214
+                                                                    size: 3
+                                                                    row: 7
+                                                                    column: 25
                                                                   relate: #
-                                                                    op: #50:
+                                                                    op: #81:
+                                                                      position: #82:
+                                                                        source: #2...
+                                                                        offset: 208
+                                                                        size: 3
+                                                                        row: 7
+                                                                        column: 19
                                                                       value: "<<~"
-                                                                    terms: #51:
-                                                                      left: #52:
+                                                                    terms: #83:
+                                                                      left: #84:
+                                                                        position: #85:
+                                                                          source: #2...
+                                                                          offset: 208
+                                                                          size: 3
+                                                                          row: 7
+                                                                          column: 19
                                                                         relate: #
-                                                                          op: #53:
+                                                                          op: #86:
+                                                                            position: #87:
+                                                                              source: #2...
+                                                                              offset: 202
+                                                                              size: 3
+                                                                              row: 7
+                                                                              column: 13
                                                                             value: "<~>"
-                                                                          terms: #54:
-                                                                            left: #55:
+                                                                          terms: #88:
+                                                                            left: #89:
+                                                                              position: #90:
+                                                                                source: #2...
+                                                                                offset: 202
+                                                                                size: 3
+                                                                                row: 7
+                                                                                column: 13
                                                                               relate: #
-                                                                                op: #56:
+                                                                                op: #91:
+                                                                                  position: #92:
+                                                                                    source: #2...
+                                                                                    offset: 196
+                                                                                    size: 3
+                                                                                    row: 7
+                                                                                    column: 7
                                                                                   value: "<|>"
-                                                                                terms: #57:
-                                                                                  left: #58:
+                                                                                terms: #93:
+                                                                                  left: #94:
+                                                                                    position: #95:
+                                                                                      source: #2...
+                                                                                      offset: 196
+                                                                                      size: 3
+                                                                                      row: 7
+                                                                                      column: 7
                                                                                     relate: #
-                                                                                      op: #59:
+                                                                                      op: #96:
+                                                                                        position: #97:
+                                                                                          source: #2...
+                                                                                          offset: 186
+                                                                                          size: 1
+                                                                                          row: 6
+                                                                                          column: 21
                                                                                         value: ">"
-                                                                                      terms: #60:
-                                                                                        left: #61:
+                                                                                      terms: #98:
+                                                                                        left: #99:
+                                                                                          position: #100:
+                                                                                            source: #2...
+                                                                                            offset: 186
+                                                                                            size: 1
+                                                                                            row: 6
+                                                                                            column: 21
                                                                                           relate: #
-                                                                                            op: #62:
+                                                                                            op: #101:
+                                                                                              position: #102:
+                                                                                                source: #2...
+                                                                                                offset: 182
+                                                                                                size: 1
+                                                                                                row: 6
+                                                                                                column: 17
                                                                                               value: "<"
-                                                                                            terms: #63:
-                                                                                              left: #64:
+                                                                                            terms: #103:
+                                                                                              left: #104:
+                                                                                                position: #105:
+                                                                                                  source: #2...
+                                                                                                  offset: 182
+                                                                                                  size: 1
+                                                                                                  row: 6
+                                                                                                  column: 17
                                                                                                 relate: #
-                                                                                                  op: #65:
+                                                                                                  op: #106:
+                                                                                                    position: #107:
+                                                                                                      source: #2...
+                                                                                                      offset: 177
+                                                                                                      size: 2
+                                                                                                      row: 6
+                                                                                                      column: 12
                                                                                                     value: "<="
-                                                                                                  terms: #66:
-                                                                                                    left: #67:
+                                                                                                  terms: #108:
+                                                                                                    left: #109:
+                                                                                                      position: #110:
+                                                                                                        source: #2...
+                                                                                                        offset: 177
+                                                                                                        size: 2
+                                                                                                        row: 6
+                                                                                                        column: 12
                                                                                                       relate: #
-                                                                                                        op: #68:
+                                                                                                        op: #111:
+                                                                                                          position: #112:
+                                                                                                            source: #2...
+                                                                                                            offset: 172
+                                                                                                            size: 2
+                                                                                                            row: 6
+                                                                                                            column: 7
                                                                                                           value: ">="
-                                                                                                        terms: #69:
-                                                                                                          left: #70:
+                                                                                                        terms: #113:
+                                                                                                          left: #114:
+                                                                                                            position: #115:
+                                                                                                              source: #2...
+                                                                                                              offset: 172
+                                                                                                              size: 2
+                                                                                                              row: 6
+                                                                                                              column: 7
                                                                                                             relate: #
-                                                                                                              op: #71:
+                                                                                                              op: #116:
+                                                                                                                position: #117:
+                                                                                                                  source: #2...
+                                                                                                                  offset: 161
+                                                                                                                  size: 2
+                                                                                                                  row: 5
+                                                                                                                  column: 29
                                                                                                                 value: "=~"
-                                                                                                              terms: #72:
-                                                                                                                left: #73:
+                                                                                                              terms: #118:
+                                                                                                                left: #119:
+                                                                                                                  position: #120:
+                                                                                                                    source: #2...
+                                                                                                                    offset: 161
+                                                                                                                    size: 2
+                                                                                                                    row: 5
+                                                                                                                    column: 29
                                                                                                                   relate: #
-                                                                                                                    op: #74:
+                                                                                                                    op: #121:
+                                                                                                                      position: #122:
+                                                                                                                        source: #2...
+                                                                                                                        offset: 156
+                                                                                                                        size: 2
+                                                                                                                        row: 5
+                                                                                                                        column: 24
                                                                                                                       value: "!="
-                                                                                                                    terms: #75:
-                                                                                                                      left: #76:
+                                                                                                                    terms: #123:
+                                                                                                                      left: #124:
+                                                                                                                        position: #125:
+                                                                                                                          source: #2...
+                                                                                                                          offset: 156
+                                                                                                                          size: 2
+                                                                                                                          row: 5
+                                                                                                                          column: 24
                                                                                                                         relate: #
-                                                                                                                          op: #77:
+                                                                                                                          op: #126:
+                                                                                                                            position: #127:
+                                                                                                                              source: #2...
+                                                                                                                              offset: 150
+                                                                                                                              size: 3
+                                                                                                                              row: 5
+                                                                                                                              column: 18
                                                                                                                             value: "!=="
-                                                                                                                          terms: #78:
-                                                                                                                            left: #79:
+                                                                                                                          terms: #128:
+                                                                                                                            left: #129:
+                                                                                                                              position: #130:
+                                                                                                                                source: #2...
+                                                                                                                                offset: 150
+                                                                                                                                size: 3
+                                                                                                                                row: 5
+                                                                                                                                column: 18
                                                                                                                               relate: #
-                                                                                                                                op: #80:
+                                                                                                                                op: #131:
+                                                                                                                                  position: #132:
+                                                                                                                                    source: #2...
+                                                                                                                                    offset: 145
+                                                                                                                                    size: 2
+                                                                                                                                    row: 5
+                                                                                                                                    column: 13
                                                                                                                                   value: "=="
-                                                                                                                                terms: #81:
-                                                                                                                                  left: #82:
+                                                                                                                                terms: #133:
+                                                                                                                                  left: #134:
+                                                                                                                                    position: #135:
+                                                                                                                                      source: #2...
+                                                                                                                                      offset: 145
+                                                                                                                                      size: 2
+                                                                                                                                      row: 5
+                                                                                                                                      column: 13
                                                                                                                                     relate: #
-                                                                                                                                      op: #83:
+                                                                                                                                      op: #136:
+                                                                                                                                        position: #137:
+                                                                                                                                          source: #2...
+                                                                                                                                          offset: 139
+                                                                                                                                          size: 3
+                                                                                                                                          row: 5
+                                                                                                                                          column: 7
                                                                                                                                         value: "==="
-                                                                                                                                      terms: #84:
-                                                                                                                                        left: #85:
+                                                                                                                                      terms: #138:
+                                                                                                                                        left: #139:
+                                                                                                                                          position: #140:
+                                                                                                                                            source: #2...
+                                                                                                                                            offset: 131
+                                                                                                                                            size: 1
+                                                                                                                                            row: 4
+                                                                                                                                            column: 15
                                                                                                                                           name: "x"
-                                                                                                                                        right: #86:
+                                                                                                                                        right: #141:
+                                                                                                                                          position: #142:
+                                                                                                                                            source: #2...
+                                                                                                                                            offset: 143
+                                                                                                                                            size: 1
+                                                                                                                                            row: 5
+                                                                                                                                            column: 11
                                                                                                                                           name: "x"
-                                                                                                                                  right: #87:
+                                                                                                                                  right: #143:
+                                                                                                                                    position: #144:
+                                                                                                                                      source: #2...
+                                                                                                                                      offset: 148
+                                                                                                                                      size: 1
+                                                                                                                                      row: 5
+                                                                                                                                      column: 16
                                                                                                                                     name: "x"
-                                                                                                                            right: #88:
+                                                                                                                            right: #145:
+                                                                                                                              position: #146:
+                                                                                                                                source: #2...
+                                                                                                                                offset: 154
+                                                                                                                                size: 1
+                                                                                                                                row: 5
+                                                                                                                                column: 22
                                                                                                                               name: "x"
-                                                                                                                      right: #89:
+                                                                                                                      right: #147:
+                                                                                                                        position: #148:
+                                                                                                                          source: #2...
+                                                                                                                          offset: 159
+                                                                                                                          size: 1
+                                                                                                                          row: 5
+                                                                                                                          column: 27
                                                                                                                         name: "x"
-                                                                                                                right: #90:
+                                                                                                                right: #149:
+                                                                                                                  position: #150:
+                                                                                                                    source: #2...
+                                                                                                                    offset: 164
+                                                                                                                    size: 1
+                                                                                                                    row: 5
+                                                                                                                    column: 32
                                                                                                                   name: "x"
-                                                                                                          right: #91:
+                                                                                                          right: #151:
+                                                                                                            position: #152:
+                                                                                                              source: #2...
+                                                                                                              offset: 175
+                                                                                                              size: 1
+                                                                                                              row: 6
+                                                                                                              column: 10
                                                                                                             name: "x"
-                                                                                                    right: #92:
+                                                                                                    right: #153:
+                                                                                                      position: #154:
+                                                                                                        source: #2...
+                                                                                                        offset: 180
+                                                                                                        size: 1
+                                                                                                        row: 6
+                                                                                                        column: 15
                                                                                                       name: "x"
-                                                                                              right: #93:
+                                                                                              right: #155:
+                                                                                                position: #156:
+                                                                                                  source: #2...
+                                                                                                  offset: 184
+                                                                                                  size: 1
+                                                                                                  row: 6
+                                                                                                  column: 19
                                                                                                 name: "x"
-                                                                                        right: #94:
+                                                                                        right: #157:
+                                                                                          position: #158:
+                                                                                            source: #2...
+                                                                                            offset: 188
+                                                                                            size: 1
+                                                                                            row: 6
+                                                                                            column: 23
                                                                                           name: "x"
-                                                                                  right: #95:
+                                                                                  right: #159:
+                                                                                    position: #160:
+                                                                                      source: #2...
+                                                                                      offset: 200
+                                                                                      size: 1
+                                                                                      row: 7
+                                                                                      column: 11
                                                                                     name: "x"
-                                                                            right: #96:
+                                                                            right: #161:
+                                                                              position: #162:
+                                                                                source: #2...
+                                                                                offset: 206
+                                                                                size: 1
+                                                                                row: 7
+                                                                                column: 17
                                                                               name: "x"
-                                                                      right: #97:
+                                                                      right: #163:
+                                                                        position: #164:
+                                                                          source: #2...
+                                                                          offset: 212
+                                                                          size: 1
+                                                                          row: 7
+                                                                          column: 23
                                                                         name: "x"
-                                                                right: #98:
+                                                                right: #165:
+                                                                  position: #166:
+                                                                    source: #2...
+                                                                    offset: 218
+                                                                    size: 1
+                                                                    row: 7
+                                                                    column: 29
                                                                   name: "x"
-                                                          right: #99:
+                                                          right: #167:
+                                                            position: #168:
+                                                              source: #2...
+                                                              offset: 223
+                                                              size: 1
+                                                              row: 7
+                                                              column: 34
                                                             name: "x"
-                                                    right: #100:
+                                                    right: #169:
+                                                      position: #170:
+                                                        source: #2...
+                                                        offset: 228
+                                                        size: 1
+                                                        row: 7
+                                                        column: 39
                                                       name: "x"
-                                              right: #101:
+                                              right: #171:
+                                                position: #172:
+                                                  source: #2...
+                                                  offset: 233
+                                                  size: 1
+                                                  row: 7
+                                                  column: 44
                                                 name: "x"
-                                        right: #102:
+                                        right: #173:
+                                          position: #174:
+                                            source: #2...
+                                            offset: 238
+                                            size: 31
+                                            row: 7
+                                            column: 49
                                           relate: #
-                                            op: #103:
+                                            op: #175:
+                                              position: #176:
+                                                source: #2...
+                                                offset: 250
+                                                size: 1
+                                                row: 8
+                                                column: 11
                                               value: "-"
-                                            terms: #104:
-                                              left: #105:
+                                            terms: #177:
+                                              left: #178:
+                                                position: #179:
+                                                  source: #2...
+                                                  offset: 250
+                                                  size: 1
+                                                  row: 8
+                                                  column: 11
                                                 relate: #
-                                                  op: #106:
+                                                  op: #180:
+                                                    position: #181:
+                                                      source: #2...
+                                                      offset: 246
+                                                      size: 1
+                                                      row: 8
+                                                      column: 7
                                                     value: "+"
-                                                  terms: #107:
-                                                    left: #108:
+                                                  terms: #182:
+                                                    left: #183:
+                                                      position: #184:
+                                                        source: #2...
+                                                        offset: 238
+                                                        size: 1
+                                                        row: 7
+                                                        column: 49
                                                       name: "x"
-                                                    right: #109:
+                                                    right: #185:
+                                                      position: #186:
+                                                        source: #2...
+                                                        offset: 248
+                                                        size: 1
+                                                        row: 8
+                                                        column: 9
                                                       name: "x"
-                                              right: #110:
+                                              right: #187:
+                                                position: #188:
+                                                  source: #2...
+                                                  offset: 252
+                                                  size: 17
+                                                  row: 8
+                                                  column: 13
                                                 relate: #
-                                                  op: #111:
+                                                  op: #189:
+                                                    position: #190:
+                                                      source: #2...
+                                                      offset: 264
+                                                      size: 1
+                                                      row: 9
+                                                      column: 11
                                                     value: "/"
-                                                  terms: #112:
-                                                    left: #113:
+                                                  terms: #191:
+                                                    left: #192:
+                                                      position: #193:
+                                                        source: #2...
+                                                        offset: 264
+                                                        size: 1
+                                                        row: 9
+                                                        column: 11
                                                       relate: #
-                                                        op: #114:
+                                                        op: #194:
+                                                          position: #195:
+                                                            source: #2...
+                                                            offset: 260
+                                                            size: 1
+                                                            row: 9
+                                                            column: 7
                                                           value: "*"
-                                                        terms: #115:
-                                                          left: #116:
+                                                        terms: #196:
+                                                          left: #197:
+                                                            position: #198:
+                                                              source: #2...
+                                                              offset: 252
+                                                              size: 1
+                                                              row: 8
+                                                              column: 13
                                                             name: "x"
-                                                          right: #117:
+                                                          right: #199:
+                                                            position: #200:
+                                                              source: #2...
+                                                              offset: 262
+                                                              size: 1
+                                                              row: 9
+                                                              column: 9
                                                             name: "x"
-                                                    right: #118:
+                                                    right: #201:
+                                                      position: #202:
+                                                        source: #2...
+                                                        offset: 266
+                                                        size: 3
+                                                        row: 9
+                                                        column: 13
                                                       relate: #
-                                                        op: #119:
+                                                        op: #203:
+                                                          position: #204:
+                                                            source: #2...
+                                                            offset: 267
+                                                            size: 1
+                                                            row: 9
+                                                            column: 14
                                                           value: "."
-                                                        terms: #120:
-                                                          left: #121:
+                                                        terms: #205:
+                                                          left: #206:
+                                                            position: #207:
+                                                              source: #2...
+                                                              offset: 266
+                                                              size: 1
+                                                              row: 9
+                                                              column: 13
                                                             name: "x"
-                                                          right: #122:
+                                                          right: #208:
+                                                            position: #209:
+                                                              source: #2...
+                                                              offset: 268
+                                                              size: 1
+                                                              row: 9
+                                                              column: 15
                                                             name: "y"
-    2: #123:
-      terms: #124:
-        0: #125:
+    2: #210:
+      terms: #211:
+        0: #212:
+          position: #213:
+            source: #2...
+            offset: 274
+            size: 3
+            row: 11
+            column: 4
           name: "fun"
-        1: #126:
+        1: #214:
+          position: #215:
+            source: #2...
+            offset: 278
+            size: 13
+            row: 11
+            column: 8
           name: "example_mixed"
-      body: #127:
-        terms: #128:
-          0: #129:
+      body: #216:
+        terms: #217:
+          0: #218:
+            position: #219:
+              source: #2...
+              offset: 296
+              size: 43
+              row: 12
+              column: 5
             relate: #
-              op: #130:
+              op: #220:
+                position: #221:
+                  source: #2...
+                  offset: 324
+                  size: 2
+                  row: 12
+                  column: 33
                 value: "||"
-              terms: #131:
-                left: #132:
+              terms: #222:
+                left: #223:
+                  position: #224:
+                    source: #2...
+                    offset: 324
+                    size: 2
+                    row: 12
+                    column: 33
                   relate: #
-                    op: #133:
+                    op: #225:
+                      position: #226:
+                        source: #2...
+                        offset: 303
+                        size: 2
+                        row: 12
+                        column: 12
                       value: "&&"
-                    terms: #134:
-                      left: #135:
+                    terms: #227:
+                      left: #228:
+                        position: #229:
+                          source: #2...
+                          offset: 296
+                          size: 6
+                          row: 12
+                          column: 5
                         relate: #
-                          op: #136:
+                          op: #230:
+                            position: #231:
+                              source: #2...
+                              offset: 298
+                              size: 2
+                              row: 12
+                              column: 7
                             value: "!="
-                          terms: #137:
-                            left: #138:
+                          terms: #232:
+                            left: #233:
+                              position: #234:
+                                source: #2...
+                                offset: 296
+                                size: 1
+                                row: 12
+                                column: 5
                               name: "a"
-                            right: #139:
+                            right: #235:
+                              position: #236:
+                                source: #2...
+                                offset: 301
+                                size: 1
+                                row: 12
+                                column: 10
                               name: "b"
-                      right: #140:
+                      right: #237:
+                        position: #238:
+                          source: #2...
+                          offset: 306
+                          size: 17
+                          row: 12
+                          column: 15
                         relate: #
-                          op: #141:
+                          op: #239:
+                            position: #240:
+                              source: #2...
+                              offset: 308
+                              size: 1
+                              row: 12
+                              column: 17
                             value: ">"
-                          terms: #142:
-                            left: #143:
+                          terms: #241:
+                            left: #242:
+                              position: #243:
+                                source: #2...
+                                offset: 306
+                                size: 1
+                                row: 12
+                                column: 15
                               name: "c"
-                            right: #144:
+                            right: #244:
+                              position: #245:
+                                source: #2...
+                                offset: 310
+                                size: 13
+                                row: 12
+                                column: 19
                               relate: #
-                                op: #145:
+                                op: #246:
+                                  position: #247:
+                                    source: #2...
+                                    offset: 316
+                                    size: 1
+                                    row: 12
+                                    column: 25
                                   value: "+"
-                                terms: #146:
-                                  left: #147:
+                                terms: #248:
+                                  left: #249:
+                                    position: #250:
+                                      source: #2...
+                                      offset: 310
+                                      size: 5
+                                      row: 12
+                                      column: 19
                                     relate: #
-                                      op: #148:
+                                      op: #251:
+                                        position: #252:
+                                          source: #2...
+                                          offset: 312
+                                          size: 1
+                                          row: 12
+                                          column: 21
                                         value: "/"
-                                      terms: #149:
-                                        left: #150:
+                                      terms: #253:
+                                        left: #254:
+                                          position: #255:
+                                            source: #2...
+                                            offset: 310
+                                            size: 1
+                                            row: 12
+                                            column: 19
                                           name: "d"
-                                        right: #151:
+                                        right: #256:
+                                          position: #257:
+                                            source: #2...
+                                            offset: 314
+                                            size: 1
+                                            row: 12
+                                            column: 23
                                           name: "x"
-                                  right: #152:
+                                  right: #258:
+                                    position: #259:
+                                      source: #2...
+                                      offset: 318
+                                      size: 5
+                                      row: 12
+                                      column: 27
                                     relate: #
-                                      op: #153:
+                                      op: #260:
+                                        position: #261:
+                                          source: #2...
+                                          offset: 320
+                                          size: 1
+                                          row: 12
+                                          column: 29
                                         value: "/"
-                                      terms: #154:
-                                        left: #155:
+                                      terms: #262:
+                                        left: #263:
+                                          position: #264:
+                                            source: #2...
+                                            offset: 318
+                                            size: 1
+                                            row: 12
+                                            column: 27
                                           name: "e"
-                                        right: #156:
+                                        right: #265:
+                                          position: #266:
+                                            source: #2...
+                                            offset: 322
+                                            size: 1
+                                            row: 12
+                                            column: 31
                                           name: "y"
-                right: #157:
+                right: #267:
+                  position: #268:
+                    source: #2...
+                    offset: 327
+                    size: 12
+                    row: 12
+                    column: 36
                   relate: #
-                    op: #158:
+                    op: #269:
+                      position: #270:
+                        source: #2...
+                        offset: 335
+                        size: 2
+                        row: 12
+                        column: 44
                       value: "<<"
-                    terms: #159:
-                      left: #160:
+                    terms: #271:
+                      left: #272:
+                        position: #273:
+                          source: #2...
+                          offset: 335
+                          size: 2
+                          row: 12
+                          column: 44
                         relate: #
-                          op: #161:
+                          op: #274:
+                            position: #275:
+                              source: #2...
+                              offset: 331
+                              size: 1
+                              row: 12
+                              column: 40
                             value: ">"
-                          terms: #162:
-                            left: #163:
+                          terms: #276:
+                            left: #277:
+                              position: #278:
+                                source: #2...
+                                offset: 327
+                                size: 3
+                                row: 12
+                                column: 36
                               relate: #
-                                op: #164:
+                                op: #279:
+                                  position: #280:
+                                    source: #2...
+                                    offset: 328
+                                    size: 1
+                                    row: 12
+                                    column: 37
                                   value: "."
-                                terms: #165:
-                                  left: #166:
+                                terms: #281:
+                                  left: #282:
+                                    position: #283:
+                                      source: #2...
+                                      offset: 327
+                                      size: 1
+                                      row: 12
+                                      column: 36
                                     name: "i"
-                                  right: #167:
+                                  right: #284:
+                                    position: #285:
+                                      source: #2...
+                                      offset: 329
+                                      size: 1
+                                      row: 12
+                                      column: 38
                                     name: "j"
-                            right: #168:
+                            right: #286:
+                              position: #287:
+                                source: #2...
+                                offset: 333
+                                size: 1
+                                row: 12
+                                column: 42
                               name: "k"
-                      right: #169:
+                      right: #288:
+                        position: #289:
+                          source: #2...
+                          offset: 338
+                          size: 1
+                          row: 12
+                          column: 47
                         name: "l"
-    3: #170:
-      terms: #171:
-        0: #172:
+    3: #290:
+      terms: #291:
+        0: #292:
+          position: #293:
+            source: #2...
+            offset: 344
+            size: 3
+            row: 14
+            column: 4
           name: "fun"
-        1: #173:
+        1: #294:
+          position: #295:
+            source: #2...
+            offset: 348
+            size: 14
+            row: 14
+            column: 8
           name: "example_prefix"
-      body: #174:
-        terms: #175:
-          0: #176:
+      body: #296:
+        terms: #297:
+          0: #298:
+            position: #299:
+              source: #2...
+              offset: 367
+              size: 2
+              row: 15
+              column: 5
             prefix: #
-              op: #177:
+              op: #300:
+                position: #301:
+                  source: #2...
+                  offset: 367
+                  size: 1
+                  row: 15
+                  column: 5
                 value: "~"
-              term: #178:
+              term: #302:
+                position: #303:
+                  source: #2...
+                  offset: 368
+                  size: 1
+                  row: 15
+                  column: 6
                 name: "x"
