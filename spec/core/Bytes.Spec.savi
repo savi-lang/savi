@@ -237,14 +237,22 @@
     assert: b"example".clone.trim_in_place(5, 4) == b""
 
   :it "truncates from the left or right"
-    assert: b"example".clone.truncate(5)        == b"examp"
-    assert: b"example".clone.truncate_left(2)   == b"ample"
-    assert: b"example".clone.truncate(0)        == b""
-    assert: b"example".clone.truncate_left(0)   == b"example"
-    assert: b"example".clone.truncate(7)        == b"example"
-    assert: b"example".clone.truncate_left(7)   == b""
-    assert: b"example".clone.truncate(100)      == b"example"
-    assert: b"example".clone.truncate_left(100) == b""
+    assert: b"example".clone.truncate(5)         == b"examp"
+    assert: b"example".clone.truncate!(5)        == b"examp"
+    assert: b"example".clone.truncate_left(2)    == b"ample"
+    assert: b"example".clone.truncate_left!(2)   == b"ample"
+    assert: b"example".clone.truncate(0)         == b""
+    assert: b"example".clone.truncate!(0)        == b""
+    assert: b"example".clone.truncate_left(0)    == b"example"
+    assert: b"example".clone.truncate_left!(0)   == b"example"
+    assert: b"example".clone.truncate(7)         == b"example"
+    assert: b"example".clone.truncate!(7)        == b"example"
+    assert: b"example".clone.truncate_left(7)    == b""
+    assert: b"example".clone.truncate_left!(7)   == b""
+    assert: b"example".clone.truncate(100)       == b"example"
+    assert error: b"example".clone.truncate!(100)
+    assert: b"example".clone.truncate_left(100)  == b""
+    assert error: b"example".clone.truncate_left!(100)
 
   :it "chops off the left or right"
     center Bytes'ref = b"example".clone
@@ -292,6 +300,50 @@
     right_right ref = right.chop_right(100)
     assert: right_right == b"", assert: right == b"lel"
 
+  :it "chops off the left or right (error-raising variant)"
+    center Bytes'ref = b"example".clone
+    original_padding = center.space - center.size
+    left ref = try (center.chop_left!(2) | Bytes.new)
+    right ref = try (center.chop_right!(3) | Bytes.new)
+
+    assert: left == b"ex"
+    assert: center == b"amp"
+    assert: right == b"le"
+
+    // The three buffers are adjacent in memory.
+    assert: left.cpointer(2).address == center.cpointer.address
+    assert: center.cpointer(3).address == right.cpointer.address
+
+    // The first two buffers have a space exactly the same as their size,
+    // and the right buffer retains whatever space padding was in the original.
+    assert: left.space == left.size
+    assert: center.space == center.size
+    assert: right.space == right.size + original_padding
+
+    // Any of the three can have a byte appended without bleeding into the
+    // adjacent memory of the other buffers, since under the hood, this
+    // extension of either the left or center buffer forces reallocation of it.
+    left.push('t'), center.push('s'), right.push('l')
+    assert: left == b"ext"
+    assert: center == b"amps"
+    assert: right == b"lel"
+
+    // After the pushes above, The buffers are no longer adjacent in memory,
+    // checking with a pointer offset of both the original size and new size.
+    assert: left.cpointer(2).address != center.cpointer.address
+    assert: left.cpointer(3).address != center.cpointer.address
+    assert: center.cpointer(3).address != right.cpointer.address
+    assert: center.cpointer(4).address != right.cpointer.address
+
+    // Also now the first two buffers have some padding in their space,
+    // since they reserved more space when they were forced to reallocate.
+    assert: left.space > left.size
+    assert: center.space > center.size
+
+    // Chopping with an out-of-bounds offset raises an error.
+    assert error: left.chop_left!(100)
+    assert error: right.chop_right!(100)
+
   :it "chops into a null pointer on the right side when it runs out of space"
     // Chopping at the right edge of the buffer correctly leaves the right
     // Bytes with a null cpointer, rather than pointing out of bounds.
@@ -305,7 +357,21 @@
     assert: buffer_a_left.cpointer.is_not_null
     assert: buffer_a.cpointer.is_null
 
-    buffer_b_right = buffer_a.chop_right(buffer_b.size)
+    buffer_b_right = buffer_b.chop_right(buffer_b.size)
+    assert: buffer_b.cpointer.is_not_null
+    assert: buffer_b_right.cpointer.is_null
+
+  :it "chops into a null pointer on the right side (error-raising variant)"
+    // Same test as above, but with the error-raising variants of chop methods.
+    buffer_a = Bytes.new_iso(8), buffer_b = Bytes.new_iso(8)
+    while buffer_a.space > buffer_a.size buffer_a.push('.')
+    while buffer_b.space > buffer_b.size buffer_b.push('.')
+
+    buffer_a_left = try (buffer_a.chop_left!(buffer_a.size) | b"".clone)
+    assert: buffer_a_left.cpointer.is_not_null
+    assert: buffer_a.cpointer.is_null
+
+    buffer_b_right = try (buffer_b.chop_right!(buffer_b.size) | b"...".clone)
     assert: buffer_b.cpointer.is_not_null
     assert: buffer_b_right.cpointer.is_null
 
