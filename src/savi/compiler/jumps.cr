@@ -24,10 +24,12 @@ module Savi::Compiler::Jumps
 
   struct Analysis
     getter catches
+    getter call_error_catches
 
     def initialize
       @flags = {} of AST::Node => UInt8
       @catches = {} of AST::Node => Array(AST::Jump)
+      @call_error_catches = {} of AST::Node => Array(AST::Call)
     end
 
     def set_flag(node, flag_bit)
@@ -55,9 +57,19 @@ module Savi::Compiler::Jumps
     end
 
     def catch(node, jump)
-      @catches[node] = [] of AST::Jump unless @catches[node]?
+      (
+        @catches[node]? || (
+          @catches[node] = [] of AST::Jump
+        )
+      ) << jump
+    end
 
-      @catches[node] << jump
+    def call_error_catch(node, call)
+      (
+        @call_error_catches[node]? || (
+          @call_error_catches[node] = [] of AST::Call
+        )
+      ) << call
     end
 
     protected def always_error!(node); set_flag(node, FLAG_ALWAYS_ERROR) end
@@ -160,7 +172,11 @@ module Savi::Compiler::Jumps
 
         try_node = @stack.reverse.find(&.is_a?(AST::Try))
 
-        analysis.catch(try_node.not_nil!, node) if try_node
+        if try_node
+          analysis.catch(try_node.not_nil!, node)
+        else
+          analysis.catch(@function, node)
+        end
       when JumpKind::Break, JumpKind::Next
         case node.kind
         when JumpKind::Break
@@ -357,7 +373,12 @@ module Savi::Compiler::Jumps
 
     def touch(node : AST::Call)
       # A call is a maybe error if its identifier indicates it as such.
-      @analysis.maybe_error!(node) if @analysis.maybe_error?(node.ident)
+      if @analysis.maybe_error?(node.ident)
+        @analysis.maybe_error!(node)
+
+        error_sink = @stack.reverse.find(&.is_a?(AST::Try)) || @function
+        analysis.call_error_catch(error_sink, node)
+      end
 
       receiver = node.receiver
       args = node.args

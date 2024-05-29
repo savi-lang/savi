@@ -93,6 +93,7 @@ class Savi::Compiler::CodeGen
   getter bitwidth
   getter ptr
   getter isize
+  getter current_error_thread_local : LLVM::Value
 
   def initialize(
     runtime : PonyRT.class | VeronaRT.class,
@@ -151,14 +152,14 @@ class Savi::Compiler::CodeGen
     @reflection_of_type_globals = {} of GenType => LLVM::Value
     @gtypes = {} of String => GenType
     @loop_next_stack = Array(Tuple(
-      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref,
+      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref
     )).new
     @loop_break_stack = Array(Tuple(
       LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref
     )).new
 
     @try_else_stack = Array(Tuple(
-      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value)
+      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref?
     )).new
 
     @value_not_needed = @llvm.struct([@i1], "_.VALUE_NOT_NEEDED").as(LLVM::Type)
@@ -190,6 +191,23 @@ class Savi::Compiler::CodeGen
     # Finish defining the forward-declared @desc and @obj types
     @runtime.gen_desc_basetype
     @obj.struct_set_body([@desc_ptr])
+
+    # We use a thread-local variable to carry the "current error" raised,
+    # for those error sites that use an error value that isn't `None`.
+    max_error_byte_width = 64 # TODO: Use inventory to find the largest-width error type
+    current_error_type = @i8.array(max_error_byte_width)
+    @current_error_thread_local = @mod.globals.add(
+      current_error_type,
+      "savi_current_error",
+    ).tap { |v|
+      v.initializer = current_error_type.null
+      # Local exec thread-locals are the most efficient mode.
+      # The key constraint is that the thread-local must be both defined and
+      # used exclusively in the main executable (not any dynamic libraries).
+      # In our case, that requirement is easy to meet, because we don't use
+      mode = LibLLVM::ThreadLocalMode::LocalExecTLSModel
+      LibLLVM.set_thread_local_mode(v, mode)
+    }.as(LLVM::Value)
 
     @runtime.gen_runtime_decls(self).each do |tuple|
       func = @mod.functions.add(tuple[0], tuple[1], tuple[2])
@@ -1506,7 +1524,7 @@ class Savi::Compiler::CodeGen
         @builder.cond(is_overflow, overflow_block, after_block)
 
         finish_block_and_move_to(overflow_block)
-        gfunc.calling_convention.gen_error_return(self, gfunc, gen_none, nil)
+        gfunc.calling_convention.gen_error_return(self, gfunc, gen_none, nil, false)
 
         finish_block_and_move_to(after_block)
         result_value = @builder.extract_value(result, 0)
@@ -1821,8 +1839,9 @@ class Savi::Compiler::CodeGen
 
     # Call the LLVM function, or do a virtual call if necessary.
     @di.set_loc(call.ident)
+    signature = gfunc.reach_func.signature
     result = gen_call(
-      gfunc.reach_func.signature,
+      signature,
       gfunc,
       llvm_func,
       args,
@@ -1855,9 +1874,7 @@ class Savi::Compiler::CodeGen
       @builder.cond(is_error, error_block, after_block)
 
       finish_block_and_move_to(error_block)
-      # TODO: Should we try to avoid destructuring and restructuring the
-      # tuple value here? Or does LLVM optimize it away so as to not matter?
-      gen_raise_error(@builder.extract_value(result, 0), call)
+      gen_continue_error_from_call(call, signature.error_out.not_nil!)
 
       finish_block_and_move_to(after_block)
       result = @builder.extract_value(result, 0)
@@ -1894,8 +1911,7 @@ class Savi::Compiler::CodeGen
         @builder.cond(is_error, error_block.not_nil!, after_final_return_block)
 
         finish_block_and_move_to(error_block.not_nil!)
-        # TODO: Allow an error value of something other than None.
-        gen_raise_error(gen_none, call)
+        gen_continue_error_from_call(call, signature.error_out.not_nil!)
       end
 
       # Move our cursor to the yield block to start generating code there.
@@ -2497,10 +2513,11 @@ class Savi::Compiler::CodeGen
     to_llvm_type : LLVM::Type?,
     from_expr : AST::Node,
     from_frame : Frame? = nil,
+    from_type : Reach::Ref? = nil,
   )
     # TODO: Can we replace from_expr and from_frame with simply from_type?
     # That would simplify the callers, if the runtime never needs the AST.
-    from_type =
+    from_type ||=
       if from_frame
         gen_within_foreign_frame(from_frame) { type_of(from_expr) }
       else
@@ -2670,7 +2687,6 @@ class Savi::Compiler::CodeGen
     when AST::Jump
       case expr.kind
       when AST::Jump::Kind::Error
-        # TODO: Allow an error value of something other than None.
         gen_raise_error(gen_expr(expr.term), expr.term)
       when AST::Jump::Kind::Return
         gen_return_value(gen_expr(expr.term), expr.term)
@@ -3720,12 +3736,15 @@ class Savi::Compiler::CodeGen
     phi_type = nil
     phi_blocks = [] of LLVM::BasicBlock
     phi_values = [] of LLVM::Value
+    catch_type_ref = expr.catch_expr.try { |x| type_of(x) }
 
     # Create all of the instruction blocks we'll need for this try.
     body_block = gen_block("body_try")
     else_block = gen_block("else_try")
     post_block = gen_block("after_try")
-    @try_else_stack << {else_block, [] of LLVM::BasicBlock, [] of LLVM::Value}
+    @try_else_stack << {
+      else_block, [] of LLVM::BasicBlock, [] of LLVM::Value, catch_type_ref
+    }
 
     # Go straight to the body block from whatever block we are in now.
     @builder.br(body_block)
@@ -3745,9 +3764,6 @@ class Savi::Compiler::CodeGen
     # Now start generating the else clause (reached when a throw happened).
     finish_block_and_move_to(else_block)
 
-    # TODO: Allow an error_phi_llvm_type of something other than None.
-    error_phi_llvm_type = llvm_type_of(@gtypes["None"])
-
     else_stack_tuple = @try_else_stack.pop
     raise "invalid try else stack" unless else_stack_tuple[0] == else_block
     if else_stack_tuple[1].empty?
@@ -3758,14 +3774,21 @@ class Savi::Compiler::CodeGen
     else
       # Catch the thrown error value, by getting the blocks and values from the
       # try_else_stack and using the LLVM mechanism called a "phi" instruction.
-      error_value = @builder.phi(
-        error_phi_llvm_type,
-        else_stack_tuple[1],
-        else_stack_tuple[2],
-        "phi_else_try",
-      )
+      if expr.catch_expr
+        error_phi_llvm_type = llvm_type_of(catch_type_ref.not_nil!)
+        error_value = @builder.phi(
+          error_phi_llvm_type,
+          else_stack_tuple[1],
+          else_stack_tuple[2],
+          "phi_else_try",
+        )
 
-      # TODO: allow the else block to reference the error value as a local.
+        # Allow the else block to reference the error value as a local.
+        catch_expr_ref = func_frame.refer[expr.catch_expr.not_nil!].as(Refer::Local)
+        catch_expr_alloca = gen_local_alloca(catch_expr_ref, error_value.type)
+        func_frame.current_locals[catch_expr_ref] = catch_expr_alloca
+        @builder.store(error_value, catch_expr_alloca)
+      end
 
       # Generate the body code of the else clause, then proceed to the post block.
       else_value = gen_expr(expr.else_body)
@@ -3800,21 +3823,58 @@ class Savi::Compiler::CodeGen
   def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node?)
     raise "inconsistent frames" if @frames.size > 1
 
-    # error_value now is generated properly from the error! argument
-    # but we need to replace it with None for now
-    # TODO: Allow an error value of something other than None.
-    error_value = gen_none
-
     # If we have no local try to catch the value, then we return it
     # using the error return approach for this calling convention.
     if @try_else_stack.empty?
       gfunc = func_frame.gfunc.not_nil!
-      gfunc.calling_convention.gen_error_return(self, gfunc, error_value, from_expr)
+      gfunc.calling_convention.gen_error_return(self, gfunc, error_value, from_expr, false)
       .tap { finish_block_and_move_to(gen_block("unreachable_after_error_return")) }
     else
       # Store the state needed to catch the value in the try else block.
       else_stack_tuple = @try_else_stack.last
       else_stack_tuple[1] << @builder.insert_block.not_nil!
+      catch_type = else_stack_tuple[3]
+      catch_type.try { |catch_type|
+        error_value = gen_assign_cast(error_value, catch_type, llvm_type_of(catch_type), from_expr.not_nil!)
+      }
+      else_stack_tuple[2] << error_value
+
+      # Jump to the try else block.
+      @builder.br(else_stack_tuple[0])
+      .tap { finish_block_and_move_to(gen_block("unreachable_after_error")) }
+    end
+  end
+
+  def gen_continue_error_from_call(from_call : AST::Call, error_type : Reach::Ref)
+    raise "inconsistent frames" if @frames.size > 1
+
+    # If we have no local try to catch the value, then we return it
+    # using the error return approach for this calling convention.
+    if @try_else_stack.empty?
+      gfunc = func_frame.gfunc.not_nil!
+      gfunc.calling_convention.gen_error_return(self, gfunc, nil, from_call, true)
+      .tap { finish_block_and_move_to(gen_block("unreachable_after_error_return")) }
+    else
+      # Store the state needed to catch the value in the try else block.
+      else_stack_tuple = @try_else_stack.last
+      else_stack_tuple[1] << @builder.insert_block.not_nil!
+      error_value_from_call = @builder.load(
+        llvm_type_of(error_type),
+        @current_error_thread_local,
+        "ERROR_VALUE.FROM_CALL",
+      )
+      catch_type = else_stack_tuple[3]
+      error_value = gen_none
+      catch_type.try { |catch_type|
+        error_value = gen_assign_cast(
+          error_value_from_call,
+          catch_type,
+          llvm_type_of(catch_type),
+          from_call,
+          nil, # from_frame
+          error_type, # from_type
+        )
+      }
       else_stack_tuple[2] << error_value
 
       # Jump to the try else block.
@@ -3921,18 +3981,6 @@ class Savi::Compiler::CodeGen
     else
       gfunc.continuation_info.yield_in_llvm_type.undef
     end
-  end
-
-  def gen_error_return_using_yield_cc
-    raise "inconsistent frames" if @frames.size > 1
-    gfunc = func_frame.gfunc.not_nil!
-
-    # Grab the continuation value from local memory and mark it as an error.
-    cont = func_frame.continuation_value
-    gfunc.continuation_info.set_as_error(cont)
-
-    # Return void.
-    @builder.ret
   end
 
   def gen_struct_bit_cast(value : LLVM::Value, to_type : LLVM::Type)

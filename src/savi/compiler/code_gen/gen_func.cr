@@ -95,7 +95,7 @@ class Savi::Compiler::CodeGen
       abstract def llvm_func_ret_type(g : CodeGen, gfunc : GenFunc) : LLVM::Type
 
       abstract def gen_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
-      def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
+      def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value?, value_expr : AST::Node?, continue_current_value : Bool)
         raise NotImplementedError.new("gen_error_return for #{self}")
       end
       def gen_yield_return(g : CodeGen, gfunc : GenFunc, yield_index : Int32, values : Array(LLVM::Value), value_exprs : Array(AST::Node?))
@@ -150,7 +150,7 @@ class Savi::Compiler::CodeGen
         ])
       end
 
-      def gen_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
+      def gen_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value?, value_expr : AST::Node?)
         if value_expr
           value_type = gfunc.reach_func.signature.ret
           value = g.gen_assign_cast(value, value_type, nil, value_expr)
@@ -161,14 +161,11 @@ class Savi::Compiler::CodeGen
         g.builder.ret(tuple)
       end
 
-      def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
+      def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value?, value_expr : AST::Node?, continue_current_value : Bool)
         tuple = llvm_func_ret_type(g, gfunc).undef
-        # Doing insert_value for slot 0 fails here when the normal return value
-        # is a struct but the error value is not a struct.
-        # Or more broadly, whenever the two do not match in size.
-        # For now we do not implement this; we check for it and fail loudly.
-        raise NotImplementedError.new("error value") unless value == g.gen_none
         tuple = g.builder.insert_value(tuple, g.llvm.int1.const_int(1), 1)
+        g.builder.store(value, g.current_error_thread_local.not_nil!) \
+          if !continue_current_value && value != g.gen_none
         g.builder.ret(tuple)
       end
     end
@@ -240,9 +237,11 @@ class Savi::Compiler::CodeGen
         g.builder.ret
       end
 
-      def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
+      def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value?, value_expr : AST::Node?, continue_current_value : Bool)
         cont = g.func_frame.continuation_value
         gfunc.continuation_info.set_as_error(cont)
+        g.builder.store(value, g.current_error_thread_local.not_nil!) \
+          if !continue_current_value && value != g.gen_none
         g.builder.ret
       end
 

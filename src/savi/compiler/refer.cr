@@ -20,7 +20,7 @@ module Savi::Compiler::Refer
   struct Analysis
     def initialize
       @infos = {} of AST::Node => Info
-      @scopes = {} of AST::Group => Scope
+      @scopes = {} of AST::Term => Scope
     end
 
     protected def []=(node : AST::Node, info : Info)
@@ -35,11 +35,11 @@ module Savi::Compiler::Refer
       @infos[node]?
     end
 
-    def set_scope(group : AST::Group, branch : Visitor)
+    def set_scope(group : AST::Term, branch : Visitor)
       @scopes[group] ||= Scope.new(branch.locals)
     end
 
-    def scope?(group : AST::Group) : Scope?
+    def scope?(group : AST::Term) : Scope?
       @scopes[group]?
     end
   end
@@ -147,6 +147,22 @@ module Savi::Compiler::Refer
       end
     end
 
+    def touch(ctx, node : AST::Try)
+      catch_expr = node.catch_expr
+      else_body = node.else_body
+
+      if catch_expr
+        sub_branch(ctx, catch_expr) { |branch|
+          branch.create_yield_param_local(catch_expr)
+          catch_expr.accept(ctx, branch)
+          else_body.accept(ctx, branch)
+          @analysis = branch.analysis
+          @analysis.set_scope(catch_expr, branch)
+          @analysis.set_scope(else_body, branch)
+        }
+      end
+    end
+
     def touch(ctx, node : AST::Node)
       # On all other nodes, do nothing.
     end
@@ -217,6 +233,7 @@ module Savi::Compiler::Refer
         })
         f.ret.try(&.accept(ctx, visitor))
         f.body.try(&.accept(ctx, visitor))
+        f.error_out.try(&.accept(ctx, visitor))
         f.yield_out.try(&.accept(ctx, visitor))
         f.yield_in.try(&.accept(ctx, visitor))
 

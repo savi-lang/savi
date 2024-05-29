@@ -115,7 +115,10 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       Util.require_terms(node, [
         nil,
         "the body to be attempted, followed by an optional\n" \
-        "  else clause to execute if the body errors (partitioned by `|`)",
+        "  else clause (partitioned by `|`) to execute if there is an error;\n" \
+        "  if there are three clauses, then the middle one is treated as a\n" \
+        "  an expression that captures the error value in a local variable,\n" \
+        "  possibly constraining the type of error values that are allowed",
       ])
       visit_try(node)
     elsif Util.match_ident?(node, 0, "yield")
@@ -502,21 +505,51 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     orig = node.terms[0]
     body = node.terms[1]
     else_body = nil
+    catch_expr = nil
 
     if body.is_a?(AST::Group) && body.style == "|"
-      Util.require_terms(body, [
-        "the body to attempt to execute fully",
-        "the body to be executed if the previous errored (the \"else\" case)",
-      ], true)
+      if body.terms.size <= 2
+        Util.require_terms(body, [
+          "the body to attempt to execute fully",
+          "the body to be executed if the previous errored (the \"else\" case)",
+        ], true)
+      else
+        Util.require_terms(body, [
+          "the body to attempt to execute fully",
+          "an optional local variable expression to bind a caught error value",
+          "the body to be executed if the previous errored (the \"else\" case)",
+        ], true)
+      end
 
-      else_body = body.terms[1]
-      body      = body.terms[0]
+      catch_expr = if body.terms.size == 3
+        catch_expr_group = body.terms[1].as(AST::Group)
+        Util.require_terms(catch_expr_group, [
+          "the name and optional type for the variable that catches the" \
+          " error value raised by the prior block, making it available" \
+          " to the next block",
+        ], true)
+        catch_expr = catch_expr_group.terms[0]
+
+        if catch_expr.is_a?(AST::Identifier)
+          catch_expr
+        elsif catch_expr.is_a?(AST::Group) && catch_expr.style == " " && catch_expr.terms.size == 2
+          AST::Relate.new(
+            catch_expr.terms[0],
+            AST::Operator.new("EXPLICITTYPE").from(catch_expr),
+            catch_expr.terms[1],
+          ).from(catch_expr)
+        else
+          raise Error.at(catch_expr, "Expected an identifier or an identifier with type for the caught error")
+        end
+      end
+      else_body  = body.terms[body.terms.size - 1]
+      body       = body.terms[0]
     end
 
     else_body ||= AST::Identifier.new("None").from(node)
 
     AST::Group.new("(", [
-      AST::Try.new(body, else_body).from(orig),
+      AST::Try.new(body, catch_expr, else_body).from(orig),
     ] of AST::Term).from(node)
   end
 
@@ -750,6 +783,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         local_rhs_assign,
         call,
       ] of AST::Term).from(orig),
+      nil,
       AST::Group.new("(", [
         AST::Call.new(
           AST::Identifier.new("Spec.Assert").from(expr),
@@ -813,6 +847,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         local_relate,
         call,
       ] of AST::Term).from(orig),
+      nil,
       AST::Group.new("(", [
         AST::Call.new(
           AST::Identifier.new("Spec.Assert").from(expr),
@@ -852,6 +887,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
           ] of AST::Term).from(expr)
         ).from(expr),
       ] of AST::Term).from(orig),
+      nil,
       AST::Group.new("(", [
         AST::Call.new(
           AST::Identifier.new("Spec.Assert").from(expr),
@@ -885,6 +921,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         expr,
         AST::Identifier.new("False").from(expr),
       ] of AST::Term).from(expr),
+      nil,
       AST::Group.new("(", [
         AST::Identifier.new("True").from(expr)
       ] of AST::Term).from(expr)

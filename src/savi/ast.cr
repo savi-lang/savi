@@ -191,6 +191,7 @@ module Savi::AST
     property params : AST::Group?
     property ret : AST::Term?
     property body : AST::Group?
+    property error_out : AST::Term?
     property yield_out : AST::Term?
     property yield_in : AST::Term?
     def initialize(@cap, @ident, @params = nil, @ret = nil, @body = nil)
@@ -205,6 +206,7 @@ module Savi::AST
         params.try(&.span_pos(source)),
         ret.try(&.span_pos(source)),
         body.try(&.span_pos(source)),
+        error_out.try(&.span_pos(source)),
         yield_out.try(&.span_pos(source)),
         yield_in.try(&.span_pos(source)),
       ].compact)
@@ -217,6 +219,7 @@ module Savi::AST
       params.try(&.to_a),
       ret.try(&.to_a),
       body.try(&.to_a),
+      error_out.try(&.to_a),
       yield_out.try(&.to_a),
       yield_in.try(&.to_a),
     ] of A end
@@ -226,6 +229,7 @@ module Savi::AST
       @params.try(&.accept(ctx, visitor))
       @ret.try(&.accept(ctx, visitor))
       @body.try(&.accept(ctx, visitor))
+      @error_out.try(&.accept(ctx, visitor))
       @yield_out.try(&.accept(ctx, visitor))
       @yield_in.try(&.accept(ctx, visitor))
     end
@@ -235,6 +239,7 @@ module Savi::AST
       new_params, params_changed = child_single_accept(ctx, @params.not_nil!, visitor) if @params
       new_ret, ret_changed = child_single_accept(ctx, @ret.not_nil!, visitor) if @ret
       new_body, body_changed = child_single_accept(ctx, @body.not_nil!, visitor) if @body
+      new_error_out, error_out_changed = child_single_accept(ctx, @error_out.not_nil!, visitor) if @error_out
       new_yield_out, yield_out_changed = child_single_accept(ctx, @yield_out.not_nil!, visitor) if @yield_out
       new_yield_in, yield_in_changed = child_single_accept(ctx, @yield_in.not_nil!, visitor) if @yield_in
       return self unless cap_changed || ident_changed || params_changed || ret_changed || body_changed || yield_out_changed || yield_in_changed
@@ -244,6 +249,7 @@ module Savi::AST
         node.params = new_params
         node.ret = new_ret
         node.body = new_body
+        node.error_out = new_error_out
         node.yield_out = new_yield_out
         node.yield_in = new_yield_in
       end
@@ -879,33 +885,42 @@ module Savi::AST
   # However, the most obvious example of use is in the `try` macro.
   class Try < Node
     property body : Term
+    property catch_expr : Term?
     property else_body : Term
     property allow_non_partial_body : Bool
-    def initialize(@body, @else_body, @allow_non_partial_body = false)
+    def initialize(@body, @catch_expr, @else_body, @allow_non_partial_body = false)
     end
 
     def span_pos(source)
       return Source::Pos.none unless pos.source == source
-      pos.span([body.span_pos(source), else_body.span_pos(source)])
+      pos.span([
+        body.span_pos(source),
+        *(catch_expr ? [catch_expr.not_nil!.span_pos(source)] : [] of Source::Pos),
+        else_body.span_pos(source)
+      ])
     end
 
     def name; :try end
     def to_a : Array(A)
       res = [name] of A
       res << body.to_a
+      catch_expr.try { |c| res << c.to_a }
       res << else_body.to_a
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       body.accept(ctx, visitor)
+      catch_expr.try { |c| c.accept(ctx, visitor) }
       else_body.accept(ctx, visitor)
     end
     def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
       new_body, body_changed = child_single_accept(ctx, @body, visitor)
+      new_catch_expr, catch_expr_changed = maybe_child_single_accept(ctx, @catch_expr, visitor)
       new_else_body, else_body_changed = child_single_accept(ctx, @else_body, visitor)
-      return self unless body_changed || else_body_changed
+      return self unless body_changed || catch_expr_changed || else_body_changed
       dup.tap do |node|
         node.body = new_body
+        node.catch_expr = new_catch_expr
         node.else_body = new_else_body
       end
     end
