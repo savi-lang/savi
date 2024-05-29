@@ -20,6 +20,7 @@ module Savi::Compiler::PreInfer
   struct Analysis
     getter yield_out_infos : Array(Infer::YieldOut)
     property! yield_in_info : Infer::YieldIn
+    property! error_out_info : Infer::ErrorOut
 
     def initialize
       @yield_out_infos = [] of Infer::YieldOut
@@ -170,11 +171,12 @@ module Savi::Compiler::PreInfer
         end || 0
       ].max
 
-      # Create fake local variables that represents the yield-related types.
+      # Create fake local variables that represents the yield/error-related types.
       yield_out_arg_count.times do
         @analysis.yield_out_infos << Infer::YieldOut.new((func.yield_out || func.ident).pos, 0)
       end
       @analysis.yield_in_info = Infer::YieldIn.new((func.yield_in || func.ident).pos, 0)
+      @analysis.error_out_info = Infer::ErrorOut.new((func.error_out || func.ident).pos, 0)
 
       # Constrain via the "yield out" part of the explicit signature if present.
       func.yield_out.try do |yield_out|
@@ -193,6 +195,7 @@ module Savi::Compiler::PreInfer
       end
 
       # Constrain via the "yield in" part of the explicit signature if present.
+      # Defaults to a fixed type of `None` if not in the explicit signature.
       yield_in = func.yield_in
       if yield_in
         yield_in.accept(ctx, self)
@@ -200,6 +203,15 @@ module Savi::Compiler::PreInfer
       else
         fixed = Infer::FixedPrelude.new(@analysis.yield_in_info.pos, 0, "None")
         @analysis.yield_in_info.set_explicit(fixed)
+      end
+
+      # Constrain via the "error out" part of the explicit signature if present.
+      error_out = func.error_out
+      did_constrain_error_out = false
+      if error_out
+        error_out.accept(ctx, self)
+        @analysis.error_out_info.set_explicit(@analysis[error_out])
+        did_constrain_error_out = true
       end
 
       # Don't bother further typechecking functions that have no body
@@ -216,10 +228,32 @@ module Savi::Compiler::PreInfer
         # self no matter what the last term of the body of the function is.
         unless func.has_tag?(:constructor) || @jumps.always_error?(func_body)
           self[ret].as(Infer::FuncBody).assign(ctx, @analysis[func_body], func_body_pos)
-          @jumps.catches[func.ast]?.try(&.each do |jump|
+          @jumps.catches[func.ast]?.try(&.each { |jump|
+            next unless jump.kind == AST::Jump::Kind::Return
             self[ret].as(Infer::FuncBody).assign(ctx, self[jump.term], jump.pos)
-          end)
+          })
         end
+      end
+
+      # Constrain the "error out" part of the signature by any errors caught.
+      @jumps.catches[func.ast]?.try(&.each { |jump|
+        next unless jump.kind == AST::Jump::Kind::Error
+        @analysis.error_out_info.assign(ctx, self[jump.term], jump.pos)
+        did_constrain_error_out = true
+      })
+      @jumps.call_error_catches[func.ast]?.try(&.each { |call|
+        call_error_info = Infer::FromCallErrorOut.new(
+          call.pos, self[call].layer_index, self[call].as(Infer::FromCall)
+        )
+        @analysis.error_out_info.assign(ctx, call_error_info, call.pos)
+        @analysis.observe_extra_info(call_error_info)
+        did_constrain_error_out = true
+      })
+
+      # If the error out type is totally unconstrained, it's None.
+      if !did_constrain_error_out
+        fixed = Infer::FixedPrelude.new(@analysis.error_out_info.pos, 0, "None")
+        @analysis.error_out_info.set_explicit(fixed)
       end
 
       nil
@@ -702,6 +736,23 @@ module Savi::Compiler::PreInfer
         ] of {Infer::Info?, Infer::Info, Bool},
         fixed_bool
       )
+
+      node.catch_expr.try { |catch_expr|
+        catch_expr_info = self[catch_expr].as(Infer::Local)
+        catch_expr_info.set_infer_from_all_upstreams
+
+        @jumps.catches[node]?.try(&.each { |jump|
+          catch_expr_info.assign(ctx, self[jump.term], jump.pos)
+        })
+
+        @jumps.call_error_catches[node]?.try(&.each { |call|
+          call_error_info = Infer::FromCallErrorOut.new(
+            call.pos, self[call].layer_index, self[call].as(Infer::FromCall)
+          )
+          catch_expr_info.assign(ctx, call_error_info, call.pos)
+          @analysis.observe_extra_info(call_error_info)
+        })
+      }
     end
 
     def touch(ctx : Context, node : AST::Yield)

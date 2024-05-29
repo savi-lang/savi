@@ -99,6 +99,9 @@ module Savi::Compiler::TInfer
     getter! yield_out_spans : Array(Span)
     protected setter yield_out_spans
 
+    getter! error_out_span : Span?
+    protected setter error_out_span
+
     protected getter captured_function_pointers
     def each_captured_function_pointer; @captured_function_pointers.each; end
 
@@ -694,6 +697,18 @@ module Savi::Compiler::TInfer
         other_rt.args, other_f.has_tag?(:constructor))
     end
 
+    def depends_on_call_error_out_span(ctx, other_rt, other_f, other_f_link)
+      # TODO: Track dependencies and invalidate cache based on those.
+      other_pre = ctx.pre_t_infer[other_f_link]
+      error_out_info = other_pre.error_out_info
+      return unless error_out_info
+      other_analysis = ctx.t_infer_edge.run_for_func(ctx, other_f, other_f_link)
+      raw_span = other_analysis.direct_span(error_out_info)
+
+      other_analysis.deciding_reify_of(raw_span,
+        other_rt.args, other_f.has_tag?(:constructor))
+    end
+
     def run_edge(ctx : Context)
       @analysis.param_spans =
         func.params.try { |params|
@@ -707,6 +722,9 @@ module Savi::Compiler::TInfer
 
       @analysis.yield_out_spans =
         @pre_infer.yield_out_infos.map { |info| resolve(ctx, info) }
+
+      @analysis.error_out_span =
+        @pre_infer.error_out_info.try { |info| resolve(ctx, info) }
     end
 
     def run(ctx : Context)

@@ -35,7 +35,10 @@ describe Savi::Compiler::Macros do
           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       - this term is the body to be attempted, followed by an optional
-        else clause to execute if the body errors (partitioned by `|`):
+        else clause (partitioned by `|`) to execute if there is an error;
+        if there are three clauses, then the middle one is treated as a
+        an expression that captures the error value in a local variable,
+        possibly constraining the type of error values that are allowed:
         from (example):3:
           try (error! | True) what now
               ^~~~~~~~~~~~~~~
@@ -73,12 +76,12 @@ describe Savi::Compiler::Macros do
           try (error! | True | what | now)
                ^~~~~~
 
-      - this section is the body to be executed if the previous errored (the "else" case):
+      - this section is an optional local variable expression to bind a caught error value:
         from (example):3:
           try (error! | True | what | now)
                         ^~~~
 
-      - this is an excessive section:
+      - this section is the body to be executed if the previous errored (the "else" case):
         from (example):3:
           try (error! | True | what | now)
                                ^~~~

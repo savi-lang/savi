@@ -608,6 +608,15 @@ module Savi::Compiler::TInfer
 
   class Local < NamedInfo
     def describe_kind : String; "local variable" end
+
+    def initialize(pos, layer_index)
+      super(pos, layer_index)
+
+      @infer_from_all_upstreams = false
+    end
+
+    def set_infer_from_all_upstreams; @infer_from_all_upstreams = true end
+    def infer_from_all_upstreams? : Bool; @infer_from_all_upstreams end
   end
 
   class Param < NamedInfo
@@ -620,6 +629,12 @@ module Savi::Compiler::TInfer
 
   class YieldOut < NamedInfo
     def describe_kind : String; "yielded result" end
+  end
+
+  class ErrorOut < NamedInfo
+    def describe_kind : String; "raised error value" end
+
+    def infer_from_all_upstreams? : Bool; true end
   end
 
   class Field < DynamicInfo
@@ -1227,6 +1242,52 @@ module Savi::Compiler::TInfer
 
             infer
               .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
+          }
+          Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
+        }
+        Span.reduce_combine_mts(union_member_spans) { |accum, mt| accum.unite(mt) }.not_nil!
+      }
+    end
+  end
+
+  class FromCallErrorOut < DynamicInfo
+    getter call : FromCall
+
+    def describe_kind : String; "error value raised by this function" end
+
+    def initialize(@pos, @layer_index, @call)
+    end
+
+    def tether_terminal?
+      true
+    end
+
+    def tether_resolve_span(ctx : Context, infer : Visitor)
+      infer.resolve(ctx, self)
+    end
+
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
+      @call.resolve_receiver_span(ctx, infer).transform_mt_to_span { |call_receiver_mt|
+        union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
+          intersection_term_spans = union_member_mt.map_each_intersection_term { |term_mt|
+            call_defn = term_mt.single!
+            call_func = call_defn.defn(ctx).find_func!(@call.member)
+            call_link = call_func.make_link(call_defn.link)
+
+            raw_err_span = infer.depends_on_call_error_out_span(
+              ctx, call_defn, call_func, call_link
+            )
+
+            unless raw_err_span
+              call_name = "#{call_defn.defn(ctx).ident.value}.#{@call.member}"
+              next Span.error(pos,
+                "This error value will never be received", [
+                  {call_func.ident.pos, "'#{call_name}' cannot raise an error"}
+                ]
+              )
+            end
+
+            raw_err_span.not_nil!
           }
           Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
         }

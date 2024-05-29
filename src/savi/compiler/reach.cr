@@ -583,9 +583,10 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     getter receiver : Ref # TODO: add to subtype_of? logic
     getter params : Array(Ref)
     getter ret : Ref
+    getter error_out : Ref? # TODO: add to subtype_of? logic
     getter yield_out : Array(Ref) # TODO: add to subtype_of? logic
     # TODO: Add yield_in as well
-    def initialize(@name, @receiver, @params, @ret, @yield_out)
+    def initialize(@name, @receiver, @params, @ret, @error_out, @yield_out)
     end
 
     def subtype_of?(ctx, other : Signature)
@@ -772,11 +773,15 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
     }
     ret = ctx.reach.handle_type_ref(ctx, rf.meta_type_of_ret(ctx, infer) || bogus_mt)
 
+    error_out = infer.error_out_span.try { |span|
+      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer) || bogus_mt)
+    }
+
     yield_out = infer.yield_out_spans.map { |span|
       ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer) || bogus_mt)
     }
 
-    Signature.new(rf.name, receiver, params, ret, yield_out)
+    Signature.new(rf.name, receiver, params, ret, error_out, yield_out)
   end
 
   def handle_field(ctx, rt : Infer::ReifiedType, f_link, ident) : {String, Ref}?

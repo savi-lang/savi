@@ -473,6 +473,13 @@
   :term out TypeOrTypeList
 
 // TODO: Document this.
+:declarator errors
+  :intrinsic
+  :context function
+
+  :term out Type
+
+// TODO: Document this.
 :declarator const
   :intrinsic
   :context type

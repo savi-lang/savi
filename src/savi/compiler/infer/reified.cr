@@ -289,6 +289,13 @@ module Savi::Compiler::Infer
     ) : MetaType?
       meta_type_of(ctx, infer.yield_in_span, infer)
     end
+
+    def meta_type_of_error_out(
+      ctx : Context,
+      infer : FuncAnalysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.error_out_span, infer)
+    end
   end
 
   struct TypeParam

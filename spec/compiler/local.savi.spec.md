@@ -61,6 +61,20 @@ It marks the use sites of yield parameters.
 
 ---
 
+It marks the use sites of a try catch expression variable.
+
+```savi
+  try (
+    error! "value"
+  |
+    err          ::local.use_site=> err:W:(4, 4)
+  |
+    string = err ::local.use_site=> err:R:(5, 7)
+  )
+```
+
+---
+
 It complains when trying to read a local variable prior to its first assignment.
 
 ```savi

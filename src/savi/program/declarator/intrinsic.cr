@@ -595,6 +595,8 @@ module Savi::Program::Intrinsic
       case declarator.name.value
       when "inline"
         scope.current_function.add_tag(:inline)
+      when "errors"
+        scope.current_function.error_out = terms["out"]?.as(AST::Term?)
       when "yields"
         scope.current_function.yield_out = terms["out"]?.as(AST::Term?)
         scope.current_function.yield_in  = terms["in"]?.as(AST::Term?)

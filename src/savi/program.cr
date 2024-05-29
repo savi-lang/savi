@@ -373,6 +373,8 @@ class Savi::Program
     def ret=(x); ast.ret = x end
     def body; ast.body end
     def body=(x); ast.body = x end
+    def error_out; ast.error_out end
+    def error_out=(x); ast.error_out = x end
     def yield_out; ast.yield_out end
     def yield_out=(x); ast.yield_out = x end
     def yield_in; ast.yield_in end

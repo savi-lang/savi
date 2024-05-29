@@ -298,6 +298,11 @@ module Savi::Compiler::Local
         if old_use_site.try(&.is_first_lexical_appearance)
     end
 
+    # Observing a try entails observing the catch expression if it has one.
+    def observe(ctx, node : AST::Try)
+      node.catch_expr.try { |e| observe_param(ctx, e) }
+    end
+
     # Observing a call site entails observing any yield parameters.
     def observe(ctx, node : AST::Call)
       node.yield_params.try(&.terms.each { |param| observe_param(ctx, param) })

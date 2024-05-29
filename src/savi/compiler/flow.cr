@@ -413,16 +413,24 @@ module Savi::Compiler::Flow
       after_block = @analysis.new_block(@current_block.containing_node)
 
       body_block = @analysis.new_block(node.body)
+      catch_block = node.catch_expr.try { |x| @analysis.new_block(x) }
       else_block = @analysis.new_block(node.else_body)
 
-      # We execute the body, using the else block as a jump target for errors.
+      # We run the body, using the catch or else block as a target for errors.
       body_block.comes_after(before_block)
-      with_jump_target(AST::Jump::Kind::Error, else_block) {
+      with_jump_target(AST::Jump::Kind::Error, catch_block || else_block) {
         body_block = visit_deferred_child(ctx, node.body, body_block)
       }
 
-      # Any errors in the body will jump to this else block.
-      else_block = visit_deferred_child(ctx, node.else_body, else_block)
+      # Any errors in the body will jump to this catch or else block.
+      # If we have a catch block, the else block comes after it.
+      if catch_block.nil?
+        else_block = visit_deferred_child(ctx, node.else_body, else_block)
+      else
+        catch_block = visit_deferred_child(ctx, node.catch_expr.not_nil!, catch_block.not_nil!)
+        else_block.comes_after(catch_block)
+        else_block = visit_deferred_child(ctx, node.else_body, else_block)
+      end
 
       # Both the body block and else block lead into the after block.
       after_block.comes_after(body_block)

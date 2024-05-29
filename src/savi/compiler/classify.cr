@@ -213,6 +213,7 @@ module Savi::Compiler::Classify
         f.ret.try(&.accept(ctx, visitor))
         visitor.type_expr_visit(ctx, f.ret)
         f.body.try(&.accept(ctx, visitor))
+        visitor.type_expr_visit(ctx, f.error_out)
         visitor.type_expr_visit(ctx, f.yield_out)
         visitor.type_expr_visit(ctx, f.yield_in)
 

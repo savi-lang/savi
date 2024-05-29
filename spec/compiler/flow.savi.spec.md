@@ -238,9 +238,41 @@ It analyzes control flow for errors and partial calls in a `try`.
     )
     @after_if ::flow.block=> 5(8U | 12)
   |
-    @catch ::flow.block=> 4(7 | 10 | 11)
+    @else ::flow.block=> 4(7 | 10 | 11)
   )
   @after ::flow.block=> 2(5 | 4)
+  @ ::flow.exit_block=> 1(2)
+```
+
+---
+
+It analyzes control flow for errors and partial calls in a `try` that
+includes an error value catch expression.
+
+```savi
+  @before ::flow.block=> 0(entry)
+  try (
+    @before_if ::flow.block=> 3(0)
+    if (
+      @cond ::flow.block=> 7(3)
+    ) (
+      @before_error ::flow.block=> 8(7T)
+      error!        ::flow.block=> 8(7T)
+      @after_error  ::flow.block=> 9U(8)
+    |
+      @before_partial_call_1 ::flow.block=> 11(10T)
+      @partial_call_1!       ::flow.block=> 11(10T)
+      @before_partial_call_2 ::flow.block=> 12(11)
+      @partial_call_2!       ::flow.block=> 12(11)
+      @after_partial_calls   ::flow.block=> 13(12)
+    )
+    @after_if ::flow.block=> 6(9U | 13)
+  |
+    err ::flow.block=> 4(8 | 11 | 12)
+  |
+    @else ::flow.block=> 5(4)
+  )
+  @after ::flow.block=> 2(6 | 5)
   @ ::flow.exit_block=> 1(2)
 ```
 
