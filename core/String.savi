@@ -230,7 +230,7 @@
       yield value
     )
 
-  // TODO: Move to be on a new `Indexable.Bytes` trait?
+  :: DEPRECATED: Use `break` to exit early from `each_byte` if needed.
   :fun each_byte_until(from USize = 0, to = USize.max_value, stride USize = 1)
     :yields for Bool
     @each_byte(from, to, stride) -> (byte |
@@ -238,6 +238,7 @@
     )
     False
 
+  // TODO: Move to be on a new `Indexable.Bytes` trait?
   :fun each_byte_with_index(from USize = 0, to = USize.max_value, stride USize = 1)
     index = from
     while index < to.at_most(@_size) (
@@ -246,6 +247,7 @@
     )
     None
 
+  // TODO: Move to be on a new `Indexable.Bytes` trait?
   :fun reverse_each_byte_with_index(
     from = USize.max_value
     to USize = 0
