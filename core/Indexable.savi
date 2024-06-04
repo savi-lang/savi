@@ -103,6 +103,28 @@
       yield value
     )
 
+  :fun reverse_find!(
+    from = USize.max_value
+    to USize = 0
+    stride USize = 1
+  ) (@->A)'aliased
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    @reverse_each(from, to, stride) -> (value |
+      return value if (yield value)
+    )
+    error!
+
+  :fun reverse_find_index!(
+    from = USize.max_value
+    to USize = 0
+    stride USize = 1
+  ) USize
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    @reverse_each_with_index(from, to, stride) -> (value, index |
+      return index if (yield value)
+    )
+    error!
+
   //--
 
   :fun select(
