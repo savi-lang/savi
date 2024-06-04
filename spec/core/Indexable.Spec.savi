@@ -87,6 +87,21 @@
     assert: array.find! -> (num | num > 30) == 33
     assert error: array.find! -> (num | num > 50)
 
+  :it "finds the first index that meets the criteria"
+    array Array(U8) = [11, 22, 33, 44, 36, 27, 18]
+    assert: array.find_index! -> (num | num > 30) == 2
+    assert error: array.find_index! -> (num | num > 50)
+
+  :it "finds, starting from the end, the first element that meets the criteria"
+    array Array(U8) = [11, 22, 33, 44, 36, 27, 18]
+    assert: array.reverse_find! -> (num | num > 30) == 36
+    assert error: array.reverse_find! -> (num | num > 50)
+
+  :it "finds, starting from the end, the first index that meets the criteria"
+    array Array(U8) = [11, 22, 33, 44, 36, 27, 18]
+    assert: array.reverse_find_index! -> (num | num > 30) == 4
+    assert error: array.reverse_find_index! -> (num | num > 50)
+
   :it "selects those elements that meet the criteria"
     array Array(U8) = [11, 22, 33, 44, 36, 27, 18]
     selected = array.select -> (num | num < 30)
