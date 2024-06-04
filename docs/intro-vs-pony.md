@@ -372,10 +372,10 @@ Note that the block is not a value that can be carried around - yielding cannot 
   :fun blab_until
     :yields (String, USize) for Bool
       index USize = 0
-      @sentences.each_until -> (sentence |
+      @sentences.each -> (sentence |
         stopped_listening = yield (sentence, index)
+        break if stopped_listening
         index += 1
-        stopped_listening // stop iterating when caller stops listening
       )
 
 :actor Main
