@@ -36,15 +36,16 @@ class Savi::Compiler::CodeGen
     end
 
     def func_start(gfunc : GenFunc, llvm_func : LLVM::Function)
-
       pos = gfunc.func.ident.pos
-      name = llvm_func.name
-      file = di_file(pos.source)
 
-      @di_func =
-        @di.create_function(file, name, name, file, pos.row + 1,
-          di_func_type(gfunc, file), true, true, pos.row + 1,
-          LLVM::DIFlags::Zero, false, llvm_func)
+      # TODO: get type info from the gfunc to generate accurate type debug info.
+      @di_func = di_func_new(gfunc.func.ident.pos, llvm_func)
+
+      set_loc(pos)
+    end
+
+    def func_start_raw(pos : Source::Pos, llvm_func : LLVM::Function)
+      @di_func = di_func_new(pos, llvm_func)
 
       set_loc(pos)
     end
@@ -108,6 +109,28 @@ class Savi::Compiler::CodeGen
         end
       end
       @llvm.md_node(values)
+    end
+
+    def di_func_new(pos : Source::Pos, llvm_func : LLVM::Function)
+      file = di_file(pos.source)
+
+      # Fullname can't be the same as basename; otherwise LLDB won't save the
+      # fullname in its index, and we won't be able to breakpoint by fullname.
+      #
+      # See https://github.com/llvm/llvm-project/blob/a74348ca66d599d3fbc7e28bf55445de53bb9838/lldb/source/Plugins/SymbolFile/DWARF/ManualDWARFIndex.cpp#L330-L334
+      fullname = llvm_func.name
+      basename = fullname.split(".").last
+      if basename == fullname
+        basename = basename[0..-2]
+      end
+
+      is_local_to_unit = false
+      is_definition = true
+      is_optimized = false
+
+      @di.create_function(file, basename, fullname, file, pos.row + 1,
+        di_func_type(file), is_local_to_unit, is_definition, pos.row + 1,
+        LLVM::DIFlags::Prototyped, is_optimized, llvm_func)
     end
 
     def di_file(source : Source)
@@ -317,7 +340,7 @@ class Savi::Compiler::CodeGen
     end
 
     # TODO: build a real type description here.
-    def di_func_type(gfunc : GenFunc, file : LibLLVM::MetadataRef)
+    def di_func_type(file : LibLLVM::MetadataRef)
       # This is just a stub that pretends there is just one int parameter.
       int = @di.create_basic_type("int", 32, 32, LLVM::DwarfTypeEncoding::Signed)
       @di.create_subroutine_type(file, [int])

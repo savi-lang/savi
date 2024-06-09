@@ -738,7 +738,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
   def gen_send_impl(g : CodeGen, gtype : GenType, gfunc : GenFunc)
     fn = gfunc.send_llvm_func
-    g.gen_func_start(fn)
+    g.gen_func_start(fn, gtype)
 
     # Get the message type and virtual table index to use.
     msg_type = gfunc.send_msg_llvm_type
@@ -826,7 +826,7 @@ class Savi::Compiler::CodeGen::PonyRT
     fn.call_convention = LLVM::CallConvention::C
     fn.linkage = LLVM::Linkage::External
 
-    g.gen_func_start(fn)
+    g.gen_func_start(fn, gtype)
 
     fn.params[0].name = "PONY_CTX"
     fn.params[1].name = "@"
@@ -922,7 +922,7 @@ class Savi::Compiler::CodeGen::PonyRT
     fn.call_convention = LLVM::CallConvention::C
     fn.linkage = LLVM::Linkage::External
 
-    g.gen_func_start(fn)
+    g.gen_func_start(fn, gtype)
 
     fn.params[0].name = "PONY_CTX"
     fn.params[1].name = "@"

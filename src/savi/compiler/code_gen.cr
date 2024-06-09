@@ -474,7 +474,11 @@ class Savi::Compiler::CodeGen
     @frames << Frame.new(self, llvm_func, gtype, gfunc)
 
     # Add debug info for this function
-    @di.func_start(gfunc, llvm_func) if gfunc
+    if gfunc
+      @di.func_start(gfunc, llvm_func)
+    elsif gtype
+      @di.func_start_raw(gtype.type_def.reified.defn(ctx).ident.pos, llvm_func)
+    end
 
     # Start building from the entry block.
     finish_block_and_move_to(func_frame.entry_block)
