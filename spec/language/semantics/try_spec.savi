@@ -124,94 +124,112 @@
       try (_Err.not_really!, 33 | 11)
     )
 
-    // test["try; with error value (numeric)"].pass = "98" == (
-    //   try (
-    //     error! 98
-    //     "success"
-    //   | err U64 |
-    //     Inspect[err]
-    //   )
-    // )
+    test["try; with error value (numeric)"].pass = "98" == (
+      try (
+        error! 98
+        "success"
+      | err U64 |
+        Inspect[err]
+      )
+    )
 
-    // test["try; with error value (class)"].pass = "whoopsie" == (
-    //   try (
-    //     error! "whoopsie"
-    //     "success"
-    //   | err |
-    //     err
-    //   )
-    // )
+    test["try; with error value (class)"].pass = "whoopsie" == (
+      try (
+        error! "whoopsie"
+        "success"
+      | err |
+        err
+      )
+    )
 
-    // test["try; with error value (struct)"].pass = "98: whoopsie" == (
-    //   try (
-    //     error! _MyError.new(98, "whoopsie")
-    //     "success"
-    //   | err |
-    //     Inspect[err]
-    //   )
-    // )
+    test["try; with error value (struct)"].pass = "98: whoopsie" == (
+      try (
+        error! _MyError.new(98, "whoopsie")
+        "success"
+      | err |
+        Inspect[err]
+      )
+    )
 
-    // test["try; with error value (struct or none)"].pass = "98: whoopsie" == (
-    //   try (
-    //     if False error!
-    //     error! _MyError.new(98, "whoopsie")
-    //     "success"
-    //   | err |
-    //     Inspect[err]
-    //   )
-    // )
+    test["try; with error value (none)"].pass = "None" == (
+      try (
+        error!
+        "success"
+      | err |
+        Inspect[err]
+      )
+    )
 
-    // test["try; with error value (none or struct)"].pass = "None" == (
-    //   try (
-    //     if True error!
-    //     error! _MyError.new(98, "whoopsie")
-    //     "success"
-    //   | err |
-    //     Inspect[err]
-    //   )
-    // )
+    test["try; with error value (struct or none)"].pass = "98: whoopsie" == (
+      try (
+        if False error!
+        error! _MyError.new(98, "whoopsie")
+        "success"
+      | err |
+        Inspect[err]
+      )
+    )
 
-    // test["try call; with error value (numeric)"].pass = "99" == (
-    //   try (
-    //     _Err.now_with_value_u64!
-    //     "success"
-    //   | err U64 |
-    //     Inspect[err]
-    //   )
-    // )
+    test["try; with error value (none or struct)"].pass = "None" == (
+      try (
+        if True error!
+        error! _MyError.new(98, "whoopsie")
+        "success"
+      | err |
+        Inspect[err]
+      )
+    )
 
-    // test["try call; with error value (class)"].pass = "whoops!" == (
-    //   try (
-    //     _Err.now_with_value_string!
-    //     "success"
-    //   | err |
-    //     err
-    //   )
-    // )
+    test["try call; with error value (numeric)"].pass = "99" == (
+      try (
+        _Err.now_with_value_u64!
+        "success"
+      | err U64 |
+        Inspect[err]
+      )
+    )
 
-    // test["try call; with error value (struct)"].pass = "99: whoops!" == (
-    //   try (
-    //     _Err.now_with_value_struct!
-    //     "success"
-    //   | err |
-    //     Inspect[err]
-    //   )
-    // )
+    test["try call; with error value (class)"].pass = "whoops!" == (
+      try (
+        _Err.now_with_value_string!
+        "success"
+      | err |
+        err
+      )
+    )
 
-    // test["try call; with error value (none or struct)"].pass = "None" == (
-    //   try (
-    //     _Err.maybe_with_value_struct_or_none!(False)
-    //     "success"
-    //   | err |
-    //     Inspect[err]
-    //   )
-    // )
+    test["try call; with error value (struct)"].pass = "99: whoops!" == (
+      try (
+        _Err.now_with_value_struct!
+        "success"
+      | err |
+        Inspect[err]
+      )
+    )
 
-    // test["try call; with error value (struct or none)"].pass = "100: whoa" == (
-    //   try (
-    //     _Err.maybe_with_value_struct_or_none!(True)
-    //     "success"
-    //   | err |
-    //     Inspect[err]
-    //   )
-    // )
+    test["try call; with error value (none)"].pass = "None" == (
+      try (
+        _Err.now!
+        "success"
+      | err |
+        Inspect[err]
+      )
+    )
+
+    test["try call; with error value (none or struct)"].pass = "None" == (
+      try (
+        _Err.maybe_with_value_struct_or_none!(False)
+        "success"
+      | err |
+        Inspect[err]
+      )
+    )
+
+    test["try call; with error value (struct or none)"].pass = "100: whoa" == (
+      try (
+        _Err.maybe_with_value_struct_or_none!(True)
+        "success"
+      | err |
+        Inspect[err]
+      )
+    )

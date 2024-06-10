@@ -3869,16 +3869,18 @@ class Savi::Compiler::CodeGen
       )
       catch_type = else_stack_tuple[3]
       error_value = gen_none
-      catch_type.try { |catch_type|
-        error_value = gen_assign_cast(
-          error_value_from_call,
-          catch_type,
-          llvm_type_of(catch_type),
-          from_call,
-          nil, # from_frame
-          error_type, # from_type
-        )
-      }
+      if error_type != @gtypes["None"].type_def.as_ref
+        catch_type.try { |catch_type|
+          error_value = gen_assign_cast(
+            error_value_from_call,
+            catch_type,
+            llvm_type_of(catch_type),
+            from_call,
+            nil, # from_frame
+            error_type, # from_type
+          )
+        }
+      end
       else_stack_tuple[2] << error_value
 
       # Jump to the try else block.
