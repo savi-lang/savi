@@ -738,7 +738,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
   def gen_send_impl(g : CodeGen, gtype : GenType, gfunc : GenFunc)
     fn = gfunc.send_llvm_func
-    g.gen_func_start(fn)
+    g.gen_func_start(fn, gtype)
 
     # Get the message type and virtual table index to use.
     msg_type = gfunc.send_msg_llvm_type
@@ -826,7 +826,7 @@ class Savi::Compiler::CodeGen::PonyRT
     fn.call_convention = LLVM::CallConvention::C
     fn.linkage = LLVM::Linkage::External
 
-    g.gen_func_start(fn)
+    g.gen_func_start(fn, gtype)
 
     fn.params[0].name = "PONY_CTX"
     fn.params[1].name = "@"
@@ -922,7 +922,7 @@ class Savi::Compiler::CodeGen::PonyRT
     fn.call_convention = LLVM::CallConvention::C
     fn.linkage = LLVM::Linkage::External
 
-    g.gen_func_start(fn)
+    g.gen_func_start(fn, gtype)
 
     fn.params[0].name = "PONY_CTX"
     fn.params[1].name = "@"
@@ -1034,6 +1034,11 @@ class Savi::Compiler::CodeGen::PonyRT
   def gen_trace_tuple(g : CodeGen, dst, src_type)
     src_gtype = g.gtype_of(src_type)
 
+    # Sometimes we may be dealing with a "boxed" tuple, so we need to unbox it.
+    if dst.type.kind == LLVM::Type::Kind::Pointer
+      dst = g.gen_unboxed_fields(dst, src_gtype)
+    end
+
     src_gtype.fields.each_with_index { |(name, field_type), index|
       field = g.builder.extract_value(dst, index)
       gen_trace(g, field, field, field_type, field_type)
@@ -1042,16 +1047,25 @@ class Savi::Compiler::CodeGen::PonyRT
 
   def gen_trace_dynamic(g : CodeGen, dst, src_type, dst_type, after_block)
     if src_type.is_union?
+      after_union_block = g.gen_block("after_dynamic_union_trace")
+
+      # We need to trace each possible type, guarded by a runtime type check.
+      # That's what gen_trace_dynamic will do for a singular type.
       src_type.union_children.each do |child_type|
-        gen_trace_dynamic(g, dst, child_type, dst_type, after_block)
+        gen_trace_dynamic(g, dst, child_type, dst_type, after_union_block)
       end
+      g.builder.br(after_union_block)
+      g.finish_block_and_move_to(after_union_block)
+
+      # We also need to trace the pointer itself as an opaque value,
+      # because it may be a "boxed" pointer to a simple/non-allocated value,
+      # and we can't let that "boxed" pointer get garbage-collected.
       gen_trace_unknown(g, dst, PonyRT::TRACE_OPAQUE)
     elsif src_type.singular?
       src_type_def = src_type.single_def!(g.ctx)
 
-      # We can't trace it if it's a simple value (with no type descriptor),
-      # and we shouldn't trace it if it isn't runtime-allocated.
-      return if src_type_def.is_simple_value?(g.ctx) || !src_type_def.has_allocation?(g.ctx)
+      # We'll only trace a constructed value (because it may have fields)
+      return unless src_type_def.is_constructed?(g.ctx)
 
       # Generate code to check if this value is a subtype of this at runtime.
       is_subtype = g.gen_check_subtype_at_runtime(dst, src_type, true)

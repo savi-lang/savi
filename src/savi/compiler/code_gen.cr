@@ -474,7 +474,11 @@ class Savi::Compiler::CodeGen
     @frames << Frame.new(self, llvm_func, gtype, gfunc)
 
     # Add debug info for this function
-    @di.func_start(gfunc, llvm_func) if gfunc
+    if gfunc
+      @di.func_start(gfunc, llvm_func)
+    elsif gtype
+      @di.func_start_raw(gtype.type_def.reified.defn(ctx).ident.pos, llvm_func)
+    end
 
     # Start building from the entry block.
     finish_block_and_move_to(func_frame.entry_block)
@@ -3865,16 +3869,18 @@ class Savi::Compiler::CodeGen
       )
       catch_type = else_stack_tuple[3]
       error_value = gen_none
-      catch_type.try { |catch_type|
-        error_value = gen_assign_cast(
-          error_value_from_call,
-          catch_type,
-          llvm_type_of(catch_type),
-          from_call,
-          nil, # from_frame
-          error_type, # from_type
-        )
-      }
+      if error_type != @gtypes["None"].type_def.as_ref
+        catch_type.try { |catch_type|
+          error_value = gen_assign_cast(
+            error_value_from_call,
+            catch_type,
+            llvm_type_of(catch_type),
+            from_call,
+            nil, # from_frame
+            error_type, # from_type
+          )
+        }
+      end
       else_stack_tuple[2] << error_value
 
       # Jump to the try else block.

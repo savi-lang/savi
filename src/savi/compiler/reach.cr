@@ -458,6 +458,10 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
       @reified.defn(ctx).has_tag?(:simple_value)
     end
 
+    def is_constructed?(ctx)
+      @reified.defn(ctx).has_tag?(:constructed)
+    end
+
     def has_allocation?(ctx)
       @reified.defn(ctx).has_tag?(:allocated)
     end

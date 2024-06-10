@@ -1,4 +1,6 @@
 :module RegressionSpec
+  :fun maybe_int_format!: 33.format.decimal
+
   :fun run(test MicroTest)
     // In a past version of the compiler, this would generate invalid LLVM IR,
     // failing to deal properly with the fact that we were calling `into_string`
@@ -7,4 +9,45 @@
       try (@maybe_int_format! | "???")
     )" == "example: 33"
 
-  :fun maybe_int_format!: 33.format.decimal
+    RegressionSpec.TraceArrayOfUnionOfNoneAndPairWithNestedClass.new(test)
+
+:class val _ValWrap(T val)
+  :let value T
+  :new val (@value)
+
+// In a past version of the compiler, this would generate a wrong kind of
+// trace for the garbage collection, causing some objects to be collected
+// (and their memory reused) while they are still in the array, causing
+// data corruption due to future objects reusing the same memory.
+:actor RegressionSpec.TraceArrayOfUnionOfNoneAndPairWithNestedClass
+  :let test MicroTest
+  :let array Array(
+    (Pair(I32, _ValWrap(_ValWrap(USize))) | None)
+  ): []
+  :const max_index USize: 1000
+  :new (@test): @next(0)
+
+  :be next(index USize)
+    if index >= @max_index (
+      @finish
+      return
+    )
+    @array << Pair(I32, _ValWrap(_ValWrap(USize))).new(
+      0
+      _ValWrap(_ValWrap(USize)).new(
+        _ValWrap(USize).new(index)
+      )
+    )
+    @next(index + 1)
+
+  :fun check_array
+    @array.each_with_index -> (element, index |
+      return False unless (
+        try (element.not!(None).value.value.value == index | False)
+      )
+    )
+    True
+
+  :be finish
+    @test["trace array of union of none and pair with nested class"].pass =
+      @check_array

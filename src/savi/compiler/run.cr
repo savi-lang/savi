@@ -19,6 +19,12 @@ class Savi::Compiler::Run
     bin_path += ".exe" if target.windows?
 
     res = Process.run("/usr/bin/env", [bin_path], output: STDOUT, error: STDERR)
-    @exitcode = res.exit_code
+
+    if res.exit_reason == Process::ExitReason::Normal
+      @exitcode = res.exit_code
+    else
+      STDERR.puts "Process exited with reason: #{res.exit_reason}"
+      @exitcode = 1
+    end
   end
 end

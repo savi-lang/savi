@@ -162,10 +162,14 @@ class Savi::Compiler::CodeGen
       end
 
       def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value?, value_expr : AST::Node?, continue_current_value : Bool)
+        value_type = gfunc.reach_func.signature.error_out.not_nil!
+        if value && value_expr
+          value = g.gen_assign_cast(value, value_type, nil, value_expr)
+        end
         tuple = llvm_func_ret_type(g, gfunc).undef
         tuple = g.builder.insert_value(tuple, g.llvm.int1.const_int(1), 1)
         g.builder.store(value, g.current_error_thread_local.not_nil!) \
-          if !continue_current_value && value != g.gen_none
+          if !continue_current_value && value_type != g.gtypes["None"].type_def.as_ref
         g.builder.ret(tuple)
       end
     end
@@ -238,10 +242,14 @@ class Savi::Compiler::CodeGen
       end
 
       def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value?, value_expr : AST::Node?, continue_current_value : Bool)
+        value_type = gfunc.reach_func.signature.error_out.not_nil!
+        if value && value_expr
+          value = g.gen_assign_cast(value, value_type, nil, value_expr)
+        end
         cont = g.func_frame.continuation_value
         gfunc.continuation_info.set_as_error(cont)
         g.builder.store(value, g.current_error_thread_local.not_nil!) \
-          if !continue_current_value && value != g.gen_none
+          if !continue_current_value && value_type != g.gtypes["None"].type_def.as_ref
         g.builder.ret
       end
 
