@@ -280,13 +280,15 @@ class Savi::Compiler::Binary
 
   # Yield each sysroot-based glob used to find paths that exist.
   def each_sysroot_lib_glob(ctx, target)
-    # For MacOS, we have just one valid sysroot path, so we can finish early.
+    # Handle MacOS sysroot paths.
     if target.macos?
+      yield "/opt/homebrew/lib", nil
+      yield "/usr/local/lib", nil
       yield "/usr/lib", nil
       return
     end
 
-    # For Windows we only allow cross compiling and require this env var.
+    # Handle Windows sysroot paths.
     if target.windows?
       yield "/**/x64", "um/x64"             # MSVC style
       yield "/**/x64", "ucrt/x64"           # MSVC style
