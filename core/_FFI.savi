@@ -13,6 +13,7 @@
   :ffi pony_os_std_write(
     fp CPointer(None)'ref, buffer CPointer(U8), length USize
   ) None
+  :ffi pony_os_std_flush(fp CPointer(None)'ref) None
 
 :module _FFI.Cast(A, B)
   :: An FFI-only utility function for bit-casting type A to B.
