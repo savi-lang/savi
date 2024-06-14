@@ -5,6 +5,7 @@
   :ffi variadic snprintf(buffer CPointer(U8), buffer_size I32, fmt CPointer(U8)) I32
 
   :ffi pony_exitcode(code I32) None
+  :ffi pony_os_stdout_setup() None
   :ffi pony_os_stdout() CPointer(None)'ref
   :ffi pony_os_stderr() CPointer(None)'ref
   :ffi pony_os_std_print(
