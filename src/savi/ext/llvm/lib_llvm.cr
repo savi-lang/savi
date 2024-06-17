@@ -12,6 +12,8 @@ lib LibLLVM
   fun const_bit_cast = LLVMConstBitCast(value : ValueRef, to_type : TypeRef) : ValueRef
   fun set_unnamed_addr = LLVMSetUnnamedAddr(global : ValueRef, is_unnamed_addr : Int32)
   fun is_unnamed_addr = LLVMIsUnnamedAddr(global : ValueRef) : Int32
+  fun set_externally_initialized = LLVMSetExternallyInitialized(global : ValueRef, is_externally_initialized : Int32)
+  fun is_externally_initialized = LLVMIsExternallyInitialized(global : ValueRef) : Int32
   fun parse_bitcode_in_context = LLVMParseBitcodeInContext(context : ContextRef, mem_buf : MemoryBufferRef, out_m : ModuleRef*, out_message : UInt8**) : Int32
   fun link_modules = LLVMLinkModules2(dest : ModuleRef, src : ModuleRef) : Int32
   fun strip_module_debug_info = LLVMStripModuleDebugInfo(mod : ModuleRef) : Bool

@@ -304,25 +304,63 @@ module Savi::Program::Intrinsic
 
         scope.on_body { |body| function.body = body }
       when "ffi"
-        name, params =
-          AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
+        if terms["thread_local"]?
+          raise NotImplementedError.new(":ffi thread_local")
+        elsif terms["global"]?
+          name = terms["name"].as(AST::Identifier)
+          t = terms["type"].as(AST::Term)
 
-        scope.current_function = function = Program::Function.new(
-          AST::Identifier.new("non").from(declare.terms.first),
-          name,
-          params,
-          terms["ret"]?.as(AST::Term?),
-        )
+          scope.current_function = function = Program::Function.new(
+            AST::Identifier.new("non").from(declare.terms.first),
+            name,
+            nil,
+            t,
+          )
 
-        function.add_tag(:ffi)
-        function.add_tag(:inline)
-        function.add_tag(:variadic) if terms["variadic"]?
+          ffi_link_name = function.ident.value
+          ffi_link_name = ffi_link_name[0...-1] if ffi_link_name.ends_with?("!")
+          function.metadata[:ffi_link_name] = ffi_link_name
+          function.add_tag(:ffi)
+          function.add_tag(:ffi_global_getter)
+          function.add_tag(:inline)
+          function.body = nil
 
-        ffi_link_name = function.ident.value
-        ffi_link_name = ffi_link_name[0...-1] if ffi_link_name.ends_with?("!")
-        function.metadata[:ffi_link_name] = ffi_link_name
+          if terms["var_or_let"].as(AST::Identifier).value == "let"
+            function.add_tag(:ffi_global_constant)
+          else
+            setter_function = Program::Function.new(
+              AST::Identifier.new("non").from(declare.terms.first),
+              AST::Identifier.new("#{name.value}=").from(name),
+              AST::Group.new("(", [t]).from(t),
+              t,
+            )
 
-        function.body = nil
+            setter_function.metadata[:ffi_link_name] = ffi_link_name
+            setter_function.add_tag(:ffi)
+            setter_function.add_tag(:ffi_global_setter)
+            setter_function.add_tag(:inline)
+            setter_function.body = nil
+          end
+        else
+          name, params =
+            AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
+
+          scope.current_function = function = Program::Function.new(
+            AST::Identifier.new("non").from(declare.terms.first),
+            name,
+            params,
+            terms["ret"]?.as(AST::Term?),
+          )
+
+          ffi_link_name = function.ident.value
+          ffi_link_name = ffi_link_name[0...-1] if ffi_link_name.ends_with?("!")
+          function.metadata[:ffi_link_name] = ffi_link_name
+          function.add_tag(:ffi)
+          function.add_tag(:ffi_call)
+          function.add_tag(:inline)
+          function.add_tag(:variadic) if terms["variadic"]?
+          function.body = nil
+        end
       when "let", "var"
         type = scope.current_type
 
@@ -583,9 +621,23 @@ module Savi::Program::Intrinsic
       when "foreign_name"
         name = terms["name"].as(AST::Identifier)
         scope.current_function.metadata[:ffi_link_name] = name.value
+
+        if scope.current_function.has_tag?(:ffi_global_getter)
+          setter_function = scope.current_type.functions.last
+          if setter_function.has_tag?(:ffi_global_setter)
+            setter_function.metadata[:ffi_link_name] = name.value
+          end
+        end
       when "link_lib"
         name = terms["name"].as(AST::Identifier)
         scope.current_function.metadata[:ffi_link_lib] = name.value
+
+        if scope.current_function.has_tag?(:ffi_global_getter)
+          setter_function = scope.current_type.functions.last
+          if setter_function.has_tag?(:ffi_global_setter)
+            setter_function.metadata[:ffi_link_lib] = name.value
+          end
+        end
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end

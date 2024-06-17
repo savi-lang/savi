@@ -817,7 +817,16 @@ class Savi::Compiler::CodeGen
 
   def gen_func_impl(gtype, gfunc, llvm_func)
     return gen_intrinsic(gtype, gfunc, llvm_func) if gfunc.func.has_tag?(:compiler_intrinsic)
-    return gen_ffi_impl(gtype, gfunc, llvm_func) if gfunc.func.has_tag?(:ffi)
+
+    if gfunc.func.has_tag?(:ffi)
+      if gfunc.func.has_tag?(:ffi_global_getter)
+        return gen_ffi_global_getter_impl(gtype, gfunc, llvm_func)
+      elsif gfunc.func.has_tag?(:ffi_global_setter)
+        return gen_ffi_global_setter_impl(gtype, gfunc, llvm_func)
+      else
+        return gen_ffi_impl(gtype, gfunc, llvm_func)
+      end
+    end
 
     # Fields with no initializer body can be skipped.
     return if gfunc.func.has_tag?(:field) && gfunc.func.body.nil?
@@ -902,8 +911,6 @@ class Savi::Compiler::CodeGen
   end
 
   def gen_ffi_impl(gtype, gfunc, llvm_func)
-    llvm_ffi_func = gen_ffi_decl(gfunc)
-
     gen_func_start(llvm_func, gtype, gfunc)
 
     param_count = llvm_func.params.size
@@ -957,12 +964,42 @@ class Savi::Compiler::CodeGen
     else
       raise NotImplementedError.new(gfunc.calling_convention)
     end
+  end
 
-    # And possibly cast the return type, for the same reasons
-    # that we possibly cast the argument types earlier above.
-    ret_type = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
+  def gen_ffi_global_decl(gfunc)
+    llvm_type = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
 
-    value
+    global = @mod.globals.add(llvm_type, gfunc.func.metadata[:ffi_link_name].as(String))
+    global.linkage = LLVM::Linkage::External
+    global.global_constant = gfunc.func.has_tag?(:ffi_global_constant)
+    global.externally_initialized = true # TODO: false and set an initializer if this ffi var has an initializer
+    global
+  end
+
+  def gen_ffi_global_getter_impl(gtype, gfunc, llvm_func)
+    gen_func_start(llvm_func, gtype, gfunc)
+
+    global = gen_ffi_global_decl(gfunc)
+    llvm_type = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
+
+    value = @builder.load(llvm_type, global, "#{global.name}.LOAD")
+
+    @builder.ret(value)
+
+    gen_func_end(gfunc)
+  end
+
+  def gen_ffi_global_setter_impl(gtype, gfunc, llvm_func)
+    gen_func_start(llvm_func, gtype, gfunc)
+
+    global = @mod.globals[gfunc.func.metadata[:ffi_link_name]]
+
+    value = llvm_func.params[0]
+    @builder.store(value, global)
+
+    @builder.ret(value)
+
+    gen_func_end(gfunc)
   end
 
   def gen_intrinsic_cpointer(gtype, gfunc, llvm_func)
@@ -1851,14 +1888,14 @@ class Savi::Compiler::CodeGen
       args,
       arg_exprs,
       arg_frames,
-      gfunc.func.has_tag?(:ffi) ? gfunc : nil,
+      gfunc.func.has_tag?(:ffi_call) ? gfunc : nil,
       needs_virtual_call,
       use_receiver,
       !cont.nil?,
     )
 
     # If this was an FFI call, skip calling-convention-specific handling.
-    return result if gfunc.func.has_tag?(:ffi)
+    return result if gfunc.func.has_tag?(:ffi_call)
 
     case gfunc.calling_convention
     when GenFunc::Simple
@@ -3201,7 +3238,6 @@ class Savi::Compiler::CodeGen
     global.linkage = LLVM::Linkage::Private
     global.initializer = const
     global.global_constant = true
-    global.unnamed_addr = true
     global
   end
 
