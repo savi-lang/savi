@@ -389,7 +389,7 @@
   :intrinsic
   :term filenames NameList
 
-:: Declare a binding to an unsafe foreign functions (FFI), such as a C function.
+:: Declare a binding to an unsafe foreign function (FFI), such as a C function.
 ::
 :: It is common to define such bindings on a dedicated private module, which is
 :: usually, by convention, named `_FFI` to make it clear at call sites.
@@ -430,12 +430,77 @@
   :term ret Type
     :optional
 
+:: Declare a binding to an unsafe foreign function (FFI) global variable,
+:: such as a C global variable.
+::
+:: It is common to define such bindings on a dedicated private module, which is
+:: usually, by convention, named `_FFI` to make it clear at call sites.
+::
+:: Because FFI bindings are inherently unsafe, it becomes the job of FFI-using
+:: library authors to guarantee safety of the packages they publish.
+:: FFI functions should never be exposed directly as a public feature - they
+:: should be carefully wrapped in a library-specific way that can guarantee
+:: memory safety, concurrency safety, and capability security safety,
+:: up to the same high standards as the Savi standard library.
+::
+:: This can be easier said than done. When in doubt, avoid using FFI bindings
+:: and prefer implementing features in pure Savi code where possible, or
+:: ask for an FFI library safety review from experienced community members.
+::
+:: An `:ffi` global declaration uses `var` or `let` and is similar to a
+:: `:var` or `:let` declaration in that it binds a getter and optional setter
+:: (only for `var`) to a global variable in the foreign library.
+:: Use `var` if the global variable is expected to change (either on the Savi
+:: side or on the C side), or `let` if it's expected to be set just once.
+::
+:: WARNING: Savi programs involve actors and are implicitly multi-threaded,
+:: so global variables whose values are expected to change during the life
+:: of the program are very likely to cause memory safety issues.
+:: You should strongly consider using thread-local FFI variables instead
+:: (not yet implemented).
+:declarator ffi
+  :intrinsic
+  :context type
+  :begins ffi
+
+  :keyword global
+  :term var_or_let enum (var, let)
+  :term name Name
+  :term type Type
+
+// TODO: Implement and document this.
+:declarator ffi
+  :intrinsic
+  :context type
+  :begins ffi
+
+  :keyword thread_local
+  :term var_or_let enum (var, let)
+  :term name Name
+  :term type Type
+
+:: Override the foreign name used for linking this FFI declaration.
+::
+:: Normally, an FFI declaration uses the same name for C linking that it uses
+:: in Savi. But it's possible to use a different link name by declaring it here.
+::
+:: This can be useful if you want to use a less verbose name in Savi,
+:: or if you want to bind multiple Savi `:ffi` declarations to the same C name.
 :declarator foreign_name
   :intrinsic
   :context ffi
 
   :term name Name
 
+:: Specify a C shared library that fulfills this particular FFI declaration.
+::
+:: If this declaration is used in the program, that shared library will be
+:: linked to the final program binary. If it's not used, the library won't be.
+::
+:: This is useful for situations where the library may only be appropriate
+:: to link on some platforms but not others. In such a situation, you can
+:: specify the link library here and make sure every invocation of the
+:: platform-specific function is guarded by a platform check conditional block.
 :declarator link_lib
   :intrinsic
   :context ffi

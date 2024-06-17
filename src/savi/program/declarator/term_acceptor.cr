@@ -21,7 +21,7 @@ abstract class Savi::Program::Declarator::TermAcceptor
     end
 
     def name : String
-      "_" # we don't care about where we save the term
+      @keyword
     end
 
     def try_accept(term : AST::Term) : AST::Term?
