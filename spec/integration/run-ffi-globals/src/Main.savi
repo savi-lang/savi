@@ -1,0 +1,57 @@
+
+:ffi_link_c_files (
+  "../vendor/mylib_globals.c"
+)
+
+:module _FFI.Cast(A, B)
+  :ffi pointer(input A) B
+    :foreign_name savi_cast_pointer
+
+:module _FFI.Globals
+  :ffi global var foo U64
+  :ffi global var bar U64
+
+  :ffi global let foo_2 U64
+    :foreign_name foo
+
+  :ffi global cpointer foo_cpointer U64
+    :foreign_name foo
+  :ffi global cpointer bar_cpointer U64
+    :foreign_name bar
+  :ffi global cpointer foo_cpointer_2 U64
+    :foreign_name foo
+
+  :fun "foo_via_cpointer="(value U64)
+    cpointer = _FFI.Globals.foo_cpointer
+    array = Array(U64).from_cpointer(
+      _FFI.Cast(CPointer(U64), CPointer(U64)'ref).pointer(cpointer)
+      1
+      1
+    )
+    try (array[0]! = value)
+    value
+
+:actor Main
+  :new (env)
+    env.out.print("initially...")
+    env.out.print("foo == \(_FFI.Globals.foo) == \(_FFI.Globals.foo_2)")
+    env.out.print("bar == \(_FFI.Globals.bar)")
+    env.out.print("foo cpointer and foo_2 cpointer have the same address? \(
+      _FFI.Globals.foo_cpointer.address == _FFI.Globals.foo_cpointer_2.address
+    )")
+    env.out.print("foo cpointer and bar cpointer have the same address? \(
+      _FFI.Globals.foo_cpointer.address == _FFI.Globals.bar_cpointer.address
+    )")
+    env.out.print("---")
+    env.out.print("foo = 42 returns \(_FFI.Globals.foo = 42)")
+    env.out.print("foo == \(_FFI.Globals.foo) == \(_FFI.Globals.foo_2)")
+    env.out.print("bar == \(_FFI.Globals.bar)")
+    env.out.print("---")
+    env.out.print("bar = 99 returns \(_FFI.Globals.bar = 99)")
+    env.out.print("foo == \(_FFI.Globals.foo) == \(_FFI.Globals.foo_2)")
+    env.out.print("bar == \(_FFI.Globals.bar)")
+    env.out.print("---")
+    env.out.print("setting foo via cpointer to \(_FFI.Globals.foo_via_cpointer = 32)")
+    env.out.print("foo == \(_FFI.Globals.foo) == \(_FFI.Globals.foo_2)")
+    env.out.print("bar == \(_FFI.Globals.bar)")
+

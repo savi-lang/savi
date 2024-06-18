@@ -391,6 +391,7 @@ class Savi::Program
       :ffi,
       :ffi_call,
       :ffi_global_constant,
+      :ffi_global_cpointer_getter,
       :ffi_global_getter,
       :ffi_global_setter,
       :field,

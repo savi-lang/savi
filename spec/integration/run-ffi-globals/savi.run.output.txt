@@ -1,0 +1,17 @@
+initially...
+foo == 1 == 1
+bar == 2
+foo cpointer and foo_2 cpointer have the same address? True
+foo cpointer and bar cpointer have the same address? False
+---
+foo = 42 returns 42
+foo == 42 == 42
+bar == 2
+---
+bar = 99 returns 99
+foo == 42 == 42
+bar == 99
+---
+setting foo via cpointer to 32
+foo == 32 == 32
+bar == 99
