@@ -2,19 +2,13 @@
 :ffi_link_c_files (
   "../vendor/mylib_add.c"
   "../vendor/mylib_sub.c"
-  "../vendor/mylib_magic_number.c"
 )
 
 :module _FFI
   :ffi mylib_add(a I32, b I32) I32
   :ffi mylib_sub(a I32, b I32) I32
-  :ffi global let mylib_magic_number I32
-  :ffi global let mylib_other_magic_number F64
-    :foreign_name mylib_magic_number_2
 
 :actor Main
   :new (env)
     env.out.print("2 + 2 == \(_FFI.mylib_add(2, 2))!")
     env.out.print("4 - 2 == \(_FFI.mylib_sub(4, 2))!")
-    env.out.print("the magic number is \(_FFI.mylib_magic_number)")
-    env.out.print("the other magic number is \(_FFI.mylib_other_magic_number)")

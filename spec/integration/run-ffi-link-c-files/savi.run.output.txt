@@ -1,4 +1,2 @@
 2 + 2 == 4!
 4 - 2 == 2!
-the magic number is 3
-the other magic number is 4.2

@@ -819,7 +819,9 @@ class Savi::Compiler::CodeGen
     return gen_intrinsic(gtype, gfunc, llvm_func) if gfunc.func.has_tag?(:compiler_intrinsic)
 
     if gfunc.func.has_tag?(:ffi)
-      if gfunc.func.has_tag?(:ffi_global_getter)
+      if gfunc.func.has_tag?(:ffi_global_cpointer_getter)
+        return gen_ffi_global_cpointer_getter_impl(gtype, gfunc, llvm_func)
+      elsif gfunc.func.has_tag?(:ffi_global_getter)
         return gen_ffi_global_getter_impl(gtype, gfunc, llvm_func)
       elsif gfunc.func.has_tag?(:ffi_global_setter)
         return gen_ffi_global_setter_impl(gtype, gfunc, llvm_func)
@@ -967,13 +969,42 @@ class Savi::Compiler::CodeGen
   end
 
   def gen_ffi_global_decl(gfunc)
-    llvm_type = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
+    global_name = gfunc.func.metadata[:ffi_link_name].as(String)
 
-    global = @mod.globals.add(llvm_type, gfunc.func.metadata[:ffi_link_name].as(String))
+    # Determine the type of the global variable value.
+    # If this is a cpointer getter we need to unwrap its type arg.
+    t = type_of(gfunc.func.ret.not_nil!, gfunc)
+    if gfunc.func.has_tag?(:ffi_global_cpointer_getter)
+      t = gtype_of(t).type_def.cpointer_type_arg(ctx)
+    end
+    llvm_type = llvm_type_of(t)
+
+    # If the global already exists, check that it has a compatible llvm_type
+    # or give a compilation error, but always return the existing global,
+    # rather than creating another global with an implicitly incremented name.
+    existing = @mod.globals[global_name]?
+    if existing
+      existing_llvm_type = LLVM::Type.new(LibLLVM.global_get_value_type(existing))
+      raise Error.at gfunc.func.ident.pos, "FFI global #{global_name} already exists with a different type" \
+        unless existing_llvm_type.kind == llvm_type.kind \
+          && abi_size_of(existing_llvm_type) == abi_size_of(llvm_type)
+      return existing
+    end
+
+    global = @mod.globals.add(llvm_type, global_name)
     global.linkage = LLVM::Linkage::External
     global.global_constant = gfunc.func.has_tag?(:ffi_global_constant)
     global.externally_initialized = true # TODO: false and set an initializer if this ffi var has an initializer
     global
+  end
+
+  def gen_ffi_global_cpointer_getter_impl(gtype, gfunc, llvm_func)
+    gen_func_start(llvm_func, gtype, gfunc)
+
+    global = gen_ffi_global_decl(gfunc)
+    @builder.ret(global)
+
+    gen_func_end(gfunc)
   end
 
   def gen_ffi_global_getter_impl(gtype, gfunc, llvm_func)
@@ -992,8 +1023,7 @@ class Savi::Compiler::CodeGen
   def gen_ffi_global_setter_impl(gtype, gfunc, llvm_func)
     gen_func_start(llvm_func, gtype, gfunc)
 
-    global = @mod.globals[gfunc.func.metadata[:ffi_link_name]]
-
+    global = gen_ffi_global_decl(gfunc)
     value = llvm_func.params[0]
     @builder.store(value, global)
 

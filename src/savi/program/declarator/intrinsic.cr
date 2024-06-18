@@ -310,36 +310,55 @@ module Savi::Program::Intrinsic
           name = terms["name"].as(AST::Identifier)
           t = terms["type"].as(AST::Term)
 
-          scope.current_function = function = Program::Function.new(
-            AST::Identifier.new("non").from(declare.terms.first),
-            name,
-            nil,
-            t,
-          )
-
-          ffi_link_name = function.ident.value
-          ffi_link_name = ffi_link_name[0...-1] if ffi_link_name.ends_with?("!")
-          function.metadata[:ffi_link_name] = ffi_link_name
-          function.add_tag(:ffi)
-          function.add_tag(:ffi_global_getter)
-          function.add_tag(:inline)
-          function.body = nil
-
-          if terms["var_or_let"].as(AST::Identifier).value == "let"
-            function.add_tag(:ffi_global_constant)
-          else
-            setter_function = Program::Function.new(
+          if terms["var_or_let"].as(AST::Identifier).value == "cpointer"
+            scope.current_function = function = Program::Function.new(
               AST::Identifier.new("non").from(declare.terms.first),
-              AST::Identifier.new("#{name.value}=").from(name),
-              AST::Group.new("(", [t]).from(t),
+              name,
+              nil,
+              AST::Qualify.new(
+                AST::Identifier.new("CPointer").from(t),
+                AST::Group.new("(", [t]).from(t)
+              ).from(t),
+            )
+
+            ffi_link_name = function.ident.value
+            function.metadata[:ffi_link_name] = ffi_link_name
+            function.add_tag(:ffi)
+            function.add_tag(:ffi_global_cpointer_getter)
+            function.add_tag(:inline)
+            function.body = nil
+          else
+            scope.current_function = function = Program::Function.new(
+              AST::Identifier.new("non").from(declare.terms.first),
+              name,
+              nil,
               t,
             )
 
-            setter_function.metadata[:ffi_link_name] = ffi_link_name
-            setter_function.add_tag(:ffi)
-            setter_function.add_tag(:ffi_global_setter)
-            setter_function.add_tag(:inline)
-            setter_function.body = nil
+            ffi_link_name = function.ident.value
+            function.metadata[:ffi_link_name] = ffi_link_name
+            function.add_tag(:ffi)
+            function.add_tag(:ffi_global_getter)
+            function.add_tag(:inline)
+            function.body = nil
+
+            if terms["var_or_let"].as(AST::Identifier).value == "let"
+              function.add_tag(:ffi_global_constant)
+            else
+              setter_function = Program::Function.new(
+                AST::Identifier.new("non").from(declare.terms.first),
+                AST::Identifier.new("#{name.value}=").from(name),
+                AST::Group.new("(", [t]).from(t),
+                t,
+              )
+              scope.current_type.functions << setter_function
+
+              setter_function.metadata[:ffi_link_name] = ffi_link_name
+              setter_function.add_tag(:ffi)
+              setter_function.add_tag(:ffi_global_setter)
+              setter_function.add_tag(:inline)
+              setter_function.body = nil
+            end
           end
         else
           name, params =

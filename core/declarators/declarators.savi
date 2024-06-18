@@ -453,6 +453,10 @@
 :: Use `var` if the global variable is expected to change (either on the Savi
 :: side or on the C side), or `let` if it's expected to be set just once.
 ::
+:: Alternatively, `cpointer` can be specified instead of `var` or `let`,
+:: causing the declaration to generate a getter that returns the address of the
+:: global variable as a `CPointer(T)`, where `T` is the specified `type`.
+::
 :: WARNING: Savi programs involve actors and are implicitly multi-threaded,
 :: so global variables whose values are expected to change during the life
 :: of the program are very likely to cause memory safety issues.
@@ -464,7 +468,7 @@
   :begins ffi
 
   :keyword global
-  :term var_or_let enum (var, let)
+  :term var_or_let enum (var, let, cpointer)
   :term name Name
   :term type Type
 
