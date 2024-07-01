@@ -56,7 +56,6 @@ class Savi::Compiler
     when "macros"           then :macros
     when "sugar"            then :sugar
     when "refer_type"       then :refer_type
-    when "lambda"           then :lambda
     when "flow"             then :flow
     when "refer"            then :refer
     when "classify"         then :classify
@@ -110,7 +109,6 @@ class Savi::Compiler
       when :macros           then ctx.run_copy_on_mutate(Macros)
       when :sugar            then ctx.run_copy_on_mutate(Sugar)
       when :refer_type       then ctx.run(ctx.refer_type)
-      when :lambda           then ctx.run_copy_on_mutate(Lambda)
       when :flow             then ctx.run(ctx.flow)
       when :refer            then ctx.run(ctx.refer)
       when :classify         then ctx.run(ctx.classify)
@@ -155,8 +153,6 @@ class Savi::Compiler
     end
   end
 
-  # TODO: Add invalidation, such that passes like :lambda can invalidate
-  # passes like :classify and :refer instead of marking a dependency.
   def deps_of(target : Symbol) : Array(Symbol)
     case target
     when :format then [] of Symbol # (not a true compiler pass)
@@ -169,17 +165,16 @@ class Savi::Compiler
     when :macros then [:populate]
     when :sugar then [:macros]
     when :refer_type then [:sugar, :macros, :reparse, :namespace, :populate_types]
-    when :lambda then [:sugar, :macros, :reparse]
-    when :flow then [:lambda, :populate, :sugar, :macros, :reparse]
-    when :classify then [:refer_type, :lambda, :populate, :sugar, :macros, :reparse]
-    when :refer then [:classify, :lambda, :populate, :sugar, :macros, :reparse, :refer_type]
+    when :flow then [:populate, :sugar, :macros, :reparse]
+    when :classify then [:refer_type, :populate, :sugar, :macros, :reparse]
+    when :refer then [:classify, :populate, :sugar, :macros, :reparse, :refer_type]
     when :local then [:refer, :flow]
     when :jumps then [:classify]
     when :inventory then [:refer]
     when :type_context then [:flow]
-    when :pre_t_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
-    when :pre_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
-    when :pre_subtyping then [:inventory, :lambda, :populate]
+    when :pre_t_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :populate]
+    when :pre_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :populate]
+    when :pre_subtyping then [:inventory, :populate]
     when :types_graph then [:refer, :classify, :refer_type]
     when :types_edge then [:types_graph]
     when :xtypes_graph then [:refer, :classify, :refer_type]

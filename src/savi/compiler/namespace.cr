@@ -67,13 +67,6 @@ class Savi::Compiler::Namespace
     end
   end
 
-  # TODO: Can this be less hacky? It feels wrong to alter this state later.
-  def add_lambda_type_later(ctx : Context, new_type : Program::Type, package : Program::Package)
-    check_conflicting_functions(ctx, new_type, new_type.make_link(package))
-    add_type_to_package(ctx, new_type, package)
-    add_type_to_accessible_types(new_type, package)
-  end
-
   # When given a package link, return the set of types accessible within it.
   def [](package : Program::Package::Link) : Analysis
     @accessible_types_by_package[package]

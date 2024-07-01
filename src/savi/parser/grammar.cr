@@ -152,7 +152,6 @@ module Savi::Parser
       terms >> sn >>
       pipesep.maybe >> sn
     parens.define(
-      (str("^(") >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
       (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
       (char('[') >> sn >> ptermsp.maybe >> sn >> char(']') >> char('!').maybe).named(:group)
     )
