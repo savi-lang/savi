@@ -577,6 +577,8 @@ module Savi::Compiler::XTypes::Graph
         @analysis[node] = core_savi_type(ctx, "String", NominalCap::VAL)
       when "identity_digest_of"
         @analysis[node] = core_savi_type(ctx, "USize", NominalCap::VAL)
+      when "stack_address_of_variable"
+        @analysis[node] = core_savi_type(ctx, "CPointer", NominalCap::TAG, [@analysis[node.term]])
       when "--"
         ref = refer[node.term].as(Refer::Local)
         @analysis.observe_local_consume(node, ref)
