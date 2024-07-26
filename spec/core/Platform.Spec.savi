@@ -14,6 +14,14 @@
       (if Platform.is_arm (1 | 0)) +
       (if Platform.is_x86 (1 | 0))
 
+  :it "detects FreeBSD, OpenBSD, NetBSD and Dragonfly"
+    if Platform.is_bsd (assert: (
+      Platform.is_freebsd ||
+      Platform.is_openbsd ||
+      Platform.is_netbsd  ||
+      Platform.is_dragonfly
+    ))
+
   :it "returns True for is_posix on POSIX platforms"
     if Platform.is_linux   (assert: Platform.is_posix)
     if Platform.is_bsd     (assert: Platform.is_posix)
