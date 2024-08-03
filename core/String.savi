@@ -9,7 +9,7 @@
   :new iso iso_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
   :new val val_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
   :fun cpointer CPointer(U8): @_ptr
-  :fun hash: @_ptr._hash(@_size)
+  :fun hash: _Unsafe.RapidHash._run(@_ptr, @_size)
   :fun size: @_size
   :fun space: @_space
 

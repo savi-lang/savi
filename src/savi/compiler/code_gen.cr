@@ -1085,8 +1085,6 @@ class Savi::Compiler::CodeGen
         gen_none
       when "_compare"
         gen_call_named("memcmp", [params[0], params[1], params[2]])
-      when "_hash"
-        gen_call_named("ponyint_hash_block", [params[0], params[1]])
       when "is_null"
         @builder.is_null(params[0])
       when "is_not_null"

@@ -1,6 +1,6 @@
 :manifest bin "spec"
   :sources "*.savi"
-  :sources "../../core/_*.savi" // (load private type files for unit testing)
+  :sources "../../core/_Ryu*.savi" // (load some private files for unit testing)
 
   :dependency Spec v0
     :from "github:savi-lang/Spec"

@@ -1,0 +1,153 @@
+:: An implementation of a leading hash function in terms of maximizing speed
+:: without sacrificing too much quality. Note that this is not a cryptographic
+:: hash function, and should not be used as such.
+::
+:: Note that rapidhash is an official successor to wyhash, which is/was a
+:: widely used hash function in many languages/platforms.
+::
+:: To follow the latest research on hash functions, see:
+:: https://github.com/rurban/smhasher
+:module _Unsafe.RapidHash
+  // Default seed.
+  :const _seed USize: U64[0xbdd89aa982704029].usize
+
+  // Default secret.
+  :const _secret_0 USize: U64[0x2d358dccaa6c78a5].usize
+  :const _secret_1 USize: U64[0x8bb84b93962eacc9].usize
+  :const _secret_2 USize: U64[0x4b33a62ed433d4a3].usize
+
+  :const _width USize: U64.byte_width.usize
+
+  :: Read a little-endian USize integer from the given byte pointer.
+  :fun _read_word(ptr CPointer(U8)) USize
+    if USize.byte_width == 8 (
+      _Unsafe.MultiByteAccess._read_native_u64(ptr).native_to_le.usize
+    |
+      _Unsafe.MultiByteAccess._read_native_u32(ptr).native_to_le.usize
+    )
+
+  :: Read a half-USize from the given byte pointer (but return as a USize)
+  :fun _read_half(ptr CPointer(U8)) USize
+    if USize.byte_width == 8 (
+      _Unsafe.MultiByteAccess._read_native_u32(ptr).native_to_le.usize
+    |
+      _Unsafe.MultiByteAccess._read_native_u16(ptr).native_to_le.usize
+    )
+
+  :: Read one, two, or three bytes (without branching) into a USize.
+  :: This is only safe if the pointer is known to point to at least one byte.
+  :: Branching is avoided by the potential of reading some bytes more than once.
+  :fun _read_small(ptr_tag CPointer(U8), count USize) USize
+    ptr = _FFI.Cast(CPointer(U8), CPointer(U8)'box).pointer(ptr_tag)
+    ptr._get_at(0).usize.bit_shl(USize.bit_width - 8)
+      .bit_or(ptr._get_at(count.bit_shr(1)).usize.bit_shl(USize.byte_width * 4))
+      .bit_or(ptr._get_at(count - 1).usize)
+
+  :fun _mix(a USize, b USize) USize
+    pair = a.wide_multiply(b)
+    pair.low.bit_xor(pair.high)
+
+  :fun _run(ptr CPointer(U8), count USize) USize
+    a USize = 0
+    b USize = 0
+    count_word = count.usize
+    twelve_width = @_width * 12
+    six_width = @_width * 6
+    two_width = @_width * 2
+    half_width = @_width / 2
+    seed = @_seed.bit_xor(
+      @_mix(
+        @_seed.bit_xor(@_secret_0)
+        @_secret_1
+      ).bit_xor(count_word)
+    )
+
+    if count <= two_width ( // TODO: "likely" annotation
+      case (
+      | count >= half_width | // TODO: "likely" annotation
+        ptr_last = ptr.offset(count - 4)
+        a = @_read_half(ptr)
+          .bit_shl(USize.bit_width / 2)
+          .bit_or(@_read_half(ptr_last))
+        delta = count.bit_and(@_width * 3)
+          .bit_shr(count.bit_shr((@_width * 3).trailing_zero_bits).u8)
+        b = @_read_half(ptr.offset(delta))
+          .bit_shl(USize.bit_width / 2)
+          .bit_or(@_read_half(ptr_last.offset(0.usize - delta)))
+      | count > 0 | // TODO: "likely" annotation
+        a = @_read_small(ptr, count)
+      )
+    |
+      i = count
+      if i > six_width  ( // TODO: "unlikely" annotation
+        see1 = seed
+        see2 = seed
+        while i >= twelve_width ( // TODO: "likely" annotation
+          seed = @_mix(
+            @_read_word(ptr).bit_xor(@_secret_0)
+            @_read_word(ptr.offset(@_width)).bit_xor(seed)
+          )
+          see1 = @_mix(
+            @_read_word(ptr.offset(@_width * 2)).bit_xor(@_secret_1)
+            @_read_word(ptr.offset(@_width * 3)).bit_xor(see1)
+          )
+          see2 = @_mix(
+            @_read_word(ptr.offset(@_width * 4)).bit_xor(@_secret_2)
+            @_read_word(ptr.offset(@_width * 5)).bit_xor(see2)
+          )
+          seed = @_mix(
+            @_read_word(ptr.offset(@_width * 6)).bit_xor(@_secret_0)
+            @_read_word(ptr.offset(@_width * 7)).bit_xor(seed)
+          )
+          see1 = @_mix(
+            @_read_word(ptr.offset(@_width * 8)).bit_xor(@_secret_1)
+            @_read_word(ptr.offset(@_width * 9)).bit_xor(see1)
+          )
+          see2 = @_mix(
+            @_read_word(ptr.offset(@_width * 10)).bit_xor(@_secret_2)
+            @_read_word(ptr.offset(@_width * 11)).bit_xor(see2)
+          )
+          ptr = ptr.offset(twelve_width), i -= twelve_width
+        )
+        if i >= six_width ( // TODO: "unlikely" annotation
+          seed = @_mix(
+            @_read_word(ptr).bit_xor(@_secret_0)
+            @_read_word(ptr.offset(@_width)).bit_xor(seed)
+          )
+          see1 = @_mix(
+            @_read_word(ptr.offset(@_width * 2)).bit_xor(@_secret_1)
+            @_read_word(ptr.offset(@_width * 3)).bit_xor(see1)
+          )
+          see2 = @_mix(
+            @_read_word(ptr.offset(@_width * 4)).bit_xor(@_secret_2)
+            @_read_word(ptr.offset(@_width * 5)).bit_xor(see2)
+          )
+          ptr = ptr.offset(six_width), i -= six_width
+        )
+        seed = seed.bit_xor(see1.bit_xor(see2))
+      )
+      if i > @_width * 2 (
+        seed = @_mix(
+          @_read_word(ptr).bit_xor(@_secret_2)
+          @_read_word(ptr.offset(@_width)).bit_xor(seed).bit_xor(@_secret_1)
+        )
+        if i > @_width * 4 (
+          seed = @_mix(
+            @_read_word(ptr.offset(@_width * 2)).bit_xor(@_secret_2)
+            @_read_word(ptr.offset(@_width * 3)).bit_xor(seed)
+          )
+        )
+      )
+      a = @_read_word(ptr.offset(i - @_width * 2))
+      b = @_read_word(ptr.offset(i - @_width))
+    )
+    a = a.bit_xor(@_secret_1)
+    b = b.bit_xor(seed)
+    pair = a.wide_multiply(b)
+    a = pair.low
+    b = pair.high
+
+    @_mix(
+      a.bit_xor(@_secret_0).bit_xor(count_word)
+      b.bit_xor(@_secret_1)
+    )
