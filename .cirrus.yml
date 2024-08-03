@@ -93,11 +93,11 @@ task:
           sudo ln -s /tmp/crystal-${CRYSTAL_VERSION}-1/bin/crystal /usr/local/bin/crystal && \
           crystal --version"
         # Set up the SDKROOT path specific to the present XCode version.
-        SDKROOT: /Applications/Xcode_14.2.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+        SDKROOT: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
         MACOSX_DEPLOYMENT_TARGET: "10.11" # set minimum MacOS version
       macos_instance:
-        image: ghcr.io/cirruslabs/macos-ventura-xcode:14.2
+        image: ghcr.io/cirruslabs/macos-runner:sonoma
       # Caching some homebrew directories helps save some of the otherwise huge
       # amount of time that it takes to update brew from the CI base image.
       brew_cache:
@@ -133,11 +133,11 @@ task:
           LIB_EVENT=/tmp/x86_64/lib/libevent.a \
           LIB_PCRE=/tmp/x86_64/lib/libpcre.a"
         # Set up the SDKROOT path specific to the present XCode version.
-        SDKROOT: /Applications/Xcode_14.2.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+        SDKROOT: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
         MACOSX_DEPLOYMENT_TARGET: "10.11" # set minimum MacOS version
       macos_instance:
-        image: ghcr.io/cirruslabs/macos-ventura-xcode:14.2
+        image: ghcr.io/cirruslabs/macos-runner:sonoma
       # Caching some homebrew directories helps save some of the otherwise huge
       # amount of time that it takes to update brew from the CI base image.
       brew_cache:
