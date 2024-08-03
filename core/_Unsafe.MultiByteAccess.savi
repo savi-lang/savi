@@ -1,0 +1,51 @@
+:module _Unsafe.MultiByteAccess
+  :fun _read_native_u16(ptr CPointer(U8)) U16
+    value U16 = 0
+    value_ptr = _FFI.Cast(CPointer(U16), CPointer(U8)'ref)
+      .pointer(stack_address_of_variable value)
+    // (we use memcpy here because it gracefully handles unaligned addresses)
+    _FFI.Cast(CPointer(U8), CPointer(U8)'box).pointer(ptr)
+      ._copy_to(value_ptr, U16.byte_width.usize)
+    value
+
+  :fun _read_native_u32(ptr CPointer(U8)) U32
+    value U32 = 0
+    value_ptr = _FFI.Cast(CPointer(U32), CPointer(U8)'ref)
+      .pointer(stack_address_of_variable value)
+    // (we use memcpy here because it gracefully handles unaligned addresses)
+    _FFI.Cast(CPointer(U8), CPointer(U8)'box).pointer(ptr)
+      ._copy_to(value_ptr, U32.byte_width.usize)
+    value
+
+  :fun _read_native_u64(ptr CPointer(U8)) U64
+    value U64 = 0
+    value_ptr = _FFI.Cast(CPointer(U64), CPointer(U8)'ref)
+      .pointer(stack_address_of_variable value)
+    // (we use memcpy here because it gracefully handles unaligned addresses)
+    _FFI.Cast(CPointer(U8), CPointer(U8)'box).pointer(ptr)
+      ._copy_to(value_ptr, U64.byte_width.usize)
+    value
+
+  :fun _write_native_u16(ptr CPointer(U8), value U16)
+    dest_ptr = _FFI.Cast(CPointer(U8), CPointer(U8)'ref).pointer(ptr)
+    // (we use memcpy here because it gracefully handles unaligned addresses)
+    _FFI.Cast(CPointer(U16), CPointer(U8)'box)
+      .pointer(stack_address_of_variable value)
+      ._copy_to(dest_ptr, U16.byte_width.usize)
+    value
+
+  :fun _write_native_u32(ptr CPointer(U8), value U32)
+    dest_ptr = _FFI.Cast(CPointer(U8), CPointer(U8)'ref).pointer(ptr)
+    // (we use memcpy here because it gracefully handles unaligned addresses)
+    _FFI.Cast(CPointer(U32), CPointer(U8)'box)
+      .pointer(stack_address_of_variable value)
+      ._copy_to(dest_ptr, U32.byte_width.usize)
+    value
+
+  :fun _write_native_u64(ptr CPointer(U8), value U64)
+    dest_ptr = _FFI.Cast(CPointer(U8), CPointer(U8)'ref).pointer(ptr)
+    // (we use memcpy here because it gracefully handles unaligned addresses)
+    _FFI.Cast(CPointer(U64), CPointer(U8)'box)
+      .pointer(stack_address_of_variable value)
+      ._copy_to(dest_ptr, U64.byte_width.usize)
+    value

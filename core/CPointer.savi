@@ -121,19 +121,6 @@
   :: The caller is expected to only do this for in-bounds element counts.
   :fun box _compare(other @'box, count USize) I32: compiler intrinsic
 
-  :: Calculate the hash of the block of memory starting at this pointer's head,
-  :: continuing through the given number of elements in that memory.
-  ::
-  :: On the Pony runtime, this uses the `ponyint_hash_block` function.
-  ::
-  :: Only the direct memory referenced by the pointer is hashed, so similar
-  :: caveats to those documented for the `_compare` method also apply here.
-  :: As such, callers should avoid using this without statically knowing the
-  :: ramifications of what kind of representation the element has in its memory.
-  ::
-  :: The caller is expected to only do this for in-bounds element counts.
-  :fun box _hash(count USize) USize: compiler intrinsic
-
   :: Return True if this is a null pointer (i.e. a zero address).
   :fun tag is_null Bool: compiler intrinsic
 

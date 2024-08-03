@@ -9,7 +9,7 @@
   :new ref from_cpointer(@_ptr, @_size, @_space)
   :new iso iso_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
   :new val val_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
-  :fun hash: @_ptr._hash(@_size)
+  :fun hash: _Unsafe.RapidHash._run(@_ptr, @_size)
   :fun size: @_size
   :fun space: @_space
   :fun cpointer(offset = 0) CPointer(U8)'tag: @_ptr._offset(offset)
@@ -653,32 +653,21 @@
   :: Raises an error if there aren't enough bytes at that offset to fill a U16.
   :fun read_native_u16!(offset USize) U16
     if (offset + U16.byte_width.usize) > @_size error!
-    result U16 = 0
-    result_ptr = _FFI.Cast(CPointer(U16), CPointer(U8)'ref)
-      .pointer(stack_address_of_variable result)
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    @_ptr._offset(offset)._copy_to(result_ptr, U16.byte_width.usize)
-    result
+    _Unsafe.MultiByteAccess._read_native_u16(@_ptr._offset(offset))
 
   :: Write a U16 as bytes starting at the given offset, in native byte order.
   :: Raises an error if there aren't enough bytes at that offset to fit a U16.
   :: Use push_native_u16 instead if writing past the end is needed.
   :fun ref write_native_u16!(offset USize, value U16)
     if (offset + U16.byte_width.usize) > @_size error!
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    _FFI.Cast(CPointer(U16), CPointer(U8)'box)
-      .pointer(stack_address_of_variable value)
-      ._copy_to(@_ptr._offset(offset), U16.byte_width.usize)
+    _Unsafe.MultiByteAccess._write_native_u16(@_ptr._offset(offset), value)
     @
 
   :: Add a U16 as bytes onto the end of the buffer, in native byte order.
   :: Use write_native_u16 instead if overwriting existing data is needed.
   :fun ref push_native_u16(value U16)
     @reserve(@_size + U16.byte_width.usize)
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    _FFI.Cast(CPointer(U16), CPointer(U8)'box)
-      .pointer(stack_address_of_variable value)
-      ._copy_to(@_ptr._offset(@_size), U16.byte_width.usize)
+    _Unsafe.MultiByteAccess._write_native_u16(@_ptr._offset(@_size), value)
     @_size += U16.byte_width.usize
     @
 
@@ -686,32 +675,21 @@
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.
   :fun read_native_u32!(offset USize) U32
     if (offset + U32.byte_width.usize) > @_size error!
-    result U32 = 0
-    result_ptr = _FFI.Cast(CPointer(U32), CPointer(U8)'ref)
-      .pointer(stack_address_of_variable result)
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    @_ptr._offset(offset)._copy_to(result_ptr, U32.byte_width.usize)
-    result
+    _Unsafe.MultiByteAccess._read_native_u32(@_ptr._offset(offset))
 
   :: Write a U32 as bytes starting at the given offset, in native byte order.
   :: Raises an error if there aren't enough bytes at that offset to fit a U32.
   :: Use push_native_u32 instead if writing past the end is needed.
   :fun ref write_native_u32!(offset USize, value U32)
     if (offset + U32.byte_width.usize) > @_size error!
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    _FFI.Cast(CPointer(U32), CPointer(U8)'box)
-      .pointer(stack_address_of_variable value)
-      ._copy_to(@_ptr._offset(offset), U32.byte_width.usize)
+    _Unsafe.MultiByteAccess._write_native_u32(@_ptr._offset(offset), value)
     @
 
   :: Add a U32 as bytes onto the end of the buffer, in native byte order.
   :: Use write_native_u32 instead if overwriting existing data is needed.
   :fun ref push_native_u32(value U32)
     @reserve(@_size + U32.byte_width.usize)
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    _FFI.Cast(CPointer(U32), CPointer(U8)'box)
-      .pointer(stack_address_of_variable value)
-      ._copy_to(@_ptr._offset(@_size), U32.byte_width.usize)
+    _Unsafe.MultiByteAccess._write_native_u32(@_ptr._offset(@_size), value)
     @_size += U32.byte_width.usize
     @
 
@@ -719,32 +697,21 @@
   :: Raises an error if there aren't enough bytes at that offset to fill a U64.
   :fun read_native_u64!(offset USize) U64
     if (offset + U64.byte_width.usize) > @_size error!
-    result U64 = 0
-    result_ptr = _FFI.Cast(CPointer(U64), CPointer(U8)'ref)
-      .pointer(stack_address_of_variable result)
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    @_ptr._offset(offset)._copy_to(result_ptr, U64.byte_width.usize)
-    result
+    _Unsafe.MultiByteAccess._read_native_u64(@_ptr._offset(offset))
 
   :: Write a U64 as bytes starting at the given offset, in native byte order.
   :: Raises an error if there aren't enough bytes at that offset to fit a U64.
   :: Use push_native_u64 instead if writing past the end is needed.
   :fun ref write_native_u64!(offset USize, value U64)
     if (offset + U64.byte_width.usize) > @_size error!
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    _FFI.Cast(CPointer(U64), CPointer(U8)'box)
-      .pointer(stack_address_of_variable value)
-      ._copy_to(@_ptr._offset(offset), U64.byte_width.usize)
+    _Unsafe.MultiByteAccess._write_native_u64(@_ptr._offset(offset), value)
     @
 
   :: Add a U64 as bytes onto the end of the buffer, in native byte order.
   :: Use write_native_u64 instead if overwriting existing data is needed.
   :fun ref push_native_u64(value U64)
     @reserve(@_size + U64.byte_width.usize)
-    // (we use memcpy here because it gracefully handles unaligned addresses)
-    _FFI.Cast(CPointer(U64), CPointer(U8)'box)
-      .pointer(stack_address_of_variable value)
-      ._copy_to(@_ptr._offset(@_size), U64.byte_width.usize)
+    _Unsafe.MultiByteAccess._write_native_u64(@_ptr._offset(@_size), value)
     @_size += U64.byte_width.usize
     @
 

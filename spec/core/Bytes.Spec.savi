@@ -210,7 +210,64 @@
     assert: b"bar food foo".includes(b"").is_false
 
   :it "hashes the bytes of the buffer"
-    assert: (b"string".hash == 0x4cf51f4a5b5cf110)
+    // TODO: separate tests for 32-bit platforms
+    assert: b"".hash == 0x5a6ef77074ebc84b
+    assert: b"a".hash == 0xc11328477bc0f5d1
+    assert: b"ab".hash == 0x5644ac035e40d569
+    assert: b"abc".hash == 0x0347080fbf5fcd81
+    assert: b"abcd".hash == 0x056b66b8dc802bcc
+    assert: b"abcde".hash == 0xa069c8fd63a91f4d
+    assert: b"abcdef".hash == 0xbeefdee945780801
+    assert: b"abcdefg".hash == 0xe69105bd8738bf8b
+    assert: b"abcdefgh".hash == 0xb6bf9055973aac7c
+    assert: b"abcdefghi".hash == 0x902378a90af0d84c
+    assert: b"abcdefghij".hash == 0xfc9c0d0d762a2620
+    assert: b"abcdefghijk".hash == 0x11282593170377f7
+    assert: b"abcdefghijkl".hash == 0x5838d192cb38726f
+    assert: b"abcdefghijklm".hash == 0xf21a597f01196756
+    assert: b"abcdefghijklmn".hash == 0x6fbbd4bf88ffa42f
+    assert: b"abcdefghijklmno".hash == 0x21b686e60a01d3cf
+    assert: b"abcdefghijklmnop".hash == 0xb9840dda738aa078
+    assert: b"abcdefghijklmnopq".hash == 0x382023e454ce0f17
+    assert: b"abcdefghijklmnopqr".hash == 0xb9a30464d3a84eea
+    assert: b"abcdefghijklmnopqrs".hash == 0x67e3d76421289602
+    assert: b"abcdefghijklmnopqrstuvwxyz".hash == 0xd923d48cb07e0dff
+    assert: b"abcdefghijklmnopqrstuvwxyz123456".hash == 0xf0313df4c45d2356
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567".hash == 0x318142938d302ca7
+    assert: b"abcdefghijklmnopqrstuvwxyz12345678".hash == 0xc252e12245234d53
+    assert: b"abcdefghijklmnopqrstuvwxyz123456789".hash == 0x67b87093be2c643a
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890".hash == 0xd08871fe67966b9c
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJK".hash == 0x1e869b7a9afa4380
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKL".hash == 0x3148b1484f8b67f2
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLM".hash == 0x49c301d536254663
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMN".hash == 0xf98dad6467aa9e59
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNO".hash == 0x6352087a94e85ca3
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ".hash == 0x92c520d7bb0dd005
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~".hash == 0x3e9cc8a6eb110aad
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!".hash == 0x664e401443fa34ec
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@".hash == 0xcdc385ef7bd81768
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#".hash == 0xcc161e1b3e08cf38
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?12345".hash == 0xf18118a7f80edff2
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?123456".hash == 0xb8f457fb4ac286be
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567".hash == 0x6d0219d3b753429b
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?12345678".hash == 0x1634233e81d92880
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?123456789".hash == 0x525edfc527066bfe
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG".hash == 0x750d408a38757d76
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGH".hash == 0x1c2bc74026bb4958
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHI".hash == 0xa14567c14f4be1d1
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJ".hash == 0xde4bacbd8259d7cd
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?".hash == 0x9f111429a3962a45
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1".hash == 0x692ea9f400b93866
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?12".hash == 0xc4fa4248bbe8a596
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?123".hash == 0x5ef404e32a583530
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234".hash == 0x7aac74791ad8ffef
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?12345".hash == 0x14a019e4c3504be2
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?123456".hash == 0xd28ff4b8190e9ea1
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABC".hash == 0x46a67d7d761bcad3
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCD".hash == 0x3d5638a13d12c777
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDE".hash == 0xc5a0044838e12f99
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEF".hash == 0xb0b208ca9308b584
+    assert: b"abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}|;':,./<>?1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG".hash == 0xc5910f257439a31e
 
   :it "returns the byte at the given byte offset"
     assert: b"example"[3]! == 'm'

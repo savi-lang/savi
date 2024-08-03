@@ -236,13 +236,6 @@ class Savi::Compiler::CodeGen::PonyRT
       {"ponyint_next_pow2", [@isize], @isize, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadNone,
       ]},
-      {"ponyint_hash_block", [@ptr, @isize], @isize, [
-        LLVM::Attribute::NoRecurse, LLVM::Attribute::NoUnwind,
-        LLVM::Attribute::ReadOnly,
-        {1, LLVM::Attribute::ReadOnly},
-      ]},
-
-      # TODO: ponyint_personality_v0
 
       # Miscellaneous non-pony functions we depend on.
       {"puts", [@ptr], @i32, [] of LLVM::Attribute},
