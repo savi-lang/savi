@@ -918,33 +918,43 @@ class Savi::Compiler::CodeGen
     param_count = llvm_func.params.size
     args = param_count.times.map { |i| llvm_func.params[i] }.to_a
 
-    value = gen_ffi_call(gfunc, args)
+    value = gen_ffi_call(gfunc, args, llvm_func.function_type.return_type)
 
     gen_return_value(value, nil)
 
     gen_func_end(gfunc)
   end
 
-  def gen_ffi_call(gfunc, args)
+  def gen_ffi_call(gfunc, args, cast_to_ret_type)
     llvm_ffi_func = gen_ffi_decl(gfunc)
+    function_type = llvm_ffi_func.function_type
+
+    # Cast arguments to their corresponding parameter types (if necessary).
+    cast_args = args.map_with_index { |arg, index|
+      if index < function_type.params_types.size
+        arg = gen_force_cast(arg, function_type.params_types[index])
+      end
+      arg
+    }
 
     # Now call the FFI function, according to its convention.
     case gfunc.calling_convention
     when GenFunc::Simple
       value = @builder.call(
-        llvm_ffi_func.function_type,
+        function_type,
         llvm_ffi_func,
-        args,
+        cast_args,
       )
       value = gen_none if llvm_ffi_func.ret_type == @void
-      value
+      value = gen_force_cast(value, cast_to_ret_type)
+
     when GenFunc::Errorable
       then_block = gen_block("invoke_then")
       else_block = gen_block("invoke_else")
       value = @builder.invoke(
-        llvm_ffi_func.function_type,
+        function_type,
         llvm_ffi_func,
-        args,
+        cast_args,
         then_block,
         else_block,
       )
@@ -2197,7 +2207,7 @@ class Savi::Compiler::CodeGen
       while args.size > cast_args.size
         cast_args << args[cast_args.size]
       end
-      return gen_ffi_call(is_ffi_gfunc, cast_args)
+      return gen_ffi_call(is_ffi_gfunc, cast_args, llvm_type_of(signature.ret))
     end
 
     @builder.call(llvm_func_type, func, cast_args)
@@ -4050,6 +4060,17 @@ class Savi::Compiler::CodeGen
       func_frame.llvm_func.params[yield_in_param_index]
     else
       gfunc.continuation_info.yield_in_llvm_type.undef
+    end
+  end
+
+  def gen_force_cast(value : LLVM::Value, to_type : LLVM::Type)
+    if value.type == to_type
+      value
+    elsif value.type.kind == LLVM::Type::Kind::Struct \
+    || to_type.kind == LLVM::Type::Kind::Struct
+      gen_struct_bit_cast(value, to_type)
+    else
+      @builder.bit_cast(value, to_type)
     end
   end
 
