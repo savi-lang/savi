@@ -70,6 +70,11 @@ class Savi::Compiler::Binary
     # Use no_pie where available, for performance reasons.
     link_args << "-no_pie" unless target.arm64?
 
+    # Set up explicitly requested library paths.
+    each_explicit_lib_path(ctx) { |lib_path|
+      link_args << "-L#{lib_path}"
+    }
+
     # Set up the main library paths.
     each_sysroot_lib_path(ctx, target) { |lib_path|
       link_args << "-L#{lib_path}"
@@ -100,10 +105,16 @@ class Savi::Compiler::Binary
 
   # Link a EXE executable for a Windows target.
   def link_for_windows(ctx, target, obj_path, bin_path)
+    lib_paths = [] of String
     link_args = %w{lld-link -nologo -defaultlib:libcmt -defaultlib:oldnames}
 
+    # Set up explicitly requested library paths.
+    each_explicit_lib_path(ctx) { |lib_path|
+      lib_paths << lib_path
+      link_args << "-libpath:#{lib_path}"
+    }
+
     # Set up the main library paths.
-    lib_paths = [] of String
     each_sysroot_lib_path(ctx, target) { |lib_path|
       lib_paths << lib_path
       link_args << "-libpath:#{lib_path}"
@@ -160,6 +171,11 @@ class Savi::Compiler::Binary
 
     # Specify the dynamic linker library, based on the target platform.
     link_args << "-dynamic-linker" << dynamic_linker_for_linux_or_bsd(target)
+
+    # Set up explicitly requested library paths.
+    each_explicit_lib_path(ctx) { |lib_path|
+      link_args << "-L#{lib_path}"
+    }
 
     # Get the list of lib search paths within the sysroot.
     lib_paths = [] of String
@@ -233,6 +249,12 @@ class Savi::Compiler::Binary
     end
 
     raise NotImplementedError.new(target.inspect)
+  end
+
+  def each_explicit_lib_path(ctx)
+    if ENV["LIBRARY_PATH"]? && !ENV["LIBRARY_PATH"].empty?
+      ENV["LIBRARY_PATH"].split(":").each { |l| yield l }
+    end
   end
 
   # Yield each sysroot-based path in which to search for linkable libs/objs.
