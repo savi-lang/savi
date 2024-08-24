@@ -19,6 +19,8 @@ class Savi::Program::Declarator::Scope
   setter current_declarator : Declarator?
   getter! current_declarator_term : Declarator::TermAcceptor
   setter current_declarator_term : Declarator::TermAcceptor?
+  getter! current_ffi_link_lib : String
+  setter current_ffi_link_lib : String?
   getter! current_type : Type
   setter current_type : Type?
   getter! current_function : Function

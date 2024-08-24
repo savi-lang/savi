@@ -356,16 +356,6 @@
     :optional
   :body optional
 
-:: Declare a link-time dependency on a particular dynamic library, by name.
-::
-:: This influences the linker arguments that the Savi compiler will use in the
-:: linker invocation when building the binary executable for the program.
-::
-:: For example, declaring `:ffi_link_lib foo` will pass `-lfoo` to the linker.
-:declarator ffi_link_lib
-  :intrinsic
-  :term name Name
-
 :: Declare a link-time dependency on some files written in C code,
 :: which will be compiled and statically linked in the Savi program.
 ::
@@ -388,6 +378,29 @@
 :declarator ffi_link_cpp_files
   :intrinsic
   :term filenames NameList
+
+:: Declare a link-time dependency on a particular dynamic library, by name.
+::
+:: This influences the linker arguments that the Savi compiler will use in the
+:: linker invocation when building the binary executable for the program.
+::
+:: For example, declaring `:ffi_link_lib foo` will pass `-lfoo` to the linker.
+:declarator ffi_link_lib
+  :intrinsic
+  :term name Name
+  :begins ffi_link_lib
+
+:: Declare that the compiler should prefer to link the above library statically.
+::
+:: This influences the linker arguments that the Savi compiler will use in the
+:: linker invocation when building the binary executable for the program.
+::
+:: If a static version of the library is found, it will be used.
+:: Otherwise, the compiler will fall back to specifying dynamic linking for it.
+:declarator prefer
+  :intrinsic
+  :context ffi_link_lib
+  :term static enum (static)
 
 :: Declare a binding to an unsafe foreign function (FFI), such as a C function.
 ::

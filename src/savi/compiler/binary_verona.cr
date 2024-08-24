@@ -39,7 +39,7 @@ class Savi::Compiler::BinaryVerona
       -lc -pthread -ldl -latomic
     }
 
-    ctx.link_libraries.each do |x|
+    ctx.link_libraries.each do |x, kind|
       link_args << "-l" + x
     end
 

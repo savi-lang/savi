@@ -94,8 +94,9 @@ module Savi::Program::Intrinsic
           raise NotImplementedError.new(declarator.name.value)
         end
       when "ffi_link_lib"
-        name = terms["name"].as(AST::Identifier)
-        ctx.link_libraries.add(name.value)
+        name = terms["name"].as(AST::Identifier).value
+        ctx.link_libraries[name] = :dynamic
+        scope.current_ffi_link_lib = name
       when "ffi_link_c_files", "ffi_link_cpp_files"
         terms["filenames"].as(AST::Group).terms.each { |term|
           c_file_path =
@@ -114,6 +115,17 @@ module Savi::Program::Intrinsic
             nil
           end
         }
+      else
+        raise NotImplementedError.new(declarator.pretty_inspect)
+      end
+
+    # Declarations within an ffi_link_lib declaration.
+    when "ffi_link_lib"
+      case declarator.name.value
+      when "prefer"
+        if terms["static"]?
+          ctx.link_libraries[scope.current_ffi_link_lib] = :prefer_static
+        end
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end
