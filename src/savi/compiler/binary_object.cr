@@ -128,7 +128,9 @@ class Savi::Compiler::BinaryObject
     # so we can mark for linking those libraries that are associated to
     # specific functions that come from those libraries.
     ctx.link_libraries_by_foreign_function.each { |ffi_name, lib_name|
-      ctx.link_libraries.add(lib_name) if mod.functions[ffi_name]?
+      next unless mod.functions[ffi_name]?
+      next if ctx.link_libraries[lib_name]?
+      ctx.link_libraries[lib_name] = :dynamic
     }
 
     # Strip debug info from the module if requested.

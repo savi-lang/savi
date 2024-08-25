@@ -62,6 +62,7 @@ class Savi::Compiler::Binary
 
   # Link a MachO executable for a MacOSX target.
   def link_for_macosx(ctx, target, obj_path, bin_path)
+    lib_paths = [] of String
     link_args = %w{ld64.lld -execute}
 
     # Specify the target architecture.
@@ -72,11 +73,13 @@ class Savi::Compiler::Binary
 
     # Set up explicitly requested library paths.
     each_explicit_lib_path(ctx) { |lib_path|
+      lib_paths << lib_path
       link_args << "-L#{lib_path}"
     }
 
     # Set up the main library paths.
     each_sysroot_lib_path(ctx, target) { |lib_path|
+      lib_paths << lib_path
       link_args << "-L#{lib_path}"
     }
 
@@ -93,7 +96,7 @@ class Savi::Compiler::Binary
     link_args << "-lc++" if ctx.link_cpp_files.any?
 
     # Link any additional libraries indicated by user code.
-    ctx.link_libraries.each { |name| link_args << "-l#{name}" }
+    ctx.link_libraries.each { |name, kind| add_unix_lib(link_args, lib_paths, name, kind) }
 
     # Finally, specify the input object file and the output filename.
     link_args << obj_path
@@ -126,7 +129,7 @@ class Savi::Compiler::Binary
     add_windows_lib(link_args, lib_paths, "WS2_32")  # used by runtime lang/socket.c
 
     # Link any additional libraries indicated by user code.
-    ctx.link_libraries.each { |name| add_windows_lib(link_args, lib_paths, name) }
+    ctx.link_libraries.each { |name, kind| add_windows_lib(link_args, lib_paths, name) }
 
     # Finally, specify the input object file and the output filename.
     link_args << obj_path
@@ -134,20 +137,6 @@ class Savi::Compiler::Binary
 
     # Invoke the linker, using the COFF flavor.
     invoke_linker("coff", link_args)
-  end
-
-  private def add_windows_lib(link_args, lib_paths, name)
-    if lib_paths.any? { |lib_path|
-      File.exists?(File.join(lib_path, "#{name}.Lib"))
-    }
-      link_args << "-defaultlib:#{name}.Lib"
-    elsif lib_paths.any? { |lib_path|
-      File.exists?(File.join(lib_path, "#{name}.lib"))
-    }
-      link_args << "-defaultlib:#{name}.lib"
-    else
-      link_args << "-defaultlib:#{name.downcase}.lib"
-    end
   end
 
   # Link an ELF executable for a Linux or FreeBSD target.
@@ -172,13 +161,9 @@ class Savi::Compiler::Binary
     # Specify the dynamic linker library, based on the target platform.
     link_args << "-dynamic-linker" << dynamic_linker_for_linux_or_bsd(target)
 
-    # Set up explicitly requested library paths.
-    each_explicit_lib_path(ctx) { |lib_path|
-      link_args << "-L#{lib_path}"
-    }
-
-    # Get the list of lib search paths within the sysroot.
+    # Get the list of lib search paths.
     lib_paths = [] of String
+    each_explicit_lib_path(ctx) { |lib_path| lib_paths << lib_path }
     each_sysroot_lib_path(ctx, target) { |path| lib_paths << path }
     lib_paths.each { |lib_path| link_args << "-L#{lib_path}" }
 
@@ -214,7 +199,7 @@ class Savi::Compiler::Binary
     end
 
     # Link any additional libraries indicated by user code.
-    ctx.link_libraries.each { |name| link_args << "-l#{name}" }
+    ctx.link_libraries.each { |name, kind| add_unix_lib(link_args, lib_paths, name, kind) }
 
     # Finally, specify the input object file and the output filename.
     link_args << obj_path
@@ -222,6 +207,32 @@ class Savi::Compiler::Binary
 
     # Invoke the linker, using the ELF flavor.
     invoke_linker("elf", link_args)
+  end
+
+  private def add_unix_lib(link_args, lib_paths, name, kind)
+    if kind == :prefer_static
+      found_lib = maybe_find_in_paths(lib_paths, "lib#{name}.a")
+      if found_lib
+        link_args << found_lib
+        return
+      end
+    end
+
+    link_args << "-l#{name}"
+  end
+
+  private def add_windows_lib(link_args, lib_paths, name)
+    if lib_paths.any? { |lib_path|
+      File.exists?(File.join(lib_path, "#{name}.Lib"))
+    }
+      link_args << "-defaultlib:#{name}.Lib"
+    elsif lib_paths.any? { |lib_path|
+      File.exists?(File.join(lib_path, "#{name}.lib"))
+    }
+      link_args << "-defaultlib:#{name}.lib"
+    else
+      link_args << "-defaultlib:#{name.downcase}.lib"
+    end
   end
 
   # Get the path to the dynamic linker library for a Linux or FreeBSD target.
@@ -363,12 +374,16 @@ class Savi::Compiler::Binary
   # Given a prioritized list of search paths and a file name, find the file.
   # Raises an error if the file couldn't be found in any of the paths
   def find_in_paths(paths, file_name) : String
+    result = maybe_find_in_paths(paths, file_name)
+    raise "failed to find #{file_name}" if !result
+    result
+  end
+  def maybe_find_in_paths(paths, file_name) : String?
     paths.each { |path|
       file_path = File.join(path, file_name)
       return file_path if File.exists?(file_path)
     }
-
-    raise "failed to find #{file_name}"
+    nil
   end
 
   def invoke_linker(flavor, link_args)
