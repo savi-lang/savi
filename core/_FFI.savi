@@ -3,6 +3,7 @@
   :ffi strlen(string CPointer(U8)) USize
   :ffi memset(pointer CPointer(U8), char I32, count USize) None
   :ffi variadic snprintf(buffer CPointer(U8), buffer_size I32, fmt CPointer(U8)) I32
+  :ffi strtod(start_pointer CPointer(U8), end_pointer CPointer(CPointer(U8))) F64
 
   :ffi pony_exitcode(code I32) None
   :ffi pony_os_stdout_setup() None

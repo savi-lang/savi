@@ -485,7 +485,7 @@
     )
     result
 
-  :fun parse_i64! // TODO: Use something like Crystal's Char::Reader instead?
+  :fun parse_i64! I64 // TODO: Use something like Crystal's Char::Reader instead?
     output I64 = 0
     possible_negation I64 = 1
     @each_byte_with_index -> (byte, index |
@@ -497,6 +497,15 @@
       )
     )
     output * possible_negation
+
+  :fun parse_f64! F64 // TODO: Use something like Crystal's Char::Reader instead?
+    // TODO: Avoid FFI and use a pure Savi `strtod` implementation.
+    start_pointer = @cstring
+    end_pointer = CPointer(U8).null
+    value = _FFI.strtod(start_pointer, stack_address_of_variable end_pointer)
+    error! if value == 0 && end_pointer.address == start_pointer.address
+    error! if end_pointer.address != start_pointer.address + @size
+    value
 
   :fun substring(from USize, to USize = 0) String'iso
     if to == 0 || to > @_size (
