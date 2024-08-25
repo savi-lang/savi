@@ -306,6 +306,10 @@
     assert: "-36".parse_i64! == -36
     assert error: "36bad".parse_i64!
 
+  :it "parses a floating point from the string decimal representation"
+    assert: "36.3".parse_f64!  == 36.3
+    assert error: "36.3bad".parse_f64!
+
   :it "returns the unicode codepoint found at the given offset, if valid"
     string = "नमस्ते"
     assert: string.char_at!(0) == 'न' // valid
