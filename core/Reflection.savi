@@ -13,6 +13,10 @@
 
   :let features Array(ReflectionFeatureOfType(A)): []
 
+  :is IntoString
+  :fun into_string_space USize: @string.size
+  :fun into_string(out String'ref) None: @string.into_string(out)
+
 :class val ReflectionFeatureOfType(A)
   :let name String: ""
   :let tags Array(String): []
