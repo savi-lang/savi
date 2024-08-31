@@ -31,30 +31,6 @@
       yield value
     )
 
-  :: DEPRECATED: Use `break` to exit early from `each` if needed.
-  :fun each_until(
-    from USize = 0
-    to = USize.max_value
-    stride USize = 1
-  )
-    :yields for Bool // TODO: this type hint shouldn't be needed
-    @each(from, to, stride) -> (value |
-      return True if (yield value)
-    )
-    False
-
-  :: DEPRECATED: Use `break` to exit early from `each_with_index` if needed.
-  :fun each_with_index_until(
-    from USize = 0
-    to = USize.max_value
-    stride USize = 1
-  )
-    :yields for Bool // TODO: this type hint shouldn't be needed
-    @each_with_index(from, to, stride) -> (value, index |
-      return True if (yield (value, index))
-    )
-    False
-
   :fun has_any(
     from USize = 0
     to = USize.max_value
