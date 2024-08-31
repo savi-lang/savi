@@ -205,11 +205,17 @@ class Savi::Compiler::Populate
         visitor = self
         params = f.params.try(&.accept(ctx, visitor))
         ret = f.ret.try(&.accept(ctx, visitor))
+        error_out = f.error_out.try(&.accept(ctx, visitor))
+        yield_out = f.yield_out.try(&.accept(ctx, visitor))
+        yield_in = f.yield_in.try(&.accept(ctx, visitor))
         body = f.body.try(&.accept(ctx, visitor))
 
         f = f.dup
         f.params = params
         f.ret = ret
+        f.error_out = error_out
+        f.yield_out = yield_out
+        f.yield_in = yield_in
         f.body = body
         f
       }
