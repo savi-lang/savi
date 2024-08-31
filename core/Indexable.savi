@@ -1,4 +1,6 @@
+:: An collection of elements of type A that can be accessed via numeric index.
 :trait box Indexable(A)
+  :fun size USize
   :fun "[]!"(index USize) (@->A)'aliased
 
   //--
@@ -9,6 +11,16 @@
     stride USize = 1
   ) None
     :yields ((@->A)'aliased, USize)
+    index = from
+    to = to.at_most(@size)
+    stride = stride.at_least(1)
+    while index < to (
+      try (
+        value = @[index]!
+        yield (--value, index)
+      )
+      index = try (index +! stride | return)
+    )
 
   :fun each(
     from USize = 0
@@ -95,6 +107,15 @@
     stride USize = 1
   ) None
     :yields ((@->A)'aliased, USize)
+    index = from.at_most(try (@size -! 1 | return))
+    stride = stride.at_least(1)
+    while index >= to (
+      try (
+        value = @[index]!
+        yield (--value, index)
+      )
+      index = try (index -! stride | return)
+    )
 
   :fun reverse_each(
     from = USize.max_value
@@ -124,6 +145,18 @@
     :yields for Bool // TODO: this type hint shouldn't be needed
     @reverse_each_with_index(from, to, stride) -> (value, index |
       return index if (yield value)
+    )
+    error!
+
+  //--
+
+  :fun first! @->(A'aliased)
+    @[0]!
+
+  :fun last! @->(A'aliased)
+    @reverse_each_with_index -> (value, index |
+      return value
+      None // TODO: this should not be needed
     )
     error!
 
