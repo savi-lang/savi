@@ -315,6 +315,74 @@
       )
     )
 
+  :is TraceData.Mutable
+  :fun ref trace_data_mutable(trace TraceData.Mutator)
+    trace.array_truncate(identity_digest_of @, @size) -> (s | @truncate(s))
+    trace.array(identity_digest_of @, @size) -> (i |
+      case (
+      | i < @size |
+        // If it's within the existing bounds of the array, allow the mutator
+        // the option to replace the current value at that index.
+        case A <: (
+        | Bool | trace.replace_bool(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | U64 | trace.replace_u64(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | U32 | trace.replace_u32(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | U16 | trace.replace_u16(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | U8 | trace.replace_u8(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | I64 | trace.replace_i64(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | I32 | trace.replace_i32(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | I16 | trace.replace_i16(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | I8 | trace.replace_i8(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | F64 | trace.replace_f64(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | F32 | trace.replace_f32(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | String'val | trace.replace_string(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | Bytes'val | trace.replace_bytes(@_ptr._get_at(i)) -> (v | @_ptr._assign_at(i, v))
+        | String'box | trace.set_string -> (v | @_ptr._assign_at(i, v.clone))
+        | Bytes'box | trace.set_bytes -> (v | @_ptr._assign_at(i, v.clone))
+        | TraceData.Mutable | @_ptr._get_at(i).trace_data_mutable(trace)
+        | trace.array_index_cannot_be_modified
+        )
+      | i == @size |
+        // If it's just one element beyond the bounds of the array, allow the
+        // mutator the option to set a new value to push onto the end.
+        case A <: (
+        | None | trace.set_none -> (v | @ << None)
+        | Bool | trace.set_bool -> (v | @ << Bool[v])
+        | U64 | trace.set_u64 -> (v | @ << U64[v])
+        | U32 | trace.set_u32 -> (v | @ << U32[v])
+        | U16 | trace.set_u16 -> (v | @ << U16[v])
+        | U8 | trace.set_u8 -> (v | @ << U8[v])
+        | I64 | trace.set_i64 -> (v | @ << I64[v])
+        | I32 | trace.set_i32 -> (v | @ << I32[v])
+        | I16 | trace.set_i16 -> (v | @ << I16[v])
+        | I8 | trace.set_i8 -> (v | @ << I8[v])
+        | F64 | trace.set_f64 -> (v | @ << F64[v])
+        | F32 | trace.set_f32 -> (v | @ << F32[v])
+        | String'val | trace.set_string -> (v | @ << v)
+        | Bytes'val | trace.set_bytes -> (v | @ << v)
+        | String'box | trace.set_string -> (v | @ << v.clone)
+        | Bytes'box | trace.set_bytes -> (v | @ << v.clone)
+        | TraceData.Mutable |
+          if A <: _EmptyConstructableRef (
+            // If the element is constructable with no arguments, that's the
+            // only case where we can make a new one and push it onto the array.
+            new = A.new
+            @ << new
+            new.trace_data_mutable(trace)
+          |
+            // Otherwise we can't mutate there.
+            trace.array_index_is_invalid
+          )
+        |
+          // If it's not an element type we can support, report that.
+          trace.array_index_cannot_be_modified
+        )
+      |
+        // If it's well beyond the bounds of the array, we can't mutate there.
+        trace.array_index_is_invalid
+      )
+    )
+
   :: Return a copy of the array that has its elements sorted by value.
   :: If the element type is not aliasable, or not Comparable, it will be empty.
 
