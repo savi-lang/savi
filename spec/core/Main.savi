@@ -30,5 +30,6 @@
       Spec.Run(Savi.Platform.Spec).new(env)
       Spec.Run(Savi.String.Spec).new(env)
       Spec.Run(Savi.String.DecodeUTF8.Spec).new(env)
+      Spec.Run(Savi.TraceData.Mutable.Spec).new(env)
       Spec.Run(Savi.U64.BCD.Spec).new(env)
     ])

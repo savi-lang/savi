@@ -1,4 +1,4 @@
-:: A trait that defines a standard way to data structures inside of an object.
+:: A trait that defines a standard way to trace data inside of an object.
 ::
 :: Implementing this trait makes it easy to integrate with various observers,
 :: such as those that print data, measure data, or serialize to various formats.
@@ -134,3 +134,289 @@
 
   :: Trace a primitive sequence of arbitrary bytes (i.e. `Bytes`).
   :fun ref primitive_bytes(value Bytes'box) None
+
+:: A trait that defines a standard way to mutate data inside of an object.
+::
+:: Implementing this trait makes it easy to integrate with various mutators,
+:: such as those that populate config data or deserialize from various formats.
+:trait ref TraceData.Mutable
+  :fun ref trace_data_mutable(trace TraceData.Mutator) None
+
+:: A trait that defines a standard for mutating a data structure being traced.
+:: The data structure being traced is one that implements `TraceData.Mutable`.
+::
+:: The mutator is itself mutable, as it will need to track state during tracing.
+::
+:: The mutator must implement all of the relevant methods, even if some of
+:: them are not meaningful to the purpose of the mutator, or happen to be
+:: redundant with each other insofar as the particular mutator is concerned.
+:trait ref TraceData.Mutator
+  :: Trace an object - a data structure that may have some named properties.
+  ::
+  :: The call yields for each key that the observer desires to mutate,
+  :: expecting that the yield block will respond appropriately with
+  :: additional relevant mutation tracing call for that key. For example,
+  :: if the key points to a string field, calling either `replace_string`
+  :: (if an existing value is known) or `set_string` (if no value is yet known),
+  :: each of which would possibly produce a new string to assign.
+  ::
+  :: Do not interrupt the yield block, lest the mutator be left in an
+  :: inconsistent state due to not getting to finish tracing the object.
+  ::
+  :: An id must be supplied as the argument for the purpose of breaking infinite
+  :: recursion - the mutator is expected to observe the id and refuse to yield
+  :: for an id that has already been seen by it in the current "stack".
+  :: Most classes should use `identity_digest_of @` as the recursion id.
+  :: Where recursion is not possible (such as for a struct), use zero as the id.
+  :: The mutator is expected to treat zero as a special case, indicating that
+  :: recursion should always be allowed without checking if it has been seen.
+  :fun ref object(recurse_id USize) None
+    :yields String for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+
+  :: Indicate that the currently requested object key is not a valid key
+  :: reachable in the current object (for example, no field has that name).
+  ::
+  :: This should only be called within the yield block of an `object` call,
+  :: as it refers to the key yielded by the mutator to that block.
+  :fun ref object_key_is_invalid None
+
+  :: Indicate that the currently requested object key is not of a traceable
+  :: mutable type or a replaceable type.
+  ::
+  :: This should only be called within the yield block of an `object` call,
+  :: as it refers to the key yielded by the mutator to that block.
+  :fun ref object_key_cannot_be_modified None
+
+  :: Trace an array-like sequence which may contain some elements.
+  ::
+  :: The call yields for each array index that the observer desires to mutate,
+  :: expecting that the yield block will respond appropriately with
+  :: additional relevant mutation tracing call for that index. For example,
+  :: if the index points to a string element, calling either `replace_string`
+  :: (if an existing value is known) or `set_string` (if no value is yet known),
+  :: each of which would possibly produce a new string to assign.
+  ::
+  :: Do not interrupt the yield block, lest the observer be left in an
+  :: inconsistent state due to not getting to finish tracing the array.
+  ::
+  :: An id must be supplied as the argument for the purpose of breaking infinite
+  :: recursion - the observer is expected to observe the id and refuse to yield
+  :: for an id that has already been seen by it in the current "stack".
+  :: Most classes should use `identity_digest_of @` as the recursion id.
+  :: Where recursion is not possible (such as for a struct), use zero as the id.
+  :: The observer is expected to treat zero as a special case, indicating that
+  :: recursion should always be allowed without checking if it has been seen.
+  :fun ref array(recurse_id USize, size USize) None
+    :yields USize for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+
+  :: Allow the mutator the option to truncate the size of the array to a
+  :: smaller size, if it yields a new size to the yield block.
+  :: Truncate the array to the new size if the mutator yields one.
+  ::
+  :: This should be called before the `array` call, such that the mutator
+  :: can choose to truncate first before writing its desired elements.
+  :fun ref array_truncate(recurse_id USize, size USize) None
+    :yields USize for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+
+  :: Indicate that the currently requested array index is not a valid index
+  :: reachable in the current array (for example, the index is out of bounds,
+  :: or the given value is not mutable, or not of a replaceable type).
+  ::
+  :: This should only be called within the yield block of an `array` call,
+  :: as it refers to the index yielded by the mutator to that block.
+  :fun ref array_index_is_invalid None
+
+  :: Indicate that the currently requested array index is not of a traceable
+  :: mutable type or a replaceable type.
+  ::
+  :: This should only be called within the yield block of an `array` call,
+  :: as it refers to the index yielded by the mutator to that block.
+  :fun ref array_index_cannot_be_modified None
+
+  :: Allow the mutator the option to assign `None` to the current location.
+  :: Only set it to `None` if the mutator decides to call the yield block.
+  :fun ref set_none None
+    :yields None for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign a `Bool` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_bool None
+    :yields Bool for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign a `U64` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_u64 None
+    :yields U64 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign a `U32` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_u32 None
+    :yields U32 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign a `U16` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_u16 None
+    :yields U16 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign a `U8` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_u8 None
+    :yields U8 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign an `I64` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_i64 None
+    :yields I64 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign an `I32` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_i32 None
+    :yields I32 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign an `I16` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_i16 None
+    :yields I16 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign an `I8` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_i8 None
+    :yields I8 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign an `F64` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_f64 None
+    :yields F64 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign an `F32` to the current location.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_f32 None
+    :yields F32 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign a named value (e.g. an enum member).
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_name None
+    :yields String for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign a UTF-8 string.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_string None
+    :yields String for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to assign a sequence of arbitrary bytes.
+  :: Set it to the value in the yield block (if the mutator decides to call it).
+  :fun ref set_bytes None
+    :yields Bytes for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to replace a `Bool` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_bool(value Bool) None
+    :yields Bool for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    None
+
+  :: Allow the mutator the option to replace a `U64` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_u64(value U64) None
+    :yields U64 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_u64 -> (v | yield v)
+
+  :: Allow the mutator the option to replace a `U32` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_u32(value U32) None
+    :yields U32 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_u32 -> (v | yield v)
+
+  :: Allow the mutator the option to replace a `U16` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_u16(value U16) None
+    :yields U16 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_u16 -> (v | yield v)
+
+  :: Allow the mutator the option to replace a `U8` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_u8(value U8) None
+    :yields U8 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_u8 -> (v | yield v)
+
+  :: Allow the mutator the option to replace an `I64` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_i64(value I64) None
+    :yields I64 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_i64 -> (v | yield v)
+
+  :: Allow the mutator the option to replace an `I32` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_i32(value I32) None
+    :yields I32 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_i32 -> (v | yield v)
+
+  :: Allow the mutator the option to replace an `I16` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_i16(value I16) None
+    :yields I16 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_i16 -> (v | yield v)
+
+  :: Allow the mutator the option to replace an `I8` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_i8(value I8) None
+    :yields I8 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_i8 -> (v | yield v)
+
+  :: Allow the mutator the option to replace an `F64` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_f64(value F64) None
+    :yields F64 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_f64 -> (v | yield v)
+
+  :: Allow the mutator the option to replace an `F32` at the current location,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_f32(value F32) None
+    :yields F32 for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_f32 -> (v | yield v)
+
+  :: Allow the mutator the option to replace a named value (e.g. an enum member)
+  :: by passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_name(value String) None
+    :yields String for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_name -> (v | yield v)
+
+  :: Allow the mutator the option to replace a UTF-8 string value,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_string(value String) None
+    :yields String for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_string -> (v | yield v)
+
+  :: Allow the mutator the option to replace a sequence of arbitrary bytes,
+  :: passing it the current value as an argument (to use as a reference).
+  :: Set the new value from the yield block (if the mutator decides to call it).
+  :fun ref replace_bytes(value Bytes) None
+    :yields Bytes for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
+    @set_bytes -> (v | yield v)

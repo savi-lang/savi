@@ -1,0 +1,135 @@
+:class Savi.TraceData.Mutable.Spec
+  :is Spec
+  :const describes: "TraceData.Mutable"
+
+  :it "can inject values into a mutable object tree"
+    alice = _ExampleMutablePerson["Alice", 30]
+    alice.children << _ExampleMutablePerson["Bobby", 12]
+    alice.children << _ExampleMutablePerson["Charlie", 5]
+
+    // Bobby now prefers to be called Rob.
+    mut1 = _TraceMutatorInject(String).new("children/0/name", "Rob")
+    alice.trace_data_mutable(mut1)
+    assert: mut1.errors == []
+
+    // Happy Birthday, Charlie!
+    mut2 = _TraceMutatorInject(U8).new("children/1/age", 6)
+    alice.trace_data_mutable(mut2)
+    assert: mut2.errors == []
+
+    // Baby David has arrived!
+    mut3 = _TraceMutatorInject(String).new("children/2/name", "David")
+    alice.trace_data_mutable(mut3)
+    assert: mut3.errors == []
+
+    // The changes are reflected in the printed trace.
+    alice_printed = String.new
+    alice.trace_data(Inspect.TraceData.Printer.Deterministic.new(alice_printed))
+    assert: alice_printed == <<<
+      #1:
+        name: "Alice"
+        age: 30
+        children: #2:
+          0: #3:
+            name: "Rob"
+            age: 12
+          1: #4:
+            name: "Charlie"
+            age: 6
+          2: #5:
+            name: "David"
+            age: 0
+    >>>
+
+:: A test class demonstrating a simple data structure that can be mutated
+:: by any `TraceData.Mutator` using the `TraceData.Mutable` trait.
+:class _ExampleMutablePerson
+  :var name String: ""
+  :var age U8: 0
+  :let children Array(_ExampleMutablePerson): []
+  :new
+  :new "[]"(@name, @age)
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(identity_digest_of @) -> (
+      trace.property("name", @name)
+      trace.property("age", @age)
+      if @children.is_not_empty (
+        trace.property("children", @children)
+      )
+    )
+
+  :is TraceData.Mutable
+  :fun ref trace_data_mutable(trace TraceData.Mutator)
+    trace.object(identity_digest_of @) -> (key |
+      case key == (
+      | "name" | trace.replace_string(@name) -> (v | @name = v)
+      | "age"  | trace.replace_u8(@age) -> (v | @age = v)
+      | "children" | @children.trace_data_mutable(trace)
+      | trace.object_key_is_invalid
+      )
+    )
+
+:: A test class used to demonstrate how a `TraceData.Mutator` implementation
+:: can be used to inject a single value into an arbitrary object tree path,
+:: as long as all the objects along that path implement `TraceData.Mutable`.
+:class _TraceMutatorInject(T val)
+  :is TraceData.Mutator
+
+  :var current USize: 0
+  :let errors Array(String): []
+
+  :let path Array(String)
+  :let value T
+  :new (path String, @value)
+    @path = path.split('/')
+
+  :fun ref object(recurse_id USize) None
+    :yields String for None
+    try (
+      path_index = @current, @current += 1
+      yield @path[path_index]!
+    |
+      @errors << "object is beyond path: \(String.join(@path, "/"))"
+    )
+
+  :fun ref object_key_is_invalid None
+    @errors << "\(try @path[@current -! 1]!.format.literal) is not a valid key"
+
+  :fun ref object_key_cannot_be_modified None
+    @errors << "\(try @path[@current -! 1]!.format.literal) cannot be modified"
+
+  :fun ref array(recurse_id USize, size USize) None
+    :yields USize for None
+    try (
+      path_index = @current, @current += 1
+      yield @path[path_index]!.parse_i64!.usize!
+    |
+      @errors << "array is beyond path: \(String.join(@path, "/"))"
+    )
+
+  :fun ref array_truncate(recurse_id USize, size USize) None
+    :yields USize for None
+    None
+
+  :fun ref array_index_is_invalid None
+    @errors << "\(try @path[@current -! 1]!) is not a valid index"
+
+  :fun ref array_index_cannot_be_modified None
+    @errors << "\(try @path[@current -! 1]!) is not a modifiable index"
+
+  :fun ref set_none:   v = @value, if v <: None   (yield None)
+  :fun ref set_bool:   v = @value, if v <: Bool   (yield Bool[v])
+  :fun ref set_u64:    v = @value, if v <: U64    (yield U64[v])
+  :fun ref set_u32:    v = @value, if v <: U32    (yield U32[v])
+  :fun ref set_u16:    v = @value, if v <: U16    (yield U16[v])
+  :fun ref set_u8:     v = @value, if v <: U8     (yield U8[v])
+  :fun ref set_i64:    v = @value, if v <: I64    (yield I64[v])
+  :fun ref set_i32:    v = @value, if v <: I32    (yield I32[v])
+  :fun ref set_i16:    v = @value, if v <: I16    (yield I16[v])
+  :fun ref set_i8:     v = @value, if v <: I8     (yield I8[v])
+  :fun ref set_f64:    v = @value, if v <: F64    (yield F64[v])
+  :fun ref set_f32:    v = @value, if v <: F32    (yield F32[v])
+  :fun ref set_bytes:  v = @value, if v <: Bytes  (yield v)
+  :fun ref set_string: v = @value, if v <: String (yield v)
