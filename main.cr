@@ -393,6 +393,9 @@ module Savi
         if check_only
           sources.each { |source_package, sources|
             ctx = Savi.compiler.compile(sources, :manifests, options)
+            errors.concat(ctx.errors)
+            next if errors.any?
+
             AST::Format.check(ctx, ctx.root_package_link, ctx.root_docs)
             errors.concat(ctx.errors)
           }
@@ -401,6 +404,9 @@ module Savi
           edited_count = 0
           sources.each { |source_package, sources|
             ctx = Savi.compiler.compile(sources, :manifests, options)
+            errors.concat(ctx.errors)
+            next if errors.any?
+
             edits_by_doc =
               AST::Format.run(ctx, ctx.root_package_link, ctx.root_docs)
 

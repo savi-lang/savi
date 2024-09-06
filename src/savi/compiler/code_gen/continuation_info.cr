@@ -25,10 +25,13 @@ class Savi::Compiler::CodeGen
       # We don't yet support the case where the public elements of the
       # continuation data do not match - they would need to be boxed/unboxed
       # in a wrapper virtual function, which we don't yet have code for.
-      public_elements_match = concrete_infos
-        .map(&.struct_element_types.[0...3].as(Array(LLVM::Type))).uniq.one?
+      public_elements_uniq = concrete_infos
+        .map(&.struct_element_types.[0...3].as(Array(LLVM::Type))).uniq
+      public_elements_match = public_elements_uniq.one?
       raise NotImplementedError.new \
-        "heterogenous public members of virtual continuation types" \
+        "heterogenous public members of virtual continuation types: #{
+          public_elements_uniq
+        }" \
           unless public_elements_match
 
       # Create a virtual continuation struct type which has all of the
