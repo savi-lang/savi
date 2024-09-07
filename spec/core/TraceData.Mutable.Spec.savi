@@ -41,6 +41,81 @@
             age: 0
     >>>
 
+  :it "can inject every type of primitive value"
+    example = _ExampleMutableEachPrimitive.new
+
+    mut_bool = _TraceMutatorInject(Bool).new("bool", True)
+    example.trace_data_mutable(mut_bool)
+    assert: mut_bool.errors == []
+
+    mut_u64 = _TraceMutatorInject(U64).new("u64", 0x1234567890ABCDEF)
+    example.trace_data_mutable(mut_u64)
+    assert: mut_u64.errors == []
+
+    mut_u32 = _TraceMutatorInject(U32).new("u32", 0x12345678)
+    example.trace_data_mutable(mut_u32)
+    assert: mut_u32.errors == []
+
+    mut_u16 = _TraceMutatorInject(U16).new("u16", 0x1234)
+    example.trace_data_mutable(mut_u16)
+    assert: mut_u16.errors == []
+
+    mut_u8 = _TraceMutatorInject(U8).new("u8", 0x12)
+    example.trace_data_mutable(mut_u8)
+    assert: mut_u8.errors == []
+
+    mut_i64 = _TraceMutatorInject(I64).new("i64", -99)
+    example.trace_data_mutable(mut_i64)
+    assert: mut_i64.errors == []
+
+    mut_i32 = _TraceMutatorInject(I32).new("i32", -98)
+    example.trace_data_mutable(mut_i32)
+    assert: mut_i32.errors == []
+
+    mut_i16 = _TraceMutatorInject(I16).new("i16", -97)
+    example.trace_data_mutable(mut_i16)
+    assert: mut_i16.errors == []
+
+    mut_i8 = _TraceMutatorInject(I8).new("i8", -96)
+    example.trace_data_mutable(mut_i8)
+    assert: mut_i8.errors == []
+
+    mut_f64 = _TraceMutatorInject(F64).new("f64", 3.14159)
+    example.trace_data_mutable(mut_f64)
+    assert: mut_f64.errors == []
+
+    mut_f32 = _TraceMutatorInject(F32).new("f32", 1.5)
+    example.trace_data_mutable(mut_f32)
+    assert: mut_f32.errors == []
+
+    mut_bytes = _TraceMutatorInject(Bytes).new("bytes", b"Hello")
+    example.trace_data_mutable(mut_bytes)
+    assert: mut_bytes.errors == []
+
+    mut_string = _TraceMutatorInject(String).new("string", "World")
+    example.trace_data_mutable(mut_string)
+    assert: mut_string.errors == []
+
+    // The changes are reflected in the printed trace.
+    example_printed = String.new
+    example.trace_data(Inspect.TraceData.Printer.Deterministic.new(example_printed))
+    assert: example_printed == <<<
+      #1:
+        bool: True
+        u64: 1311768467294899695
+        u32: 305419896
+        u16: 4660
+        u8: 18
+        i64: -99
+        i32: -98
+        i16: -97
+        i8: -96
+        f64: 3.14159
+        f32: 1.5
+        bytes: b"Hello"
+        string: "World"
+    >>>
+
 :: A test class demonstrating a simple data structure that can be mutated
 :: by any `TraceData.Mutator` using the `TraceData.Mutable` trait.
 :class _ExampleMutablePerson
@@ -67,6 +142,61 @@
       | "name" | trace.replace_string(@name) -> (v | @name = v)
       | "age"  | trace.replace_u8(@age) -> (v | @age = v)
       | "children" | @children.trace_data_mutable(trace)
+      | trace.object_key_is_invalid
+      )
+    )
+
+:: A test class demonstrating a every primitive that can be mutably replaced.
+:class _ExampleMutableEachPrimitive
+  :var bool Bool: False
+  :var u64 U64: 0
+  :var u32 U32: 0
+  :var u16 U16: 0
+  :var u8 U8: 0
+  :var i64 I64: 0
+  :var i32 I32: 0
+  :var i16 I16: 0
+  :var i8 I8: 0
+  :var f64 F64: 0.0
+  :var f32 F32: 0.0
+  :var bytes Bytes: b""
+  :var string String: ""
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(identity_digest_of @) -> (
+      trace.property("bool", @bool)
+      trace.property("u64", @u64)
+      trace.property("u32", @u32)
+      trace.property("u16", @u16)
+      trace.property("u8", @u8)
+      trace.property("i64", @i64)
+      trace.property("i32", @i32)
+      trace.property("i16", @i16)
+      trace.property("i8", @i8)
+      trace.property("f64", @f64)
+      trace.property("f32", @f32)
+      trace.property("bytes", @bytes)
+      trace.property("string", @string)
+    )
+
+  :is TraceData.Mutable
+  :fun ref trace_data_mutable(trace TraceData.Mutator)
+    trace.object(identity_digest_of @) -> (key |
+      case key == (
+      | "bool" | trace.replace_bool(@bool) -> (v | @bool = v)
+      | "u64"  | trace.replace_u64(@u64) -> (v | @u64 = v)
+      | "u32"  | trace.replace_u32(@u32) -> (v | @u32 = v)
+      | "u16"  | trace.replace_u16(@u16) -> (v | @u16 = v)
+      | "u8"   | trace.replace_u8(@u8) -> (v | @u8 = v)
+      | "i64"  | trace.replace_i64(@i64) -> (v | @i64 = v)
+      | "i32"  | trace.replace_i32(@i32) -> (v | @i32 = v)
+      | "i16"  | trace.replace_i16(@i16) -> (v | @i16 = v)
+      | "i8"   | trace.replace_i8(@i8) -> (v | @i8 = v)
+      | "f64"  | trace.replace_f64(@f64) -> (v | @f64 = v)
+      | "f32"  | trace.replace_f32(@f32) -> (v | @f32 = v)
+      | "bytes" | trace.replace_bytes(@bytes) -> (v | @bytes = v)
+      | "string" | trace.replace_string(@string) -> (v | @string = v)
       | trace.object_key_is_invalid
       )
     )
