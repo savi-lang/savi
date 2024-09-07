@@ -297,25 +297,36 @@ class Savi::Compiler::SourceService
   def get_sources_for_manifest(ctx, manifest : Packaging::Manifest)
     package = Source::Package.for_manifest(manifest)
 
-    manifest.sources_paths.flat_map { |sources_path, exclusions|
-      sources = [] of Source
+    sources = [] of Source
+
+    manifest.sources_paths.each { |sources_path, exclusions|
+      glob_sources = [] of Source
       absolute_glob = File.join(package.path, sources_path.value)
       exclusion_paths = exclusions.map { |e| File.join(package.path, e.value) }
 
       prior_source_size = sources.size
+      found_at_least_one = false
       each_savi_file_in_glob(absolute_glob) { |name, content|
         # Skip this source file if it is excluded.
         next if exclusion_paths.any? { |e| File.match?(e, name) }
 
-        # Otherwise add it to the list.
+        # Note that we found at least one source file in this glob.
+        found_at_least_one = true
+
+        # Split the file path into its two parts.
         dirname = File.dirname(name)
-        basename = File.basename(name)
-        sources << Source.new(dirname, basename, content, package)
+        filename = File.basename(name)
+
+        # Skip this source file if it already is included.
+        next if sources.any? { |s| s.filename == filename && s.dirname == dirname }
+
+        # Otherwise add it to the list.
+        glob_sources << Source.new(dirname, filename, content, package)
       }
 
       ctx.error_at sources_path,
-        "No '.savi' source files found in #{absolute_glob.inspect}" \
-          if sources.empty?
+        "No new '.savi' source files found in #{absolute_glob.inspect}" \
+          unless found_at_least_one
 
       # Sort the sources by case-insensitive name, so that they always get loaded
       # in a repeatable order regardless of platform implementation details, or
@@ -324,10 +335,14 @@ class Savi::Compiler::SourceService
       # Note that we sort each group (from each glob) separately,
       # and concatenate them in order of the globs declaration order, so that
       # the declaration order can be meaningful if desired.
-      sources.sort_by!(&.filename.downcase)
+      glob_sources.sort_by!(&.filename.downcase)
 
-      sources
+      # Finally, add the glob sources to the total sources list.
+      sources.concat(glob_sources)
     }
+
+
+    sources
   end
 
   # Given a directory name, load source objects for all the source files in

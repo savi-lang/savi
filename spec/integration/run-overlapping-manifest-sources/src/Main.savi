@@ -1,0 +1,3 @@
+:actor Main
+  :new (env)
+    Main.Example.new(env)

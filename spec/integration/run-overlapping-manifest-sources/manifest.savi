@@ -1,0 +1,3 @@
+:manifest "example"
+  :sources "src/Main*.savi"    // matches both Main.savi            and Main.Example.savi
+  :sources "src/*Example.savi" // matches both Message.Example.savi and Main.Example.savi
