@@ -1,0 +1,2 @@
+:module Message.Example
+  :const string: "Example output"

@@ -1,0 +1,3 @@
+:actor Main.Example
+  :new (env Env)
+    env.out.print(Message.Example.string)
