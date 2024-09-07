@@ -328,7 +328,7 @@
   :: Set the new value from the yield block (if the mutator decides to call it).
   :fun ref replace_bool(value Bool) None
     :yields Bool for None // TODO: add a "without interruption" enforcement to the yield signature to ensure that the yield block isn't allowed to jump away.
-    None
+    @set_bool -> (v | yield v)
 
   :: Allow the mutator the option to replace a `U64` at the current location,
   :: passing it the current value as an argument (to use as a reference).
