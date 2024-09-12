@@ -589,12 +589,40 @@ class Savi::Compiler::CodeGen::PonyRT
       [main_actor, env],
     )
 
+    # Specify the language features we want.
+    # If we don't set init_network to true, some networking stuff won't work.
+    pony_language_features_init_t =
+      g.llvm.struct_create_named("pony_language_features_init_t")
+    pony_language_features_init_t.struct_set_body([
+      @i8, # init_network
+      @i8, # init_serialisation
+      @ptr, # descriptor_table
+      @isize, # descriptor_table_size
+    ])
+    pony_start_features = g.builder.alloca(pony_language_features_init_t, "features")
+    g.builder.store(
+      @i8.const_int(1),
+      g.builder.struct_gep(pony_language_features_init_t, pony_start_features, 0, "init_network")
+    )
+    g.builder.store(
+      @i8.const_int(0),
+      g.builder.struct_gep(pony_language_features_init_t, pony_start_features, 1, "init_serialisation")
+    )
+    g.builder.store(
+      @ptr.null,
+      g.builder.struct_gep(pony_language_features_init_t, pony_start_features, 2, "descriptor_table")
+    )
+    g.builder.store(
+      @isize.const_int(0),
+      g.builder.struct_gep(pony_language_features_init_t, pony_start_features, 3, "descriptor_table_size")
+    )
+
     # Start the runtime.
     start_success = g.gen_call_named("pony_start",
       [
         @i1.const_int(0),
         @i32_ptr.null,
-        @ptr.null, # TODO: pony_language_features_init_t*
+        pony_start_features,
       ],
       "start_success"
     )
