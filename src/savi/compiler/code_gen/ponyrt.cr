@@ -388,10 +388,10 @@ class Savi::Compiler::CodeGen::PonyRT
     di_type_desc_ptr = debug.di_create_pointer_type("TYPE*",
       debug.di_create_struct_type("TYPE", @desc, {
         DESC_ID => {"id", @i32, di_type_u32},
-        DESC_TYPE_NAME => {"name", @typestring, di_type_typestring_ptr},
+        DESC_TYPE_NAME => {"name", @ptr, di_type_typestring_ptr},
       }),
     )
-    { 0 => {"TYPE", @desc, di_type_desc_ptr} }
+    { 0 => {"TYPE", @ptr, di_type_desc_ptr} }
   end
 
   # This defines a global constant for the type descriptor of a type,
