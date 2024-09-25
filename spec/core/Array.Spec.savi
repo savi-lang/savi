@@ -186,6 +186,25 @@
     assert: array.remove_at!(1) == "bar"
     assert: array == ["foo", "baz"]
 
+  :it "shifts and unshifts elements from the start of the array"
+    array Array(String) = []
+
+    assert: array.unshift("baz") == "baz"
+    assert: array.unshift("bar") == "bar"
+    assert: array == ["bar", "baz"]
+
+    assert: array.shift! == "bar"
+    assert: array.unshift("foo") == "foo"
+    assert: array == ["foo", "baz"]
+
+    assert: array.shift! == "foo"
+    assert: array == ["baz"]
+
+    assert: array.shift! == "baz"
+    assert: array == []
+
+    assert error: array.shift!
+
   :it "returns True if the given element is pointer-identical to one in the array"
     opaque_1 = _ArrayExampleElementOpaque.new
     opaque_2 = _ArrayExampleElementOpaque.new

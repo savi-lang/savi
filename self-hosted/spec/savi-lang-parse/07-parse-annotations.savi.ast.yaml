@@ -43,28 +43,28 @@
       main_annotation: "1st line of function-level annotation\n2nd line of function-level annotation"
       body_annotations: #17:
         0: #18:
-          target: 2176
+          target: 2152
           value: "1st block in function\nassignment-level annotation (combines with above)"
         1: #19:
-          target: 2216
+          target: 2192
           value: "another assignment-level annotation"
         2: #20:
-          target: 2256
+          target: 2232
           value: "yet another assignment-level annotation"
         3: #21:
-          target: 2296
+          target: 2272
           value: "2nd block in function"
         4: #22:
-          target: 4136
+          target: 3576
           value: "value-level annotation"
         5: #23:
-          target: 2336
+          target: 2312
           value: "4th block in function\ntrailing 4th-block annotation (combines with above)"
         6: #24:
-          target: 4288
+          target: 3728
           value: "1st sub-block\n1st nested assignment-level annotation (combines with above)"
         7: #25:
-          target: 4328
+          target: 3768
           value: "2nd sub-block\n2nd nested assignment-level annotation (combines with above)"
       body: #26:
         terms: #27:

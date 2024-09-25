@@ -190,15 +190,12 @@
 
     new_value_alias
 
-  :: Insert an element with the given `value` at the given `index`.
-  :: Returns an alias of the `value`.
-  :: Raises an error if the given `index` is beyond the size of the array.
+  :: Private implementation of `insert_at!` without the bounds check that
+  :: confirms that the insertion index is a valid one.
   ::
-  :: Elements at all later indexes will be shifted one index to make room
-  :: for the insertion of the new element.
-  :fun ref insert_at!(index, value)
-    error! if @_size < index
-
+  :: Can be called internally by functions which have already proven the
+  :: validity of the insertion index.
+  :fun ref _insert_at_without_bounds_check(index, value)
     // Make sure the buffer is large enough to hold another element.
     @reserve(@_size + 1)
 
@@ -213,6 +210,16 @@
     @_ptr._assign_at(index, --value)
     @_size += 1
     value_alias
+
+  :: Insert an element with the given `value` at the given `index`.
+  :: Returns an alias of the `value`.
+  :: Raises an error if the given `index` is beyond the size of the array.
+  ::
+  :: Elements at all later indexes will be shifted one index to make room
+  :: for the insertion of the new element.
+  :fun ref insert_at!(index, value)
+    error! if @_size < index
+    @_insert_at_without_bounds_check(index, --value)
 
   :: Delete the element at the given `index`, discarding it.
   :: Raises an error if the given `index` is beyond the size of the array.
@@ -250,6 +257,19 @@
 
     @_size -= 1
     --element
+
+  :: Remove the first element, returning it.
+  :: Raises an error if the array is empty.
+  ::
+  :: Elements at all later indexes will be shifted one index.
+  :fun ref shift!: @remove_at!(0)
+
+  :: Insert an element at the beginning of the array.
+  ::
+  :: Elements at all later indexes will be shifted one index to make room.
+  :fun ref unshift(value)
+    // An index of zero is never out of bounds for insertion
+    @_insert_at_without_bounds_check(0, --value)
 
   :fun each_with_index(
     from USize = 0
