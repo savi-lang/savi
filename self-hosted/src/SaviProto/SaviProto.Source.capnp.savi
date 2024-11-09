@@ -5,6 +5,7 @@
 :struct box SaviProto.Source
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
 
   :const capn_proto_data_word_count U16: 1
   :const capn_proto_pointer_count U16: 3
@@ -34,6 +35,7 @@
 :struct box SaviProto.Source.Position
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
 
   :const capn_proto_data_word_count U16: 2
   :const capn_proto_pointer_count U16: 1
@@ -67,6 +69,7 @@
 :struct box SaviProto.Source.Package
   :let _p CapnProto.Pointer.Struct
   :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
 
   :const capn_proto_data_word_count U16: 0
   :const capn_proto_pointer_count U16: 2
@@ -98,6 +101,12 @@
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
 
+  :fun ref copy_data_from(other SaviProto.Source) None
+    try @_p.set_text(0, "\(other.absolute_file_path_if_set!)", "")
+    try @_p.set_text(1, "\(other.content_for_non_file_if_set!)", "")
+    try @_p.set_u64(0x0, other.content_hash64_if_set!, 0)
+    try (other_package = other.package_if_set!, @package.copy_data_from(other_package))
+
   :fun ref absolute_file_path: @_p.text(0)
   :fun ref absolute_file_path_if_set!: @_p.text_if_set!(0)
   :fun ref "absolute_file_path="(new_value): @_p.set_text(0, new_value, "")
@@ -126,6 +135,13 @@
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Source.Position) None
+    try (other_source = other.source_if_set!, @source.copy_data_from(other_source))
+    try @_p.set_u32(0x0, other.offset_if_set!, 0)
+    try @_p.set_u32(0x4, other.size_if_set!, 0)
+    try @_p.set_u32(0x8, other.row_if_set!, 0)
+    try @_p.set_u32(0xc, other.column_if_set!, 0)
 
   :fun ref source: SaviProto.Source.Builder.from_pointer(@_p.struct(0, 1, 3))
   :fun ref source_if_set!: SaviProto.Source.Builder.from_pointer(@_p.struct_if_set!(0, 1, 3))
@@ -159,6 +175,10 @@
   :is TraceData
   :fun trace_data(trace TraceData.Observer)
     @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Source.Package) None
+    try @_p.set_text(0, "\(other.absolute_manifest_directory_path_if_set!)", "")
+    try @_p.set_text(1, "\(other.name_if_set!)", "")
 
   :fun ref absolute_manifest_directory_path: @_p.text(0)
   :fun ref absolute_manifest_directory_path_if_set!: @_p.text_if_set!(0)

@@ -208,11 +208,13 @@ module Savi::Packaging::RemoteService
       show_args << "HEAD:by-lib-name/#{dep_name}.txt"
       show_process = Process.new("/usr/bin/env", show_args, output: show_output)
       if !show_process.wait.success?
-        ctx.error_at Source::Pos.none, "The library #{dep_name.inspect} isn't known in the remote library index", [
-          {Source::Pos.none, "please check your spelling, or specify an " + \
-            "explicit location using an option like the following:"},
-          {Source::Pos.none, "--from github:some-user/some-repo"},
-        ]
+        ctx.error_at Source::Pos.none, "The library #{dep_name.inspect} " + \
+          "isn't known in the remote library index " + \
+          "(https://github.com/savi-lang/library-index)", [
+            {Source::Pos.none, "please check your spelling, or specify an " + \
+              "explicit location using an option like the following:"},
+            {Source::Pos.none, "--from github:some-user/some-repo"},
+          ]
         return
       end
 
