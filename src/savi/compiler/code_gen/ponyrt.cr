@@ -444,9 +444,7 @@ class Savi::Compiler::CodeGen::PonyRT
     is_asio_event_actor = false
     traits_bitmap = g.trait_bitmap_size.times.map { 0 }.to_a
     g.ctx.reach.each_type_def.each { |other_def|
-      g.ctx.reach.each_reached_subtype_of(g.ctx, other_def) { |sub_def|
-        next unless sub_def == gtype.type_def
-
+      if gtype.type_def.is_subtype_of?(g.ctx, other_def)
         index = other_def.desc_id >> Math.log2(g.bitwidth).to_i
         raise "bad index or trait_bitmap_size" unless index < g.trait_bitmap_size
 
@@ -455,7 +453,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
         # Take special note if this type is a subtype of AsioEvent.Actor.
         is_asio_event_actor = true if other_def.llvm_name == "AsioEvent.Actor"
-      }
+      end
     }
     traits_bitmap_global = g.gen_global_for_const \
       @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) }),

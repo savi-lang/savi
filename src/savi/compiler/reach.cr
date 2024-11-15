@@ -542,6 +542,20 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
       Ref.new(Infer::MetaType.new(@reified))
     end
 
+    def is_subtype_of?(ctx, super_def : Def)
+      super_link = super_def.link
+
+      # Nothing can be a subtype of a non-abstract type.
+      return false unless super_link.is_abstract?
+
+      # The possible subtype list is a cheap first check with no false negatives.
+      possible_subtype_links = ctx.pre_subtyping[super_link].possible_subtypes
+      return false unless possible_subtype_links.includes?(self.link)
+
+      # Check the actual subtyping rules
+      return ctx.subtyping.is_subtype_of?(ctx, self.reified, super_def.reified)
+    end
+
     def ordered_fields(ctx, target_info : Target)
       t = @reified.link.resolve(ctx)
       metadata = t.metadata
