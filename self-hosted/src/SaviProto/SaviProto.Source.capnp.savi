@@ -88,6 +88,32 @@
   :fun name: @_p.text(1)
   :fun name_if_set!: @_p.text_if_set!(1)
 
+:struct box SaviProto.Source.Error
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 3
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("position", @position_if_set!)
+      try trace.property("message", @message_if_set!)
+      try trace.property("extra_info", @extra_info_if_set!)
+    )
+
+  :fun position: SaviProto.Source.Position.read_from_pointer(@_p.struct(0))
+  :fun position_if_set!: SaviProto.Source.Position.read_from_pointer(@_p.struct_if_set!(0))
+
+  :fun message: @_p.text(1)
+  :fun message_if_set!: @_p.text_if_set!(1)
+
+  :fun extra_info: CapnProto.List(SaviProto.Source.Error).read_from_pointer(@_p.list(2))
+  :fun extra_info_if_set!: CapnProto.List(SaviProto.Source.Error).read_from_pointer(@_p.list_if_set!(2))
+
 :struct SaviProto.Source.Builder
   :let _p CapnProto.Pointer.Struct.Builder
   :new from_pointer(@_p)
@@ -187,3 +213,43 @@
   :fun ref name: @_p.text(1)
   :fun ref name_if_set!: @_p.text_if_set!(1)
   :fun ref "name="(new_value): @_p.set_text(1, new_value, "")
+
+:struct SaviProto.Source.Error.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Source.Error.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 3
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Source.Error) None
+    try (other_position = other.position_if_set!, @position.copy_data_from(other_position))
+    try @_p.set_text(1, "\(other.message_if_set!)", "")
+    try @init_extra_info_and_copy_data_from(other.extra_info_if_set!)
+
+  :fun ref position: SaviProto.Source.Position.Builder.from_pointer(@_p.struct(0, 2, 1))
+  :fun ref position_if_set!: SaviProto.Source.Position.Builder.from_pointer(@_p.struct_if_set!(0, 2, 1))
+  :fun ref set_position_to_point_to_existing(existing SaviProto.Source.Position.Builder): SaviProto.Source.Position.Builder.from_pointer(@_p.set_struct_to_point_to_existing(0, existing._p))
+
+  :fun ref message: @_p.text(1)
+  :fun ref message_if_set!: @_p.text_if_set!(1)
+  :fun ref "message="(new_value): @_p.set_text(1, new_value, "")
+
+  :fun ref extra_info: CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.list(2))
+  :fun ref extra_info_if_set!: CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.list_if_set!(2))
+  :fun ref init_extra_info(new_count)
+    CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.init_list(2, 0, 3, new_count))
+  :fun ref init_extra_info_and_copy_data_from(existing CapnProto.List(SaviProto.Source.Error))
+    list = CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.init_list(2, 0, 3, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref trim_extra_info(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.trim_list(2, 0, 3, new_start, new_finish))

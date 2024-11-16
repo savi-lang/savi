@@ -1,0 +1,31 @@
+:module SaviProto.Artifact.Path
+  :fun read_root(root Env.Root)
+    File.Path.ReadOnly.new(root, "/tmp/savi-cache") // TODO: configurable
+
+  :fun write_root(root Env.Root)
+    File.Path.WriteOnly.new(root, "/tmp/savi-cache") // TODO: configurable
+
+  :fun read_from(root File.Path.Readable, name SaviProto.Artifact)
+    root.subpath(@_for(name))
+
+  :fun write_to(root File.Path.Writable, name SaviProto.Artifact)
+    root.subpath(@_for(name))
+
+  :fun _for(artifact SaviProto.Artifact, out = String.new(0x200)) String'ref
+    @_for_name(artifact.name, out)
+    out << "+\(artifact.hash).savi-\(artifact.name.kind)"
+    out
+
+  :fun _for_name(name SaviProto.Artifact.Name, out String'ref) None
+    try (p = name.package!, return @_for_package(p, out))
+    try (s = name.source!, return @_for_source(s, out))
+    out << "UNSUPPORTED-ARTIFACT-NAME-TYPE"
+
+  :fun _for_package(name SaviProto.Artifact.Name.Package, out String'ref) None
+    out << "\(name.key)"
+
+  :fun _for_source(name SaviProto.Artifact.Name.Source, out String'ref) None
+    prior_size = out.size
+    @_for_package(name.package, out)
+    if out.size != prior_size out << "-"
+    out << "\(name.key)"

@@ -1,0 +1,352 @@
+///
+// NOTE: This file was auto-generated from a Cap'n Proto file
+// using the `capnp` compiler with the `--output=savi` option.
+
+:struct box SaviProto.Artifact
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("name", @name_if_set!)
+      try trace.property("hash", @hash_if_set!)
+    )
+
+  :fun name: SaviProto.Artifact.Name.read_from_pointer(@_p.struct(0))
+  :fun name_if_set!: SaviProto.Artifact.Name.read_from_pointer(@_p.struct_if_set!(0))
+
+  :fun hash: @_p.u64(0x0)
+  :fun hash_if_set!: @_p.u64_if_set!(0x0)
+
+:struct box SaviProto.Artifact.Name
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("kind", @kind_if_set!)
+      try trace.property("package", @package!)
+      try trace.property("source", @source!)
+    )
+
+  :fun kind: @_p.text(0)
+  :fun kind_if_set!: @_p.text_if_set!(0)
+
+  :fun is_package: @_p.check_union(0x0, 0)
+  :fun package!: @_p.assert_union!(0x0, 0), SaviProto.Artifact.Name.Package.read_from_pointer(@_p.struct(1))
+  :fun package_if_set!: @_p.assert_union!(0x0, 0), SaviProto.Artifact.Name.Package.read_from_pointer(@_p.struct_if_set!(1))
+
+  :fun is_source: @_p.check_union(0x0, 1)
+  :fun source!: @_p.assert_union!(0x0, 1), SaviProto.Artifact.Name.Source.read_from_pointer(@_p.struct(1))
+  :fun source_if_set!: @_p.assert_union!(0x0, 1), SaviProto.Artifact.Name.Source.read_from_pointer(@_p.struct_if_set!(1))
+
+:struct box SaviProto.Artifact.Name.Package
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("key", @key_if_set!)
+      try trace.property("path", @path_if_set!)
+    )
+
+  :fun key: @_p.text(0)
+  :fun key_if_set!: @_p.text_if_set!(0)
+
+  :fun path: @_p.text(1)
+  :fun path_if_set!: @_p.text_if_set!(1)
+
+:struct box SaviProto.Artifact.Name.Source
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 3
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("package", @package_if_set!)
+      try trace.property("key", @key_if_set!)
+      try trace.property("path", @path_if_set!)
+    )
+
+  :fun package: SaviProto.Artifact.Name.Package.read_from_pointer(@_p.struct(0))
+  :fun package_if_set!: SaviProto.Artifact.Name.Package.read_from_pointer(@_p.struct_if_set!(0))
+
+  :fun key: @_p.text(1)
+  :fun key_if_set!: @_p.text_if_set!(1)
+
+  :fun path: @_p.text(2)
+  :fun path_if_set!: @_p.text_if_set!(2)
+
+:struct box SaviProto.Artifact.Invoke
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("id", @id_if_set!)
+      try trace.property("inputs", @inputs_if_set!)
+    )
+
+  :fun id: @_p.u64(0x0)
+  :fun id_if_set!: @_p.u64_if_set!(0x0)
+
+  :fun inputs: CapnProto.List(SaviProto.Artifact).read_from_pointer(@_p.list(0))
+  :fun inputs_if_set!: CapnProto.List(SaviProto.Artifact).read_from_pointer(@_p.list_if_set!(0))
+
+:struct box SaviProto.Artifact.Invoke.Result
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("id", @id_if_set!)
+      try trace.property("outputs", @outputs_if_set!)
+      try trace.property("errors", @errors_if_set!)
+    )
+
+  :fun id: @_p.u64(0x0)
+  :fun id_if_set!: @_p.u64_if_set!(0x0)
+
+  :fun outputs: CapnProto.List(SaviProto.Artifact).read_from_pointer(@_p.list(0))
+  :fun outputs_if_set!: CapnProto.List(SaviProto.Artifact).read_from_pointer(@_p.list_if_set!(0))
+
+  :fun errors: CapnProto.List(SaviProto.Source.Error).read_from_pointer(@_p.list(1))
+  :fun errors_if_set!: CapnProto.List(SaviProto.Source.Error).read_from_pointer(@_p.list_if_set!(1))
+
+:struct SaviProto.Artifact.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Artifact.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Artifact) None
+    try (other_name = other.name_if_set!, @name.copy_data_from(other_name))
+    try @_p.set_u64(0x0, other.hash_if_set!, 0)
+
+  :fun ref name: SaviProto.Artifact.Name.Builder.from_pointer(@_p.struct(0, 1, 2))
+  :fun ref name_if_set!: SaviProto.Artifact.Name.Builder.from_pointer(@_p.struct_if_set!(0, 1, 2))
+  :fun ref set_name_to_point_to_existing(existing SaviProto.Artifact.Name.Builder): SaviProto.Artifact.Name.Builder.from_pointer(@_p.set_struct_to_point_to_existing(0, existing._p))
+
+  :fun hash: @_p.u64(0x0)
+  :fun hash_if_set!: @_p.u64_if_set!(0x0)
+  :fun ref "hash="(new_value): @_p.set_u64(0x0, new_value, 0)
+
+:struct SaviProto.Artifact.Name.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Artifact.Name.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Artifact.Name) None
+    try @_p.set_text(0, "\(other.kind_if_set!)", "")
+    try (other_package = other.package!, @init_package.copy_data_from(other_package))
+    try (other_source = other.source!, @init_source.copy_data_from(other_source))
+
+  :fun ref kind: @_p.text(0)
+  :fun ref kind_if_set!: @_p.text_if_set!(0)
+  :fun ref "kind="(new_value): @_p.set_text(0, new_value, "")
+
+  :fun is_package: @_p.check_union(0x0, 0)
+  :fun ref package!: @_p.assert_union!(0x0, 0), SaviProto.Artifact.Name.Package.Builder.from_pointer(@_p.struct(1, 0, 2))
+  :fun ref package_if_set!: @_p.assert_union!(0x0, 0), SaviProto.Artifact.Name.Package.Builder.from_pointer(@_p.struct_if_set!(1, 0, 2))
+  :fun ref init_package
+    @_p.clear_pointer(1) // package
+    @_p.mark_union(0x0, 0)
+    SaviProto.Artifact.Name.Package.Builder.from_pointer(@_p.struct(1, 0, 2))
+
+  :fun is_source: @_p.check_union(0x0, 1)
+  :fun ref source!: @_p.assert_union!(0x0, 1), SaviProto.Artifact.Name.Source.Builder.from_pointer(@_p.struct(1, 0, 3))
+  :fun ref source_if_set!: @_p.assert_union!(0x0, 1), SaviProto.Artifact.Name.Source.Builder.from_pointer(@_p.struct_if_set!(1, 0, 3))
+  :fun ref init_source
+    @_p.clear_pointer(1) // source
+    @_p.mark_union(0x0, 1)
+    SaviProto.Artifact.Name.Source.Builder.from_pointer(@_p.struct(1, 0, 3))
+
+:struct SaviProto.Artifact.Name.Package.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Artifact.Name.Package.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Artifact.Name.Package) None
+    try @_p.set_text(0, "\(other.key_if_set!)", "")
+    try @_p.set_text(1, "\(other.path_if_set!)", "")
+
+  :fun ref key: @_p.text(0)
+  :fun ref key_if_set!: @_p.text_if_set!(0)
+  :fun ref "key="(new_value): @_p.set_text(0, new_value, "")
+
+  :fun ref path: @_p.text(1)
+  :fun ref path_if_set!: @_p.text_if_set!(1)
+  :fun ref "path="(new_value): @_p.set_text(1, new_value, "")
+
+:struct SaviProto.Artifact.Name.Source.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Artifact.Name.Source.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 3
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Artifact.Name.Source) None
+    try (other_package = other.package_if_set!, @package.copy_data_from(other_package))
+    try @_p.set_text(1, "\(other.key_if_set!)", "")
+    try @_p.set_text(2, "\(other.path_if_set!)", "")
+
+  :fun ref package: SaviProto.Artifact.Name.Package.Builder.from_pointer(@_p.struct(0, 0, 2))
+  :fun ref package_if_set!: SaviProto.Artifact.Name.Package.Builder.from_pointer(@_p.struct_if_set!(0, 0, 2))
+  :fun ref set_package_to_point_to_existing(existing SaviProto.Artifact.Name.Package.Builder): SaviProto.Artifact.Name.Package.Builder.from_pointer(@_p.set_struct_to_point_to_existing(0, existing._p))
+
+  :fun ref key: @_p.text(1)
+  :fun ref key_if_set!: @_p.text_if_set!(1)
+  :fun ref "key="(new_value): @_p.set_text(1, new_value, "")
+
+  :fun ref path: @_p.text(2)
+  :fun ref path_if_set!: @_p.text_if_set!(2)
+  :fun ref "path="(new_value): @_p.set_text(2, new_value, "")
+
+:struct SaviProto.Artifact.Invoke.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Artifact.Invoke.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 1
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Artifact.Invoke) None
+    try @_p.set_u64(0x0, other.id_if_set!, 0)
+    try @init_inputs_and_copy_data_from(other.inputs_if_set!)
+
+  :fun id: @_p.u64(0x0)
+  :fun id_if_set!: @_p.u64_if_set!(0x0)
+  :fun ref "id="(new_value): @_p.set_u64(0x0, new_value, 0)
+
+  :fun ref inputs: CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.list(0))
+  :fun ref inputs_if_set!: CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.list_if_set!(0))
+  :fun ref init_inputs(new_count)
+    CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.init_list(0, 1, 1, new_count))
+  :fun ref init_inputs_and_copy_data_from(existing CapnProto.List(SaviProto.Artifact))
+    list = CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.init_list(0, 1, 1, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref trim_inputs(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.trim_list(0, 1, 1, new_start, new_finish))
+
+:struct SaviProto.Artifact.Invoke.Result.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Artifact.Invoke.Result.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Artifact.Invoke.Result) None
+    try @_p.set_u64(0x0, other.id_if_set!, 0)
+    try @init_outputs_and_copy_data_from(other.outputs_if_set!)
+    try @init_errors_and_copy_data_from(other.errors_if_set!)
+
+  :fun id: @_p.u64(0x0)
+  :fun id_if_set!: @_p.u64_if_set!(0x0)
+  :fun ref "id="(new_value): @_p.set_u64(0x0, new_value, 0)
+
+  :fun ref outputs: CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.list(0))
+  :fun ref outputs_if_set!: CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.list_if_set!(0))
+  :fun ref init_outputs(new_count)
+    CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.init_list(0, 1, 1, new_count))
+  :fun ref init_outputs_and_copy_data_from(existing CapnProto.List(SaviProto.Artifact))
+    list = CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.init_list(0, 1, 1, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref trim_outputs(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.Artifact.Builder).from_pointer(@_p.trim_list(0, 1, 1, new_start, new_finish))
+
+  :fun ref errors: CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.list(1))
+  :fun ref errors_if_set!: CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.list_if_set!(1))
+  :fun ref init_errors(new_count)
+    CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.init_list(1, 0, 3, new_count))
+  :fun ref init_errors_and_copy_data_from(existing CapnProto.List(SaviProto.Source.Error))
+    list = CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.init_list(1, 0, 3, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref trim_errors(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.Source.Error.Builder).from_pointer(@_p.trim_list(1, 0, 3, new_start, new_finish))

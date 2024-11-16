@@ -1,0 +1,99 @@
+:actor SaviBroker
+  :is SaviWorker.TCP.Connection.Registry
+
+  :const ping_interval_seconds U64: 1
+  :let log _Log
+  :let _ping_timer _PingTimer
+  :let _workers: Map(String, SaviBroker.WorkerPool).new
+  :var _next_id U64: 0
+
+  :new (@log)
+    @_ping_timer = _PingTimer.new(@, @ping_interval_seconds)
+
+  :be register(kind String, conn SaviWorker.TCP.Connection)
+    pool = @_workers.get_or_insert(kind) -> (SaviBroker.WorkerPool.new)
+    pool.register(kind, conn)
+    @log.info -> ("Registered a worker of kind: \(kind)")
+
+  :be deregister(kind String, conn SaviWorker.TCP.Connection)
+    try (
+      pool = @_workers[kind]!
+      pool.deregister(kind, conn)
+      @log.info -> ("Deregistered a worker of kind: \(kind)")
+    )
+
+  :be ping(number U64)
+    @_workers.each_value -> (pool |
+      pool.workers.each -> (worker |
+        worker.conn.ping(number)
+      )
+    )
+
+  :be invoke(kind String, message CapnProto.Message(SaviProto.Artifact.Invoke)'val)
+    pool = @_workers.get_or_insert(kind) -> (SaviBroker.WorkerPool.new)
+    pool.invoke(message)
+
+  :be trigger_manifest_parse(path String)
+    message = CapnProto.Message.Builder(SaviProto.Artifact.Invoke.Builder).new(0x4000)
+    message.root.id = (@_next_id += 1)
+
+    inputs = message.root.init_inputs(1)
+    try (
+      input = inputs[0]!
+      input.name.kind = "trigger-parse"
+
+      source = input.name.init_source
+      source.key = "manifest"
+      source.path = path
+    )
+
+    try (
+      @invoke("parse"
+        CapnProto.Message(SaviProto.Artifact.Invoke).from_val_segments!(
+          message.take_val_segments
+        )
+      )
+    |
+      @log.error -> ("Failed to convert invoke to val message")
+    )
+
+:class SaviBroker.WorkerPool
+  :let workers Array(SaviBroker.WorkerEntry)'ref: []
+  :let queued Array(CapnProto.Message(SaviProto.Artifact.Invoke)'val)'ref: []
+  :var _round_robin_index USize: 0
+
+  :fun ref register(kind String, conn SaviWorker.TCP.Connection)
+    @workers << SaviBroker.WorkerEntry.new(kind, conn)
+    @_drain_queue
+
+  :fun ref deregister(kind String, conn SaviWorker.TCP.Connection)
+    try @workers.delete_at!(@workers.find_index! -> (w | w.conn === conn))
+    // TODO: pull out any pending messages and requeue them
+    conn.close
+
+  :fun ref invoke(message CapnProto.Message(SaviProto.Artifact.Invoke)'val) None
+    if @workers.is_empty (
+      @queued << message
+      return
+    )
+
+    if @_round_robin_index >= @workers.size (
+      @_round_robin_index = 0
+    )
+    try @workers[@_round_robin_index]!.invoke(message)
+    @_round_robin_index += 1
+
+  :fun ref _drain_queue None
+    return if @queued.is_empty || @workers.is_empty
+    @queued.each -> (message | @invoke(message))
+    @queued.clear
+
+:struct SaviBroker.WorkerEntry
+  :let kind String
+  :let conn SaviWorker.TCP.Connection
+  :let pending_invokes: Map(U64, CapnProto.Message(SaviProto.Artifact.Invoke)'val).new
+  :new (@kind, @conn)
+
+  :fun ref invoke(message CapnProto.Message(SaviProto.Artifact.Invoke)'val)
+    @pending_invokes[message.root.id] = message
+    @conn.invoke(message)

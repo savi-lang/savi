@@ -1,0 +1,7 @@
+:trait tag SaviWorker
+  :fun non kind String
+  :be set_result_sink(sink SaviWorker.ResultSink)
+  :be work(invoke CapnProto.Message(SaviProto.Artifact.Invoke)'val)
+
+:trait tag SaviWorker.ResultSink
+  :be work_result(result CapnProto.Message(SaviProto.Artifact.Invoke.Result)'val)
