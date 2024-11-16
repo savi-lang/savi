@@ -442,14 +442,14 @@ class Savi::Compiler::CodeGen::PonyRT
     # the corresponding bit set in their version of the bitmap.
     # This is used for runtime type matching against abstract types (traits).
     is_asio_event_actor = false
-    traits_bitmap = g.trait_bitmap_size.times.map { 0 }.to_a
+    traits_bitmap = g.trait_bitmap_size.times.map { 0_u64 }.to_a
     g.ctx.reach.each_type_def.each { |other_def|
       if gtype.type_def.is_subtype_of?(g.ctx, other_def)
         index = other_def.desc_id >> Math.log2(g.bitwidth).to_i
         raise "bad index or trait_bitmap_size" unless index < g.trait_bitmap_size
 
         bit = other_def.desc_id & (g.bitwidth - 1)
-        traits_bitmap[index] |= (1 << bit)
+        traits_bitmap[index] |= (1_u64 << bit)
 
         # Take special note if this type is a subtype of AsioEvent.Actor.
         is_asio_event_actor = true if other_def.llvm_name == "AsioEvent.Actor"
