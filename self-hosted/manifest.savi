@@ -26,6 +26,9 @@
     :from "github:savi-lang/Logger"
     :depends on Time
 
+  :dependency ByteStream v0
+    :from "github:savi-lang/ByteStream"
+
   :dependency IO v0
     :from "github:savi-lang/IO"
     :depends on ByteStream
@@ -44,12 +47,6 @@
     :depends on IO
     :depends on OSError
 
-  :transitive dependency Time v0
-    :from "github:savi-lang/Time"
-
-  :transitive dependency ByteStream v0
-    :from "github:savi-lang/ByteStream"
-
   :transitive dependency OSError v0
     :from "github:savi-lang/OSError"
 
@@ -66,6 +63,11 @@
 
 :manifest bin "savi-lang-broker"
   :sources "src/savi-lang-broker/*.savi"
+  :copies SaviWorker
+
+:manifest bin "savi-lang-plumber"
+  :sources "src/savi-lang-plumber/*.savi"
+  :sources "src/SaviProto/SaviProto.AST.capnp.savi"
   :copies SaviWorker
 
 :manifest bin "savi-lang-parse"

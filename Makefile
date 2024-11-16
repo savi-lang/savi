@@ -129,11 +129,14 @@ gen.capnp.check: gen.capnp
 # Update deps for the Self-hosted Savi compiler subprograms.
 self-hosted.deps: PHONY SAVI
 	echo && $(SAVI) deps update --cd self-hosted --for savi-lang-broker
+	echo && $(SAVI) deps update --cd self-hosted --for savi-lang-plumber
 	echo && $(SAVI) deps update --cd self-hosted --for savi-lang-parse
 
 # Create the self-hosted Savi compiler subprograms.
 self-hosted/bin/savi-lang-broker: $(SAVI) $(shell find self-hosted/src/savi-lang-broker self-hosted/src/SaviWorker self-hosted/src/SaviProto -name '*.savi')
 	echo && $(SAVI) build --cd self-hosted savi-lang-broker --print-perf --backtrace
+self-hosted/bin/savi-lang-plumber: $(SAVI) $(shell find self-hosted/src/savi-lang-plumber self-hosted/src/SaviWorker self-hosted/src/SaviProto -name '*.savi')
+	echo && $(SAVI) build --cd self-hosted savi-lang-plumber --print-perf --backtrace
 self-hosted/bin/savi-lang-parse: $(SAVI) $(shell find self-hosted/src/savi-lang-parse self-hosted/src/SaviWorker self-hosted/src/SaviProto -name '*.savi')
 	echo && $(SAVI) build --cd self-hosted savi-lang-parse --print-perf --backtrace
 
