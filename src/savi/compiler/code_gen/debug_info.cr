@@ -176,8 +176,7 @@ class Savi::Compiler::CodeGen
       t : Reach::Ref,
       llvm_struct_type : LLVM::Type,
     )
-      ident = t.single!.defn(ctx).ident
-      name = ident.value
+      name = t.single_def!(ctx).llvm_name
 
       # Create a temporary stand-in for this debug type, which is used to
       # prevent unwanted recursion if it (directly or indirectly) contains
@@ -218,6 +217,17 @@ class Savi::Compiler::CodeGen
 
       # Create the debug type, as a struct type with those element types.
       di_create_struct_type(name, llvm_type, di_member_info, pos)
+    end
+
+    @di_opaque_object_pointer_type : LibLLVM::MetadataRef?
+    def di_opaque_object_pointer_type
+      @di_opaque_object_pointer_type ||= begin
+        di_create_pointer_type("OPAQUE*",
+          di_create_struct_type("OPAQUE",
+            @runtime.obj, di_runtime_member_info, Source::Pos.none
+          )
+        )
+      end
     end
 
     def di_create_fields_struct_type(
@@ -332,8 +342,7 @@ class Savi::Compiler::CodeGen
             ctx.code_gen.gtypes[ctx.reach[t.single!].llvm_name].struct_type,
           )
         elsif t.llvm_use_type(ctx) == :struct_ptr_opaque
-          # TODO: Some more descriptive debug type?
-          di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Address)
+          di_opaque_object_pointer_type
         else
           raise NotImplementedError.new(t)
         end

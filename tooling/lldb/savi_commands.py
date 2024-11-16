@@ -12,6 +12,10 @@ def get_command(debugger, command, result, internal_dict):
   # Get the root value by name, then dig into it using the child field names.
   value = frame.FindVariable(names[0])
   for name in names[1:]:
+    # If we're looking for a field in a struct, we need to use the FIELDS field.
+    if name != "TYPE" and name != "FIELDS":
+      value = value.GetChildMemberWithName("FIELDS")
+
     # TODO: If the value has an abstract type, we need to use its TYPE field
     # here to .Cast() it to the corresponding concrete type.
     # However it may be difficult to find the appropriate concrete type by name;

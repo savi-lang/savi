@@ -3457,7 +3457,7 @@ class Savi::Compiler::CodeGen
     # This code is shamelessly copied from gen_desc, with a few modifications,
     # because we already know that we are just targeting exactly one gtype
     # (the mutator_gtype which this object is tailor-made to fit).
-    traits_bitmap = trait_bitmap_size.times.map { 0 }.to_a
+    traits_bitmap = trait_bitmap_size.times.map { 0_u64 }.to_a
     mutator_gtype.type_def.tap do |other_def|
       raise "can't be subtype of a concrete" unless other_def.is_abstract?(ctx)
 
@@ -3465,7 +3465,7 @@ class Savi::Compiler::CodeGen
       raise "bad index or trait_bitmap_size" unless index < trait_bitmap_size
 
       bit = other_def.desc_id & (@bitwidth - 1)
-      traits_bitmap[index] |= (1 << bit)
+      traits_bitmap[index] |= (1_u64 << bit)
     end
     traits_bitmap_global = gen_global_for_const \
       @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) })

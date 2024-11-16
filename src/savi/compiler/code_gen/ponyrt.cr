@@ -378,6 +378,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
   def di_runtime_member_info(debug : DebugInfo)
     di_type_u32 = debug.di_create_basic_type("uint32_t", @i32, LLVM::DwarfTypeEncoding::Unsigned)
+    di_type_usize = debug.di_create_basic_type("size_t", @isize, LLVM::DwarfTypeEncoding::Unsigned)
     di_type_char = debug.di_create_basic_type("char", @i8, LLVM::DwarfTypeEncoding::Signed)
     di_type_cstring = debug.di_create_pointer_type("char*", di_type_char)
     di_type_typestring_ptr = debug.di_create_pointer_type("TYPESTRING*",
@@ -385,10 +386,12 @@ class Savi::Compiler::CodeGen::PonyRT
         3 => {"_ptr", @ptr, di_type_cstring},
       }),
     )
+    di_type_trait_bitmap_ptr = debug.di_create_pointer_type("size_t*", di_type_usize)
     di_type_desc_ptr = debug.di_create_pointer_type("TYPE*",
       debug.di_create_struct_type("TYPE", @desc, {
         DESC_ID => {"id", @i32, di_type_u32},
         DESC_TYPE_NAME => {"name", @ptr, di_type_typestring_ptr},
+        DESC_TRAITS => {"traits", @ptr, di_type_trait_bitmap_ptr},
       }),
     )
     { 0 => {"TYPE", @ptr, di_type_desc_ptr} }
@@ -442,14 +445,14 @@ class Savi::Compiler::CodeGen::PonyRT
     # the corresponding bit set in their version of the bitmap.
     # This is used for runtime type matching against abstract types (traits).
     is_asio_event_actor = false
-    traits_bitmap = g.trait_bitmap_size.times.map { 0 }.to_a
+    traits_bitmap = g.trait_bitmap_size.times.map { 0_u64 }.to_a
     g.ctx.reach.each_type_def.each { |other_def|
       if gtype.type_def.is_subtype_of?(g.ctx, other_def)
         index = other_def.desc_id >> Math.log2(g.bitwidth).to_i
         raise "bad index or trait_bitmap_size" unless index < g.trait_bitmap_size
 
         bit = other_def.desc_id & (g.bitwidth - 1)
-        traits_bitmap[index] |= (1 << bit)
+        traits_bitmap[index] |= (1_u64 << bit)
 
         # Take special note if this type is a subtype of AsioEvent.Actor.
         is_asio_event_actor = true if other_def.llvm_name == "AsioEvent.Actor"
