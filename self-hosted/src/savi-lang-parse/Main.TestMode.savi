@@ -3,29 +3,17 @@
   :let env Env
   :let log _Log
   :let io StdIn.Engine
+  :let _reader: CapnProto.Segments.Reader.new
   :new (@env, @log)
     @io = StdIn.Engine.new(@)
     StdIn.Ticket.get(@env.root.ticket_issuer, @)
 
   :fun ref io_react(action IO.Action)
     case action == (
-    | IO.Action.Read |
-      try (
-        if @_reader.read!(@io.read_stream) @_handle_segments
-      |
-        @env.err.print("Maximum total capnpc segments size exceeded")
-      )
+    | IO.Action.Closed |
+      @handle_code(@io.read_stream.extract_all.as_string)
     )
     @
-
-  :fun ref _handle_segments
-    try (
-      message = CapnProto.Message(CapnProto.Meta.CodeGeneratorRequest)
-        .from_segments!(@_reader.take_segments)
-      @_generate(message.root)
-    |
-      @env.err.print("Failed to parse the root of the capnpc data")
-    )
 
   :fun handle_code(code String)
     nanos = Time.Measure.nanoseconds -> (
