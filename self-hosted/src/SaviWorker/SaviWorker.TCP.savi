@@ -1,0 +1,180 @@
+:trait tag SaviWorker.TCP.Connection.Registry
+  :be register(kind String, worker SaviWorker.TCP.Connection)
+  :be deregister(kind String, worker SaviWorker.TCP.Connection)
+
+:actor SaviWorker.TCP.Listener
+  :is IO.Actor(IO.Action)
+
+  :const default_port I64: 43434 // TODO: register with IANA
+
+  :let registry SaviWorker.TCP.Connection.Registry
+  :let log _Log
+  :let io TCP.Listen.Engine
+  :let workers: Map(String, Array(SaviWorker.TCP.Connection)).new
+
+  :new (@registry, @log, ticket)
+    @io = TCP.Listen.Engine.new(@, --ticket)
+
+  :fun ref io_react(action IO.Action)
+    case action == (
+    | IO.Action.Opened |
+      @log.info -> (
+        port = try @io.listen_port_number!
+        "Listening on port: \(port)"
+      )
+    | IO.Action.OpenFailed |
+      @log.error -> (
+        "Failed to listen: \(@io.listen_error)"
+      )
+    | IO.Action.Read |
+      @io.pending_connections -> (ticket |
+        SaviWorker.TCP.Connection.new(@registry, @log, --ticket)
+      )
+    | IO.Action.Closed |
+      @log.info -> ("Stopped listening")
+    )
+    @
+
+:actor SaviWorker.TCP.Connection
+  :is IO.Actor(IO.Action)
+
+  :let registry SaviWorker.TCP.Connection.Registry
+  :let log _Log
+  :let io TCP.Engine
+  :var _ping_number U64: 0
+  :var _pong_number U64: 0
+  :const ping_miss_max U64: 3
+
+  :new (@registry, @log, ticket)
+    @io = TCP.Engine.accept(@, --ticket)
+    @log.info -> ("Accepted connection from worker")
+
+  :fun ref io_react(action IO.Action)
+    case action == (
+    | IO.Action.Read |
+      try (
+        while True (
+          @handle_message(@io.read_stream.extract_frame_u32_be!)
+        )
+      )
+    | IO.Action.Closed |
+      @log.info -> ("Closed connection from worker")
+    )
+    @
+
+  :fun ref send_message(message Bytes)
+    @io.write_stream.push_native_u32(message.size.u32.native_to_be)
+    @io.write_stream << message
+    try @io.flush! // TODO: do we need to handle failure here in some way?
+
+  :var kind: ""
+  :fun ref handle_message(message Bytes)
+    case (
+    | @kind.is_empty |
+      @kind = String.from_bytes(message)
+      @registry.register(@kind, @)
+    | message == b"PONG" |
+      @_pong_number = @_ping_number
+    |
+      segments = CapnProto.Segments.new
+      segment = CapnProto.Segment.new_from_bytes(segments, message.clone) // TODO: no clone
+
+      try (
+        m = CapnProto.Message(SaviProto.Artifact.Invoke.Result)
+          .from_val_segments!(segments.take_val_segments)
+        @log.debug -> ("Received: \(Inspect[m.root])")
+      |
+        @log.error -> ("Failed to parse invoke result")
+      )
+    )
+
+  :be invoke(message CapnProto.Message(SaviProto.Artifact.Invoke)'val)
+    id = message.root.id
+    @log.info -> ("Invoking with id: \(id)")
+
+    try (
+      @send_message(message.val_buffers.first!) // TODO: not just the first segment
+    |
+      @log.error -> ("Failed to get invoke message buffer")
+    )
+
+  :be ping(number U64)
+    @send_message(b"PING")
+
+    @_ping_number = number
+    if @_pong_number.is_zero (
+      @_pong_number = @_ping_number
+      return
+    )
+
+    if @_ping_number - @_pong_number > @ping_miss_max (
+      @log.warn -> ("Ping timeout")
+      @registry.deregister(@kind, @)
+    )
+
+  :be close
+    @io.close
+    @log.info -> ("Closed worker connection")
+
+:actor SaviWorker.TCP
+  :is IO.Actor(IO.Action)
+  :is SaviWorker.ResultSink
+
+  :let worker SaviWorker
+  :let log _Log
+  :let io TCP.Engine
+
+  :new (@worker, @log, ticket)
+    @worker.set_result_sink(@)
+    @io = TCP.Engine.new(@, --ticket)
+
+  :fun ref io_react(action IO.Action)
+    case action == (
+    | IO.Action.Opened |
+      @log.info -> ("Connecting as worker with kind: \(@worker.kind)")
+      @send_message(@worker.kind.as_bytes)
+    | IO.Action.OpenFailed |
+      @log.error -> ("Failed to connect")
+    | IO.Action.Read |
+      try (
+        while True (
+          @handle_message(@io.read_stream.extract_frame_u32_be!)
+        )
+      )
+    | IO.Action.Closed |
+      @log.info -> ("Disconnected")
+    )
+    @
+
+  :fun ref send_message(message Bytes)
+    @io.write_stream.push_native_u32(message.size.u32.native_to_be)
+    @io.write_stream << message
+    try @io.flush! // TODO: do we need to handle failure here in some way?
+
+  :fun ref handle_message(bytes Bytes'iso)
+    case (
+    | bytes == b"PING" |
+      @send_message(b"PONG")
+    |
+      invoke = try (
+        segments = CapnProto.Segments.new
+        segment = CapnProto.Segment.new_from_bytes(segments, --bytes)
+        @worker.work(
+          CapnProto.Message(SaviProto.Artifact.Invoke)
+            .from_val_segments!(segments.take_val_segments)
+        )
+      |
+        @log.error -> ("Failed to parse invoke message")
+        return
+      )
+    )
+
+  :be work_result(message CapnProto.Message(SaviProto.Artifact.Invoke.Result)'val)
+    try (
+      @log.debug -> ("Sending: \(Inspect[message.root])")
+      @send_message(message.val_buffers.first!) // TODO: not just the first segment
+      @log.info -> ("Finished processing invoke")
+    |
+      @log.error -> ("Failed to get result message buffer")
+      return
+    )

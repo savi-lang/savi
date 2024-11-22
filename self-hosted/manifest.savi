@@ -1,6 +1,8 @@
-:manifest bin "savi-lang-parse"
-  :sources "src/savi-lang-parse/*.savi"
-  :sources "src/SaviProto/*.savi"
+:manifest lib SaviWorker
+  :sources "src/SaviWorker/*.savi"
+  :sources "src/SaviProto/SaviProto.Source.capnp.savi"
+  :sources "src/SaviProto/SaviProto.Artifact.capnp.savi"
+  :sources "src/SaviProto/SaviProto.Artifact.Path.savi"
 
   :dependency CapnProto v0
     :from "github:jemc-savi/CapnProto"
@@ -9,11 +11,35 @@
   :dependency Map v0
     :from "github:savi-lang/Map"
 
-  :dependency PEG v0
-    :from "github:savi-lang/PEG"
-
   :dependency Time v0
     :from "github:savi-lang/Time"
+
+  :dependency Timer v0
+    :from "github:savi-lang/Timer"
+    :depends on Time
+
+  :dependency CLI v0
+    :from "github:savi-lang/CLI"
+    :depends on Map
+
+  :dependency Logger v0
+    :from "github:savi-lang/Logger"
+    :depends on Time
+
+  :dependency ByteStream v0
+    :from "github:savi-lang/ByteStream"
+
+  :dependency IO v0
+    :from "github:savi-lang/IO"
+    :depends on ByteStream
+    :depends on OSError
+
+  :dependency TCP v0
+    :from "github:savi-lang/TCP"
+    :depends on ByteStream
+    :depends on IO
+    :depends on OSError
+    :depends on IPAddress
 
   :dependency StdIn v0
     :from "github:savi-lang/StdIn"
@@ -21,13 +47,33 @@
     :depends on IO
     :depends on OSError
 
-  :dependency IO v0
-    :from "github:savi-lang/IO"
-    :depends on ByteStream
-    :depends on OSError
-
-  :transitive dependency ByteStream v0
-    :from "github:savi-lang/ByteStream"
-
   :transitive dependency OSError v0
     :from "github:savi-lang/OSError"
+
+  :transitive dependency IPAddress v0
+    :from "github:savi-lang/IPAddress"
+
+  :dependency File v0
+    :from "github:savi-lang/File"
+    :depends on OSError
+    :depends on Time
+    :depends on IO
+    :depends on ByteStream
+    :depends on Map
+
+:manifest bin "savi-lang-broker"
+  :sources "src/savi-lang-broker/*.savi"
+  :copies SaviWorker
+
+:manifest bin "savi-lang-plumber"
+  :sources "src/savi-lang-plumber/*.savi"
+  :sources "src/SaviProto/SaviProto.AST.capnp.savi"
+  :copies SaviWorker
+
+:manifest bin "savi-lang-parse"
+  :sources "src/savi-lang-parse/*.savi"
+  :sources "src/SaviProto/SaviProto.AST.capnp.savi"
+  :copies SaviWorker
+
+  :dependency PEG v0
+    :from "github:savi-lang/PEG"

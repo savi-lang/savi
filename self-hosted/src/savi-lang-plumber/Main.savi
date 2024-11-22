@@ -1,0 +1,80 @@
+:class _CLI
+  :var to_yaml: ""
+
+  :is CLI.Option.Data
+  :fun non define_cli_options(defs CLI.Option.Defs) None
+    defs.string("to-yaml")
+
+  :fun ref trace_data_mutable(trace TraceData.Mutator) None
+    trace.object(identity_digest_of @) -> (key |
+      case key == (
+      | "to-yaml" | trace.replace_string(@to_yaml) -> (v | @to_yaml = v)
+      )
+    )
+
+:actor Main
+  :let env Env
+  :new (@env)
+    cli = try (
+      CLI.Parser(_CLI).parse!(_CLI.new, @env.args)
+    | error |
+      @env.err.print(error.message)
+      @env.exit_code = 1
+      return
+    )
+    log = _Log.new(@env.err, Logger.Level.Debug)
+
+    case (
+    | cli.options.to_yaml != "" |
+      path = File.Path.ReadOnly.new(@env.root, cli.options.to_yaml)
+      ToYAML.new(log, path, @env.out)
+    )
+
+:actor ToYAML
+  :let log _Log
+  :let path File.Path.Readable
+  :let out Env.OutStream
+  :new (@log, @path, @out)
+    File.Loader.new.load_from_file(@path, @)
+
+  :is File.Loader.ResultActor
+  :be result_of_load_from_file(
+    path File.Path.Readable
+    result File.Result
+    content Bytes'iso
+  )
+    if result != File.Result.Success (
+      @log.error -> ("Failed to load file \(path.string): \(result)")
+      return
+    )
+
+    stream = ByteStream.Pair.new
+    stream.write << --content
+    try stream.write.flush!
+
+    reader = CapnProto.Segments.Reader.new
+    try (
+      res = reader.read!(stream.read)
+      if !res (
+        @log.error -> ("Incomplete data at \(path.string)")
+        return
+      )
+    |
+      @log.error -> ("Failed to read the data at \(path.string)")
+      return
+    )
+
+    try (
+      case @path.ext_name == (
+      | "savi-parse" |
+        message = CapnProto.Message(SaviProto.AST.Document)
+          .from_segments!(reader.take_segments)
+        @out.print(Inspect.TraceData.Printer.Deterministic.print(message.root))
+      |
+        @log.error -> ("Unsupported file extension \(path.ext_name)")
+        return
+      )
+    |
+      @log.error -> ("Error reading segments from \(path.string)")
+    )
+

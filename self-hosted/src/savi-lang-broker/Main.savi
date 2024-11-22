@@ -1,0 +1,97 @@
+:class _CLI
+  :var port: SaviWorker.TCP.Listener.default_port
+  :var trigger_port: _Trigger.TCP.Listener.default_port
+
+  :is CLI.Option.Data
+  :fun non define_cli_options(defs CLI.Option.Defs) None
+    defs.i64("port", 'p')
+    defs.i64("trigger-port", 'P')
+
+  :fun ref trace_data_mutable(trace TraceData.Mutator) None
+    trace.object(identity_digest_of @) -> (key |
+      case key == (
+      | "port"         | trace.replace_i64(@port)         -> (v | @port = v)
+      | "trigger-port" | trace.replace_i64(@trigger_port) -> (v | @trigger_port = v)
+      )
+    )
+
+:actor Main
+  :let env Env
+  :new (@env)
+    cli = try (
+      CLI.Parser(_CLI).parse!(_CLI.new, @env.args)
+    | error |
+      @env.err.print(error.message)
+      @env.exit_code = 1
+      return
+    )
+    log = _Log.new(@env.err, Logger.Level.Debug)
+    tcp = TCP.auth(@env.root)
+
+    broker = SaviBroker.new(log)
+    SaviWorker.TCP.Listener.new(
+      broker, log, tcp.listen.on("0.0.0.0", "\(cli.options.port)")
+    )
+    _Trigger.TCP.Listener.new(
+      broker, log, tcp.listen.on("0.0.0.0", "\(cli.options.trigger_port)")
+    )
+
+
+:actor _Trigger.TCP.Listener
+  :is IO.Actor(IO.Action)
+
+  :const default_port I64: 23232 // TODO: register with IANA
+
+  :let broker SaviBroker
+  :let log _Log
+  :let io TCP.Listen.Engine
+
+  :new (@broker, @log, ticket)
+    @io = TCP.Listen.Engine.new(@, --ticket)
+
+  :fun ref io_react(action IO.Action)
+    case action == (
+    | IO.Action.Opened |
+      @log.info -> (
+        port = try @io.listen_port_number!
+        "Listening for triggers on port: \(port)"
+      )
+    | IO.Action.OpenFailed |
+      @log.error -> (
+        "Failed to listen for triggers: \(@io.listen_error)"
+      )
+    | IO.Action.Read |
+      @io.pending_connections -> (ticket |
+        _Trigger.TCP.Connection.new(@broker, @log, --ticket)
+      )
+    | IO.Action.Closed |
+      @log.info -> ("Stopped listening for triggers")
+    )
+    @
+
+:actor _Trigger.TCP.Connection
+  :is IO.Actor(IO.Action)
+
+  :let broker SaviBroker
+  :let log _Log
+  :let io TCP.Engine
+
+  :new (@broker, @log, ticket)
+    @io = TCP.Engine.accept(@, --ticket)
+    @log.info -> ("Accepted connection from trigger client")
+
+  :fun ref io_react(action IO.Action)
+    case action == (
+    | IO.Action.Read |
+      try (
+        while True (
+          @handle_message(@io.read_stream.extract_line!)
+        )
+      )
+    | IO.Action.Closed |
+      @log.info -> ("Closed connection from worker")
+    )
+    @
+
+  :fun ref handle_message(message Bytes)
+    @broker.trigger_manifest_parse(message.as_string)

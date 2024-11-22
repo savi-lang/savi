@@ -5,6 +5,6 @@ cd -- "$(dirname -- "$0")"
 set -e
 
 find savi-lang-parse -name '*.savi' | xargs -I '{}' \
-  sh -c 'cat {} | ../bin/savi-lang-parse > {}.ast.yaml'
+  sh -c 'cat {} | ../bin/savi-lang-parse --test-mode > {}.ast.yaml'
 
 git diff --exit-code savi-lang-parse

@@ -101,6 +101,10 @@ example.deps: PHONY SAVI
 gen.capnp: PHONY self-hosted.deps $(BUILD)/capnpc-savi $(BUILD)/capnpc-crystal
 	capnp compile \
 		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+		self-hosted/src/SaviProto/SaviProto.Artifact.capnp --output=- \
+		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.Artifact.capnp.savi
+	capnp compile \
+		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
 		self-hosted/src/SaviProto/SaviProto.AST.capnp --output=- \
 		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.AST.capnp.savi
 	capnp compile \
@@ -113,18 +117,28 @@ gen.capnp: PHONY self-hosted.deps $(BUILD)/capnpc-savi $(BUILD)/capnpc-crystal
 		| $(BUILD)/capnpc-crystal > self-hosted/src/SaviProto/SaviProto.AST.capnp.cr
 	capnp compile \
 		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+		self-hosted/src/SaviProto/SaviProto.Artifact.capnp --output=- \
+		| $(BUILD)/capnpc-crystal > self-hosted/src/SaviProto/SaviProto.Artifact.capnp.cr
+	capnp compile \
+		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
 		self-hosted/src/SaviProto/SaviProto.Source.capnp --output=- \
 		| $(BUILD)/capnpc-crystal > self-hosted/src/SaviProto/SaviProto.Source.capnp.cr
 gen.capnp.check: gen.capnp
 	git diff --exit-code self-hosted/src/SaviProto
 
-# Update deps for the Self-hosted Savi subprograms.
+# Update deps for the Self-hosted Savi compiler subprograms.
 self-hosted.deps: PHONY SAVI
+	echo && $(SAVI) deps update --cd self-hosted --for savi-lang-broker
+	echo && $(SAVI) deps update --cd self-hosted --for savi-lang-plumber
 	echo && $(SAVI) deps update --cd self-hosted --for savi-lang-parse
 
-# Create the self-hosted Savi parse subprogram.
-self-hosted/bin/savi-lang-parse: $(SAVI) $(shell find self-hosted/src/savi-lang-parse self-hosted/src/SaviProto -name '*.savi')
-	echo && $(SAVI) --cd self-hosted savi-lang-parse --print-perf --backtrace
+# Create the self-hosted Savi compiler subprograms.
+self-hosted/bin/savi-lang-broker: $(SAVI) $(shell find self-hosted/src/savi-lang-broker self-hosted/src/SaviWorker self-hosted/src/SaviProto -name '*.savi')
+	echo && $(SAVI) build --cd self-hosted savi-lang-broker --print-perf --backtrace
+self-hosted/bin/savi-lang-plumber: $(SAVI) $(shell find self-hosted/src/savi-lang-plumber self-hosted/src/SaviWorker self-hosted/src/SaviProto -name '*.savi')
+	echo && $(SAVI) build --cd self-hosted savi-lang-plumber --print-perf --backtrace
+self-hosted/bin/savi-lang-parse: $(SAVI) $(shell find self-hosted/src/savi-lang-parse self-hosted/src/SaviWorker self-hosted/src/SaviProto -name '*.savi')
+	echo && $(SAVI) build --cd self-hosted savi-lang-parse --print-perf --backtrace
 
 # Run spec scripts for self-hosted Savi subprograms.
 spec.self-hosted: PHONY self-hosted/bin/$(name)

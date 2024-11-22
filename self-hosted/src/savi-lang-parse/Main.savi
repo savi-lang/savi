@@ -1,50 +1,199 @@
-:actor Main
-  :is StdIn.Actor
-  :let env Env
-  :let io StdIn.Engine
-  :let _reader: CapnProto.Segments.Reader.new
-  :new (@env)
-    @io = StdIn.Engine.new(@)
-    StdIn.Ticket.get(@env.root.ticket_issuer, @)
+:class _CLI
+  :var test_mode: False
+  :var port: SaviWorker.TCP.Listener.default_port
 
-  :fun ref io_react(action IO.Action)
-    case action == (
-    | IO.Action.Closed |
-      @handle_code(@io.read_stream.extract_all.as_string)
-    )
-    @
+  :is CLI.Option.Data
+  :fun non define_cli_options(defs CLI.Option.Defs) None
+    defs.bool("test-mode", 't')
+    defs.i64("port", 'p')
 
-  :fun handle_code(code String)
-    nanos = Time.Measure.nanoseconds -> (
-      printer = PEG.Parser(_Token, String).new(_Grammar.new, _TreePrinter.new)
-
-      builder = _TreeBuilder.new
-      builder.code = code
-      parser = PEG.Parser(
-        _Token
-        CapnProto.Message.Builder(SaviProto.AST.Document.Builder)
-      ).new(_Grammar.new, builder)
-
-      try (
-        message = parser.parse!(code)
-
-        if builder.error.has_any (
-          @env.err.print(printer.parse!(code))
-
-          builder.error.each -> (info |
-            @env.err.print("\(info.code) at \(info.at.start)...\(info.at.end)")
-          )
-        |
-          @env.out.print(Inspect.TraceData.Printer.Deterministic.print(message.root))
-          // message.take_val_buffers.each -> (buffer |
-          //   @env.out.write(buffer.as_string)
-          // )
-        )
-      |
-        @env.err.print(
-          "Parse error at byte \(parser.last_parse_byte_size)"
-        )
+  :fun ref trace_data_mutable(trace TraceData.Mutator) None
+    trace.object(identity_digest_of @) -> (key |
+      case key == (
+      | "test-mode" | trace.replace_bool(@test_mode) -> (v | @test_mode = v)
+      | "port" | trace.replace_i64(@port) -> (v | @port = v)
       )
     )
 
-    @env.err.print("It took \(nanos.f64 / 1e6) milliseconds...")
+:actor Main
+  :let env Env
+  :new (@env)
+    cli = try (
+      CLI.Parser(_CLI).parse!(_CLI.new, @env.args)
+    | error |
+      @env.err.print(error.message)
+      @env.exit_code = 1
+      return
+    )
+    log = _Log.new(@env.err, Logger.Level.Debug)
+
+    if cli.options.test_mode (
+      Main.TestMode.new(@env, log)
+    |
+      SaviWorker.TCP.new(
+        _Worker.new(@env, log)
+        log
+        TCP.auth(@env.root).connect.to("0.0.0.0", "\(cli.options.port)")
+      )
+    )
+
+:actor _Worker
+  :is SaviWorker
+
+  :let env Env
+  :let log _Log
+  :let file_loader: File.Loader.new
+  :let file_dumper: File.Dumper.new
+  :new (@env, @log)
+
+  :fun non kind: "parse"
+  :var result_sink (SaviWorker.ResultSink | None): None
+  :let pending_results Array(
+    CapnProto.Message.Builder(SaviProto.Artifact.Invoke.Result.Builder)
+  ): [] // TODO: This isn't enough to handle a future scenario where the file loading/dumping isn't causal
+
+  :be set_result_sink(sink): @result_sink = sink
+
+  :fun ref send_result None
+    result = try (@pending_results.shift! |
+      @log.error -> ("No pending result in the stack")
+      return
+    )
+
+    final = try (
+      CapnProto.Message(SaviProto.Artifact.Invoke.Result).from_val_segments!(
+        result.take_val_segments
+      )
+    |
+      @log.error -> ("Failed to finalize result")
+      return
+    )
+
+    try (
+      @result_sink.not!(None).work_result(final)
+    |
+      @log.error -> ("No result sink set")
+    )
+
+  :fun ref prep_result None
+    :yields SaviProto.Artifact.Invoke.Result.Builder
+
+    result = try (@pending_results.first! |
+      @log.error -> ("No pending result in the stack")
+      return
+    )
+
+    yield result.root
+
+  :fun ref send_error(message String) None
+    @prep_result -> (result |
+      result.init_errors(1)
+      try (result.errors[0]!.message = message) // "cannot fail"
+    )
+    @send_result
+
+  :fun ref send_error_bug(message String) None
+    @send_error(message)
+    @log.error -> (message)
+
+  :be work(invoke CapnProto.Message(SaviProto.Artifact.Invoke)'val)
+    result = CapnProto.Message.Builder(SaviProto.Artifact.Invoke.Result.Builder).new(0x4000)
+    result.root.id = invoke.root.id
+    @pending_results << result
+
+    if invoke.root.inputs.size != 1 (
+      return @send_error("parse step expects \
+        1 input per invoke, but got \(invoke.root.inputs.size)")
+    )
+
+    input = try (invoke.root.inputs[0]! | return)
+
+    if "\(input.name.kind)" != "trigger-parse" ( // TODO: no string interpolation
+      return @send_error("parse step expects \
+        a trigger-parse artifact as input, but got \(input.name.kind)")
+    )
+
+    source = try (input.name.source! |
+      return @send_error("parse step expects a source-level artifact as input")
+    )
+
+    try (
+      output = result.root.init_outputs(1)[0]!
+      output.name.copy_data_from(input.name)
+      output.name.kind = "parse"
+    |
+      @send_error_bug("Output artifact list was not initialized")
+    )
+
+    path = File.Path.ReadOnly.new(@env.root, "\(source.path)")
+    @log.debug -> ("Loading file from \(path.string)")
+    @file_loader.load_from_file(path, @)
+
+  :is File.Loader.ResultActor
+  :be result_of_load_from_file(
+    path File.Path.Readable
+    result File.Result
+    content Bytes'iso
+  )
+    if result != File.Result.Success (
+      return @send_error("Error loading file from \(path.string): \(result)")
+    )
+    @log.debug -> ("Loaded file from \(path.string)")
+
+    code = (--content).as_string
+    builder = _TreeBuilder.new
+    builder.code = code
+    parser = PEG.Parser(
+      _Token
+      CapnProto.Message.Builder(SaviProto.AST.Document.Builder)
+    ).new(_Grammar.new, builder)
+
+    message = try (
+      parser.parse!(code)
+    |
+      return @send_error("TODO: show grammar error specifics during parsing")
+    )
+
+    if builder.error.has_any (
+      // TODO: show more error specifics
+
+      // builder.error.each -> (info |
+      //   @env.err.print("\(info.code) at \(info.at.start)...\(info.at.end)")
+      // )
+      return @send_error("TODO: show build error specifics during parsing")
+    )
+
+    buffers = try (
+      CapnProto.Segments.Writer.add_header_to_val_buffers!(
+        message.take_val_buffers
+      )
+    |
+      return @send_error_bug("Output artifact data was too large")
+    )
+
+    try (
+      output = @pending_results[0]!.root.outputs[0]!
+      buffers.each -> (b | output.hash = output.hash.bit_xor(b.hash.u64)) // TODO: proper hash64, even on 32-bit platforms
+    |
+      return @send_error_bug("Output artifact data was not initialized")
+    )
+
+    output_path = SaviProto.Artifact.Path.write_to(
+      SaviProto.Artifact.Path.write_root(@env.root)
+      output.as_reader
+    )
+
+    @log.debug -> ("Writing parse results to \(output_path.string)")
+    @file_dumper.dump_to_file(output_path, buffers, @)
+
+  :is File.Dumper.ResultActor
+  :be result_of_dump_to_file(
+    path File.Path.Writable
+    result File.Result
+  )
+    @log.debug -> ("Wrote parse results to \(path.string)")
+    if result != File.Result.Success (
+      return @send_error_bug("Error writing file to \(path.string): \(result)")
+    )
+
+    @send_result

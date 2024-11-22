@@ -1,0 +1,17 @@
+
+:trait tag _PingTimerTarget
+  :be ping(number U64)
+
+:actor _PingTimer
+  :is Timer.Actor
+  :let timer Timer.Engine
+  :let target _PingTimerTarget
+  :var number U64: 0
+
+  :new (@target, interval_seconds)
+    interval = Time.Duration.seconds(interval_seconds)
+    @timer = Timer.Engine.new(@, interval)
+
+  :fun ref timer_react @
+    @target.ping(@number += 1)
+    @

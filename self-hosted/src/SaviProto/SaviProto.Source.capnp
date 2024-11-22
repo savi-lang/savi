@@ -21,4 +21,10 @@ struct Source {
     absoluteManifestDirectoryPath @0 :Text;
     name @1 :Text;
   }
+
+  struct Error {
+    position @0 :Position;
+    message @1 :Text;
+    extraInfo @2 :List(Source.Error);
+  }
 }
