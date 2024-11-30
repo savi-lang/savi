@@ -34,6 +34,18 @@
   :: If true, it implies that `is_posix` is also true.
   :const is_bsd Bool: compiler intrinsic
 
+  :: Returns `True` if the target platform uses a FreeBSD operating system.
+  :const is_freebsd Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses a OpenBSD operating system.
+  :const is_openbsd Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses a NetBSD operating system.
+  :const is_netbsd Bool: compiler intrinsic
+
+  :: Returns `True` if the target platform uses a Dragonfly operating system.
+  :const is_dragonfly Bool: compiler intrinsic
+
   :: Returns `True` if the target platform uses a MacOS operating system.
   ::
   :: This is mutually exclusive with `is_linux`, `is_bsd`, and `is_windows`.
