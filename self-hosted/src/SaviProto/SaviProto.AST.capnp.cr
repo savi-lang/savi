@@ -614,7 +614,7 @@ enum SaviProto::AST::JumpKind
   Next = 3
 end
 
-struct SaviProto::AST::Declare
+struct SaviProto::AST::RawDeclare
   def initialize(@p : CapnProto::Pointer::Struct)
   end
   private def self.new; end
@@ -641,6 +641,99 @@ struct SaviProto::AST::Declare
   end
 end
 
+struct SaviProto::AST::RawDocument
+  def initialize(@p : CapnProto::Pointer::Struct)
+  end
+  private def self.new; end
+  def self.read_from_pointer(p); obj = allocate; obj.initialize(p); obj; end
+
+  CAPN_PROTO_DATA_WORD_COUNT = 0_u16
+  CAPN_PROTO_POINTER_COUNT = 2_u16
+  def capn_proto_address : UInt64; @p.capn_proto_address; end
+
+  def source
+    SaviProto::Source.read_from_pointer(@p.struct(0))
+  end
+
+  def declares
+    CapnProto::List(SaviProto::AST::RawDeclare).read_from_pointer(@p.list(1))
+  end
+end
+
+struct SaviProto::AST::Declare
+  def initialize(@p : CapnProto::Pointer::Struct)
+  end
+  private def self.new; end
+  def self.read_from_pointer(p); obj = allocate; obj.initialize(p); obj; end
+
+  CAPN_PROTO_DATA_WORD_COUNT = 0_u16
+  CAPN_PROTO_POINTER_COUNT = 6_u16
+  def capn_proto_address : UInt64; @p.capn_proto_address; end
+
+  def name
+    SaviProto::AST::Name.read_from_pointer(@p.struct(0))
+  end
+
+  def qualifier
+    SaviProto::AST::Name.read_from_pointer(@p.struct(1))
+  end
+
+  def type_expr
+    SaviProto::AST.read_from_pointer(@p.struct(2))
+  end
+
+  def params
+    CapnProto::List(SaviProto::AST::Declare).read_from_pointer(@p.list(3))
+  end
+
+  def members
+    CapnProto::List(SaviProto::AST::Declare).read_from_pointer(@p.list(4))
+  end
+
+  def attrs
+    CapnProto::List(SaviProto::AST::Declare::Attr).read_from_pointer(@p.list(5))
+  end
+end
+
+struct SaviProto::AST::Declare::Attr
+  def initialize(@p : CapnProto::Pointer::Struct)
+  end
+  private def self.new; end
+  def self.read_from_pointer(p); obj = allocate; obj.initialize(p); obj; end
+
+  CAPN_PROTO_DATA_WORD_COUNT = 2_u16
+  CAPN_PROTO_POINTER_COUNT = 2_u16
+  def capn_proto_address : UInt64; @p.capn_proto_address; end
+
+  def name
+    @p.text(0)
+  end
+
+  def is_tag : Bool
+    @p.check_union(0x0, 0)
+  end
+  def tag!
+    @p.assert_union!(0x0, 0)
+    nil
+  end
+
+  def is_u64 : Bool
+    @p.check_union(0x0, 1)
+  end
+  def u64!
+    @p.assert_union!(0x0, 1)
+    @p.u64(0x8)
+  end
+
+  def is_text : Bool
+    @p.check_union(0x0, 2)
+  end
+  def text!
+    @p.assert_union!(0x0, 2)
+    @p.text(1)
+  end
+end
+
 struct SaviProto::AST::Document
   def initialize(@p : CapnProto::Pointer::Struct)
   end
@@ -648,7 +741,7 @@ struct SaviProto::AST::Document
   def self.read_from_pointer(p); obj = allocate; obj.initialize(p); obj; end
 
   CAPN_PROTO_DATA_WORD_COUNT = 0_u16
-  CAPN_PROTO_POINTER_COUNT = 3_u16
+  CAPN_PROTO_POINTER_COUNT = 2_u16
   def capn_proto_address : UInt64; @p.capn_proto_address; end
 
   def source
@@ -657,9 +750,5 @@ struct SaviProto::AST::Document
 
   def declares
     CapnProto::List(SaviProto::AST::Declare).read_from_pointer(@p.list(1))
-  end
-
-  def bodies
-    CapnProto::List(SaviProto::AST::Group).read_from_pointer(@p.list(2))
   end
 end

@@ -1,6 +1,11 @@
 :trait tag SaviWorker.TCP.Connection.Registry
   :be register(kind String, worker SaviWorker.TCP.Connection)
   :be deregister(kind String, worker SaviWorker.TCP.Connection)
+  :be invoke_result(
+    kind String
+    worker SaviWorker.TCP.Connection
+    result CapnProto.Message(SaviProto.Artifact.Invoke.Result)'val
+  )
 
 :actor SaviWorker.TCP.Listener
   :is IO.Actor(IO.Action)
@@ -83,6 +88,7 @@
         m = CapnProto.Message(SaviProto.Artifact.Invoke.Result)
           .from_val_segments!(segments.take_val_segments)
         @log.debug -> ("Received: \(Inspect[m.root])")
+        @registry.invoke_result(@kind, @, m)
       |
         @log.error -> ("Failed to parse invoke result")
       )

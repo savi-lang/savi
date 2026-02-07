@@ -1,0 +1,77 @@
+// This is the minimal set of "bootstrap" declarators needed for
+// declaring the declarators used for declaring declarators.
+//
+// We must declare them here instead of in Savi code like the others, because
+// these must be in place before we can declare anything in Savi code.
+// We then remove them from circulation once the "real" ones are in place.
+//
+// See the explanation in `meta_declarators.savi` for more information
+// about the reasoning and intention behind the bootstrapping process.
+:module _Bootstrap.Declarators
+  :fun set_up(analysis SaviProto.Declarator.Analysis.Builder) None
+    analysis.init_list(@size)
+    @set_up_each(analysis.list)
+
+  // TODO: This would likely be cleaner looking and easier to maintain
+  // if we moved these constant values to the capnp source code,
+  // once the CapnProto library supports constant values like that.
+  // Alternatively, Savi itself could/should have nicer syntax to support
+  // in-place initialization of nested data structures like CapnProto.
+  :fun set_up_each(list CapnProto.List.Builder(SaviProto.Declarator.Builder))
+    list.each_with_index -> (decl, index |
+      // All bootstrap declarators are intrinsic.
+      decl.intrinsic = True
+
+      case index == (
+      | 0 |
+        decl.name.text = "declarator"
+        try (decl.init_begins(1)[0]!.text = "declarator")
+        try (
+          term2 = decl.init_terms(1)[0]!
+          term3 SaviProto.Declarator.TermAcceptor.Builder = term2
+          term3.name.text = "name"
+          term3.init_type.text = "Name"
+        )
+      | 1 |
+        decl.name.text = "intrinsic"
+        decl.context.text = "declarator"
+      | 2 |
+        decl.name.text = "context"
+        decl.context.text = "declarator"
+        try (
+          term2 = decl.init_terms(1)[0]!
+          term4 SaviProto.Declarator.TermAcceptor.Builder = term2
+          term4.name.text = "name"
+          term4.init_type.text = "Name"
+        )
+      | 3 |
+        decl.name.text = "begins"
+        decl.context.text = "declarator"
+        try (
+          term2 = decl.init_terms(1)[0]!
+          term5 SaviProto.Declarator.TermAcceptor.Builder = term2
+          term5.name.text = "name"
+          term5.init_type.text = "Name"
+        )
+      | 4 |
+        decl.name.text = "term"
+        decl.context.text = "declarator"
+        try (decl.init_begins(1)[0]!.text = "declarator_term")
+        decl.init_terms(2)
+        try (
+          term2 = decl.terms[0]!
+          term6 SaviProto.Declarator.TermAcceptor.Builder = term2
+          term6.name.text = "name"
+          term6.init_type.text = "Name"
+        )
+        try (
+          term2 = decl.terms[1]!
+          term7 SaviProto.Declarator.TermAcceptor.Builder = term2
+          term7.name.text = "type"
+          term7.init_type.text = "Term"
+        )
+      )
+    )
+
+  :fun size USize: 5
+

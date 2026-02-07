@@ -33,6 +33,18 @@
     pool = @_workers.get_or_insert(kind) -> (SaviBroker.WorkerPool.new)
     pool.invoke(message)
 
+  :be invoke_result(
+    kind String
+    worker SaviWorker.TCP.Connection
+    result CapnProto.Message(SaviProto.Artifact.Invoke.Result)'val
+  )
+    result.root.outputs.each -> (output |
+      // TODO: non-hard-coded rules for which workloads follow which others
+      case "\(output.name.kind)" == (
+      | "parse" | @trigger_next_single("declares", output)
+      )
+    )
+
   :be trigger_manifest_parse(path String)
     message = CapnProto.Message.Builder(SaviProto.Artifact.Invoke.Builder).new(0x4000)
     message.root.id = (@_next_id += 1)
@@ -49,6 +61,23 @@
 
     try (
       @invoke("parse"
+        CapnProto.Message(SaviProto.Artifact.Invoke).from_val_segments!(
+          message.take_val_segments
+        )
+      )
+    |
+      @log.error -> ("Failed to convert invoke to val message")
+    )
+
+  :fun ref trigger_next_single(kind String, prev_output SaviProto.Artifact)
+    message = CapnProto.Message.Builder(SaviProto.Artifact.Invoke.Builder).new(0x4000)
+    message.root.id = (@_next_id += 1)
+
+    inputs = message.root.init_inputs(1)
+    try (inputs[0]!.copy_data_from(prev_output))
+
+    try (
+      @invoke(kind
         CapnProto.Message(SaviProto.Artifact.Invoke).from_val_segments!(
           message.take_val_segments
         )

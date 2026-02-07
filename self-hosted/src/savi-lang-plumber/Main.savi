@@ -67,7 +67,7 @@
     try (
       case @path.ext_name == (
       | "savi-parse" |
-        message = CapnProto.Message(SaviProto.AST.Document)
+        message = CapnProto.Message(SaviProto.AST.RawDocument)
           .from_segments!(reader.take_segments)
         @out.print(Inspect.TraceData.Printer.Deterministic.print(message.root))
       |

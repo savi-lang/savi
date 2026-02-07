@@ -145,7 +145,7 @@
     builder.code = code
     parser = PEG.Parser(
       _Token
-      CapnProto.Message.Builder(SaviProto.AST.Document.Builder)
+      CapnProto.Message.Builder(SaviProto.AST.RawDocument.Builder)
     ).new(_Grammar.new, builder)
 
     message = try (

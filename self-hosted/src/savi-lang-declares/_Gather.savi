@@ -1,0 +1,222 @@
+:module _GatherDeclarators
+  :fun _name_of(declare SaviProto.AST.RawDeclare) String
+    try ("\(declare.terms[0]!.name!)" | "")
+
+  :fun count_max(doc SaviProto.AST.RawDocument) USize
+    count = 0
+    doc.declares.each -> (declare |
+      if @_name_of(declare) == "declarator" (
+        count += 1
+      )
+    )
+    count
+
+  :fun gather(
+    declarators SaviProto.Declarator.Analysis.Builder
+    doc SaviProto.AST.RawDocument
+  ) None
+    cache = CapnProto.ReferenceCache.new // TODO: receive as param
+
+    wip_declarator_index = USize.max_value
+    declarators.list.each_with_index -> (d, index |
+      if d.name.text.size == 0 (
+        wip_declarator_index = index
+        break
+      )
+    )
+
+    use_sites = declarators.init_use_sites(doc.declares.size)
+
+    doc.declares.each_with_index -> (declare, use_site_index |
+      try (
+        use_site = use_sites[use_site_index]!
+        use_site.copy_or_reference_position_data_from(declare.terms[0]!.position, cache)
+        use_site_terms = use_site.init_terms(declare.terms.size - 1)
+
+        declarator = declarators.list.each_with_index -> (declarator, declarator_index |
+          break if declarator_index >= wip_declarator_index
+
+          if @_name_of(declare) == "\(declarator.name.text)" (
+            try (
+              @_declarator_match!(
+                declarator.as_reader, declare, use_site_terms, cache
+              )
+              // tmp_accepted[0]!.copy_or_reference_data_from(declare.terms[0]!, tmp_cache)
+              Inspect.out("")
+              Inspect.out("")
+              Inspect.out("")
+              Inspect.out("")
+              Inspect.out("MATCH 3")
+              Inspect.out_deterministic(use_site)
+              return
+            )
+            break
+          )
+        )
+      )
+    )
+
+  :fun _declarator_match!(
+    declarator SaviProto.Declarator
+    declare SaviProto.AST.RawDeclare
+    accepted_terms CapnProto.List.Builder(SaviProto.AST.Builder)
+    cache CapnProto.ReferenceCache
+  ) None
+    acceptor_index USize = 0
+
+    // Each term in the head must be accepted for us to have a match overall.
+    declare.terms.each_with_index -> (term, index |
+      if index == 0 (
+        // The first term in the head must match the declarator name.
+        error! unless "\(declarator.name.text)" == "\(term.name!)"
+      |
+        // Try to find a term acceptor that matches this term.
+        // We consider each term acceptor in order until one accepts the term.
+        // Term acceptors that fail to match must have a default available, or
+        // their lack of acceptance of this term will cause us to fail overall.
+        while True (
+          acceptor = declarator.terms[acceptor_index]!
+
+          // Try accepting the term if we can.
+          // If so, then break out of this loop.
+          try (
+            @_term_accept!(acceptor, term, accepted_terms[acceptor_index]!, cache)
+            acceptor_index += 1
+            break
+          )
+
+          // The term wasn't accepted by this term acceptor,
+          // but if this term acceptor has a default value,
+          // we can apply that and move on to try the next term acceptor.
+          try (
+            defaulted = acceptor.default_if_set!
+            // TODO: accepted_terms["\(acceptor.name.text)"] = defaulted
+            acceptor_index += 1
+            next
+          )
+
+          // Similarly, if the term acceptor is strictly optional, we can
+          // move on to the next term acceptor and try it.
+          if acceptor.optional (
+            acceptor_index += 1
+            next
+          )
+
+          // TODO: emit useful error info here when a match fails.
+          error!
+        )
+      )
+    )
+
+  :fun _term_accept!(
+    acceptor SaviProto.Declarator.TermAcceptor
+    term SaviProto.AST
+    accepted SaviProto.AST.Builder
+    cache CapnProto.ReferenceCache
+  ) None
+    if acceptor.is_keyword (
+      error! unless "\(term.name!)" == "\(acceptor.name.text)"
+    )
+
+    if acceptor.is_enum (
+      term_name val = "\(term.name!)"
+      acceptor.enum!.each -> (possible |
+        if term_name == "\(possible.text)" (
+          accepted.copy_or_reference_data_from(term, cache)
+        )
+      )
+    )
+
+    if acceptor.is_type (
+      @_term_match_type!("\(acceptor.type!.text)", term, accepted, cache)
+    )
+
+  :fun _term_match_type!(
+    type_name String
+    term SaviProto.AST
+    accepted SaviProto.AST.Builder
+    cache CapnProto.ReferenceCache
+  ) None
+    :errors None
+    case type_name == (
+    | "Term" |
+      accepted.copy_or_reference_data_from(term, cache)
+      return
+    | "String" |
+      error! unless term.is_string
+      accepted.copy_or_reference_data_from(term, cache)
+      return
+    | "Integer" |
+      if term.is_positive_integer || term.is_negative_integer (
+        accepted.copy_or_reference_data_from(term, cache)
+        return
+      )
+      if term.is_character (
+        accepted.copy_or_reference_data_from(term, cache)
+        accepted.init_positive_integer(term.character!)
+        return
+      )
+    | "Name" |
+      if term.is_name (
+        accepted.copy_or_reference_data_from(term, cache)
+        return
+      )
+      if term.is_string (
+        accepted.copy_or_reference_data_from(term, cache)
+        accepted.init_name("\(term.string!)")
+        return
+      )
+      if term.is_relate && "\(term.relate!.op.value)" == "." (
+        left = @_term_match_type!("Name", term.relate!.terms.left, accepted, cache)
+        left_name val = "\(accepted.name!)" // TODO: avoid extra string copy?
+        right = @_term_match_type!("Name", term.relate!.terms.right, accepted, cache)
+        right_name val = "\(accepted.name!)" // TODO: avoid extra string copy?
+        accepted.copy_or_reference_data_from(term, cache)
+        accepted.init_name("\(left_name).\(right_name)")
+        return
+      )
+    | "Param" |
+      if term.is_name (
+        accepted.copy_or_reference_data_from(term, cache)
+        return
+      )
+      if term.is_relate && "\(term.relate!.op.value)" == "=" (
+        accepted.copy_or_reference_data_from(term, cache)
+        relate = accepted.init_relate
+        relate.op.copy_or_reference_data_from(term.relate!.op, cache)
+        relate.op.value = "DEFAULTPARAM" // TODO: avoid these weird op names
+        @_term_match_type!("Param"
+          term.relate!.terms.left
+          relate.terms.left
+          cache
+        )
+        relate.terms.right.copy_or_reference_data_from(
+          term.relate!.terms.right, cache
+        )
+        return
+      )
+      if (
+        term.is_group
+        && term.group!.style == SaviProto.AST.Group.Style.Space
+        && term.group!.terms.size == 2
+      ) (
+        accepted.copy_or_reference_data_from(term, cache)
+        relate = accepted.init_relate
+        relate.op.position.copy_or_reference_data_from(term.position, cache)
+        relate.op.value = "EXPLICITTYPE" // TODO: avoid these weird op names
+        @_term_match_type!("Name"
+          term.group!.terms[0]!, relate.terms.left, cache
+        )
+        relate.terms.right.copy_or_reference_data_from(
+          term.group!.terms[1]!, cache
+        )
+        return
+      )
+    | "Type" |
+      // TODO: be as discerning as the original compiler is
+      accepted.copy_or_reference_data_from(term, cache)
+      return
+    // | "NameList" |
+    //   // TODO
+    )
+    error!

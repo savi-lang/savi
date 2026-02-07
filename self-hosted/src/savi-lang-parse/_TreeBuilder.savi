@@ -24,7 +24,7 @@
       data.get_string(annotation)
     )
 
-  :fun ref finish_annotations(declare SaviProto.AST.Declare.Builder)
+  :fun ref finish_annotations(declare SaviProto.AST.RawDeclare.Builder)
     if @_main_annotation.is_not_empty (
       declare.main_annotation = @_main_annotation.take_buffer // TODO: no take_buffer - String'box should be enough
       @_main_annotation = String.new
@@ -45,19 +45,19 @@
 :class _TreeBuilder
   :is PEG.Parser.Builder(
     _Token
-    CapnProto.Message.Builder(SaviProto.AST.Document.Builder)
+    CapnProto.Message.Builder(SaviProto.AST.RawDocument.Builder)
   )
   :var code: "" // TODO: remove this field and add it as an arg to build fn?
   :var error: _Error.List.new
 
   :fun ref build(tokens Array(PEG.Token(_Token))'val)
     message =
-      CapnProto.Message.Builder(SaviProto.AST.Document.Builder).new(0x4000)
+      CapnProto.Message.Builder(SaviProto.AST.RawDocument.Builder).new(0x4000)
     @_build_all(message.root, _TreeBuilder.Data.new(@code, tokens))
     message
 
   :fun ref _build_all(
-    doc SaviProto.AST.Document.Builder
+    doc SaviProto.AST.RawDocument.Builder
     data _TreeBuilder.Data
   )
     doc.source.content_for_non_file = data.code // TODO: set absolute file path and skip this one
@@ -91,7 +91,7 @@
     position.column = pair.second.u32
 
   :fun ref _build_doc(
-    doc SaviProto.AST.Document.Builder
+    doc SaviProto.AST.RawDocument.Builder
     data _TreeBuilder.Data
     state _TreeBuilder.State
     token PEG.Token(_Token)
@@ -183,7 +183,7 @@
     @
 
   :fun ref _build_declare(
-    declare SaviProto.AST.Declare.Builder
+    declare SaviProto.AST.RawDeclare.Builder
     data _TreeBuilder.Data
     state _TreeBuilder.State
     token PEG.Token(_Token)

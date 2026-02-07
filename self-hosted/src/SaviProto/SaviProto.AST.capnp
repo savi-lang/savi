@@ -156,16 +156,41 @@ struct AST {
     next   @3;
   }
 
-  struct Declare {
+  struct RawDeclare {
     terms @0 :List(AST);
     mainAnnotation @1 :Text;
     bodyAnnotations @2 :List(AST.Annotation);
     body @3 :AST.Group;
   }
 
+  struct RawDocument {
+    source @0 :Source;
+    declares @1 :List(AST.RawDeclare);
+  }
+
+  struct Declare {
+    name @0 :AST.Name;
+    qualifier @1 :AST.Name;
+    typeExpr @2 :AST;
+    params @3 :List(AST.Declare);
+    members @4 :List(AST.Declare);
+    attrs @5 :List(AST.Declare.Attr);
+
+    struct Attr {
+      # TODO: Can this name be some kind of "open" enum instead?
+      # We want it to be extensible, but we also want to make it efficient.
+      name @0 :Text;
+
+      union {
+        tag @1 :Void;
+        u64 @2 :UInt64;
+        text @3 :Text;
+      }
+    }
+  }
+
   struct Document {
     source @0 :Source;
     declares @1 :List(AST.Declare);
-    bodies @2 :List(AST.Group);
   }
 }

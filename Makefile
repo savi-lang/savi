@@ -109,6 +109,14 @@ gen.capnp: PHONY self-hosted.deps $(BUILD)/capnpc-savi $(BUILD)/capnpc-crystal
 		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.AST.capnp.savi
 	capnp compile \
 		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+		self-hosted/src/SaviProto/SaviProto.Declarator.capnp --output=- \
+		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.Declarator.capnp.savi
+	capnp compile \
+		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+		self-hosted/src/SaviProto/SaviProto.Ref.capnp --output=- \
+		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.Ref.capnp.savi
+	capnp compile \
+		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
 		self-hosted/src/SaviProto/SaviProto.Source.capnp --output=- \
 		| $(BUILD)/capnpc-savi > self-hosted/src/SaviProto/SaviProto.Source.capnp.savi
 	capnp compile \
@@ -119,6 +127,14 @@ gen.capnp: PHONY self-hosted.deps $(BUILD)/capnpc-savi $(BUILD)/capnpc-crystal
 		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
 		self-hosted/src/SaviProto/SaviProto.Artifact.capnp --output=- \
 		| $(BUILD)/capnpc-crystal > self-hosted/src/SaviProto/SaviProto.Artifact.capnp.cr
+	# capnp compile \
+	# 	-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+	# 	self-hosted/src/SaviProto/SaviProto.Declarator.capnp --output=- \
+	# 	| $(BUILD)/capnpc-crystal > self-hosted/src/SaviProto/SaviProto.Declarator.capnp.cr
+	# capnp compile \
+	# 	-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
+	# 	self-hosted/src/SaviProto/SaviProto.Ref.capnp --output=- \
+	# 	| $(BUILD)/capnpc-crystal > self-hosted/src/SaviProto/SaviProto.Ref.capnp.cr
 	capnp compile \
 		-I"$(shell find self-hosted/deps/github:jemc-savi/CapnProto/* -name src | sort -r -V | head -n 1)/" \
 		self-hosted/src/SaviProto/SaviProto.Source.capnp --output=- \
@@ -139,6 +155,8 @@ self-hosted/bin/savi-lang-plumber: $(SAVI) $(shell find self-hosted/src/savi-lan
 	echo && $(SAVI) build --cd self-hosted savi-lang-plumber --print-perf --backtrace
 self-hosted/bin/savi-lang-parse: $(SAVI) $(shell find self-hosted/src/savi-lang-parse self-hosted/src/SaviWorker self-hosted/src/SaviProto -name '*.savi')
 	echo && $(SAVI) build --cd self-hosted savi-lang-parse --print-perf --backtrace
+self-hosted/bin/savi-lang-declares: $(SAVI) $(shell find self-hosted/src/savi-lang-declares self-hosted/src/SaviWorker self-hosted/src/SaviProto -name '*.savi')
+	echo && $(SAVI) build --cd self-hosted savi-lang-declares --print-perf --backtrace
 
 # Run spec scripts for self-hosted Savi subprograms.
 spec.self-hosted: PHONY self-hosted/bin/$(name)
@@ -196,7 +214,7 @@ $(eval $(call MAKE_VAR_CACHE_FOR,RUNTIME_BITCODE_RELEASE_URL))
 
 # Specify where to download the CapnProto compiler plugin for Savi code gen.
 # This needs to get bumped explicitly here when we do a new CapnProto release.
-CAPNPC_SAVI_DOWNLOAD_URL?=https://github.com/jemc-savi/CapnProto/releases/download/v0.20240922.0/capnpc-savi-v0.20240922.0-$(TARGET_PLATFORM).tar.gz
+CAPNPC_SAVI_DOWNLOAD_URL?=https://github.com/jemc-savi/CapnProto/releases/download/v0.20250308.0/capnpc-savi-v0.20250308.0-$(TARGET_PLATFORM).tar.gz
 $(eval $(call MAKE_VAR_CACHE_FOR,CAPNPC_SAVI_DOWNLOAD_URL))
 
 # This is the path where we look for the LLVM pre-built static libraries to be,

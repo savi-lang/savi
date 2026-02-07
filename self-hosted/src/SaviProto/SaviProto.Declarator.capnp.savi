@@ -1,0 +1,503 @@
+///
+// NOTE: This file was auto-generated from a Cap'n Proto file
+// using the `capnp` compiler with the `--output=savi` option.
+
+:struct box SaviProto.Declarator
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 4
+  :fun capn_proto_address U64: @_p.capn_proto_address
+  :fun capn_proto_absolute_address USize: @_p.absolute_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("name", @name_if_set!)
+      try trace.property("context", @context_if_set!)
+      try trace.property("begins", @begins_if_set!)
+      try trace.property("terms", @terms_if_set!)
+      try trace.property("body_allowed", @body_allowed_if_set!)
+      try trace.property("body_required", @body_required_if_set!)
+      try trace.property("intrinsic", @intrinsic_if_set!)
+    )
+
+  :fun name: SaviProto.Ref.Name(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct(0))
+  :fun name_if_set!: SaviProto.Ref.Name(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct_if_set!(0))
+
+  :fun context: SaviProto.Ref.Name(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct(1))
+  :fun context_if_set!: SaviProto.Ref.Name(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct_if_set!(1))
+
+  :fun begins: CapnProto.List(SaviProto.Ref.Name(SaviProto.Artifact.Name.Source)).read_from_pointer(@_p.list(2))
+  :fun begins_if_set!: CapnProto.List(SaviProto.Ref.Name(SaviProto.Artifact.Name.Source)).read_from_pointer(@_p.list_if_set!(2))
+
+  :fun terms: CapnProto.List(SaviProto.Declarator.TermAcceptor).read_from_pointer(@_p.list(3))
+  :fun terms_if_set!: CapnProto.List(SaviProto.Declarator.TermAcceptor).read_from_pointer(@_p.list_if_set!(3))
+
+  :fun body_allowed: @_p.bool(0x0, 0b00000001)
+  :fun body_allowed_if_set!: @_p.bool_if_set!(0x0, 0b00000001)
+
+  :fun body_required: @_p.bool(0x0, 0b00000010)
+  :fun body_required_if_set!: @_p.bool_if_set!(0x0, 0b00000010)
+
+  :fun intrinsic: @_p.bool(0x0, 0b00000100)
+  :fun intrinsic_if_set!: @_p.bool_if_set!(0x0, 0b00000100)
+
+:struct box SaviProto.Declarator.TermAcceptor
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 3
+  :fun capn_proto_address U64: @_p.capn_proto_address
+  :fun capn_proto_absolute_address USize: @_p.absolute_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("name", @name_if_set!)
+      try trace.property("optional", @optional_if_set!)
+      try trace.property("default", @default_if_set!)
+      try trace.property("keyword", @keyword!)
+      try trace.property("enum", @enum!)
+      try trace.property("type", @type!)
+    )
+
+  :fun name: SaviProto.Ref.Name(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct(0))
+  :fun name_if_set!: SaviProto.Ref.Name(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct_if_set!(0))
+
+  :fun optional: @_p.bool(0x0, 0b00000001)
+  :fun optional_if_set!: @_p.bool_if_set!(0x0, 0b00000001)
+
+  :fun default: SaviProto.Ref(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct(1))
+  :fun default_if_set!: SaviProto.Ref(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct_if_set!(1))
+
+  :fun is_keyword: @_p.check_union(0x2, 0)
+  :fun keyword!: @_p.assert_union!(0x2, 0), None
+  :fun keyword_if_set!: @_p.assert_union!(0x2, 0), None
+
+  :fun is_enum: @_p.check_union(0x2, 1)
+  :fun enum!: @_p.assert_union!(0x2, 1), CapnProto.List(SaviProto.Ref.Name(SaviProto.Artifact.Name.Source)).read_from_pointer(@_p.list(2))
+  :fun enum_if_set!: @_p.assert_union!(0x2, 1), CapnProto.List(SaviProto.Ref.Name(SaviProto.Artifact.Name.Source)).read_from_pointer(@_p.list_if_set!(2))
+
+  :fun is_type: @_p.check_union(0x2, 2)
+  :fun type!: @_p.assert_union!(0x2, 2), SaviProto.Ref.Name(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct(2))
+  :fun type_if_set!: @_p.assert_union!(0x2, 2), SaviProto.Ref.Name(SaviProto.Artifact.Name.Source).read_from_pointer(@_p.struct_if_set!(2))
+
+:struct box SaviProto.Declarator.Analysis
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
+  :fun capn_proto_absolute_address USize: @_p.absolute_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("list", @list_if_set!)
+      try trace.property("use_sites", @use_sites_if_set!)
+    )
+
+  :fun list: CapnProto.List(SaviProto.Declarator).read_from_pointer(@_p.list(0))
+  :fun list_if_set!: CapnProto.List(SaviProto.Declarator).read_from_pointer(@_p.list_if_set!(0))
+
+  :fun use_sites: CapnProto.List(SaviProto.Declarator.UseSite).read_from_pointer(@_p.list(1))
+  :fun use_sites_if_set!: CapnProto.List(SaviProto.Declarator.UseSite).read_from_pointer(@_p.list_if_set!(1))
+
+:struct box SaviProto.Declarator.UseSite
+  :let _p CapnProto.Pointer.Struct
+  :new box read_from_pointer(@_p)
+  :new val read_val_from_pointer(p CapnProto.Pointer.Struct'val): @_p = p
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 3
+  :fun capn_proto_address U64: @_p.capn_proto_address
+  :fun capn_proto_absolute_address USize: @_p.absolute_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    trace.object(@_p.absolute_address) -> (
+      try trace.property("position", @position_if_set!)
+      try trace.property("declarator", @declarator_if_set!)
+      try trace.property("terms", @terms_if_set!)
+    )
+
+  :fun position: SaviProto.Source.Position.read_from_pointer(@_p.struct(0))
+  :fun position_if_set!: SaviProto.Source.Position.read_from_pointer(@_p.struct_if_set!(0))
+
+  :fun declarator: SaviProto.Declarator.read_from_pointer(@_p.struct(1))
+  :fun declarator_if_set!: SaviProto.Declarator.read_from_pointer(@_p.struct_if_set!(1))
+
+  :fun terms: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list(2))
+  :fun terms_if_set!: CapnProto.List(SaviProto.AST).read_from_pointer(@_p.list_if_set!(2))
+
+:struct SaviProto.Declarator.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Declarator.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 4
+  :fun capn_proto_address U64: @_p.capn_proto_address
+  :fun capn_proto_absolute_address USize: @_p.absolute_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Declarator) None
+    try (other_name = other.name_if_set!, @name.copy_data_from(other_name))
+    try (other_context = other.context_if_set!, @context.copy_data_from(other_context))
+    try @init_begins_and_copy_data_from(other.begins_if_set!)
+    try @init_terms_and_copy_data_from(other.terms_if_set!)
+    @_p.copy_data_section_from(other._p)
+
+  :fun ref copy_or_reference_data_from(other SaviProto.Declarator, cache CapnProto.ReferenceCache) None
+    try @copy_or_reference_name_data_from(other.name_if_set!, cache)
+    try @copy_or_reference_context_data_from(other.context_if_set!, cache)
+    try @init_begins_and_copy_or_reference_data_from(other.begins_if_set!, cache)
+    try @init_terms_and_copy_or_reference_data_from(other.terms_if_set!, cache)
+    @_p.copy_data_section_from(other._p)
+
+  :fun ref name: SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct(0, 1, 2))
+  :fun ref name_if_set!: SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct_if_set!(0, 1, 2))
+  :fun ref set_name_to_point_to_existing(existing SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)): SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.set_struct_to_point_to_existing(0, existing._p))
+  :fun ref copy_or_reference_name_data_from(other_field SaviProto.Ref.Name(SaviProto.Artifact.Name.Source), cache CapnProto.ReferenceCache) None
+    is_new = False
+    p = cache.struct(other_field.capn_proto_absolute_address) -> (
+      is_new = True
+      @_p.struct(0, 1, 2)
+    )
+    if is_new (
+      SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p).copy_or_reference_data_from(other_field, cache)
+    |
+      @set_name_to_point_to_existing(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p))
+    )
+
+  :fun ref context: SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct(1, 1, 2))
+  :fun ref context_if_set!: SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct_if_set!(1, 1, 2))
+  :fun ref set_context_to_point_to_existing(existing SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)): SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.set_struct_to_point_to_existing(1, existing._p))
+  :fun ref copy_or_reference_context_data_from(other_field SaviProto.Ref.Name(SaviProto.Artifact.Name.Source), cache CapnProto.ReferenceCache) None
+    is_new = False
+    p = cache.struct(other_field.capn_proto_absolute_address) -> (
+      is_new = True
+      @_p.struct(1, 1, 2)
+    )
+    if is_new (
+      SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p).copy_or_reference_data_from(other_field, cache)
+    |
+      @set_context_to_point_to_existing(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p))
+    )
+
+  :fun ref begins: CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.list(2))
+  :fun ref begins_if_set!: CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.list_if_set!(2))
+  :fun ref init_begins(new_count)
+    CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.init_list(2, 1, 2, new_count))
+  :fun ref init_begins_and_copy_data_from(existing CapnProto.List(SaviProto.Ref.Name(SaviProto.Artifact.Name.Source)))
+    list = CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.init_list(2, 1, 2, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref init_begins_and_copy_or_reference_data_from(existing CapnProto.List(SaviProto.Ref.Name(SaviProto.Artifact.Name.Source)), cache CapnProto.ReferenceCache)
+    list = CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.init_list(2, 1, 2, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_or_reference_data_from(existing_item, cache)
+    )
+    list
+  :fun ref trim_begins(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.trim_list(2, 1, 2, new_start, new_finish))
+
+  :fun ref terms: CapnProto.List.Builder(SaviProto.Declarator.TermAcceptor.Builder).from_pointer(@_p.list(3))
+  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.Declarator.TermAcceptor.Builder).from_pointer(@_p.list_if_set!(3))
+  :fun ref init_terms(new_count)
+    CapnProto.List.Builder(SaviProto.Declarator.TermAcceptor.Builder).from_pointer(@_p.init_list(3, 1, 3, new_count))
+  :fun ref init_terms_and_copy_data_from(existing CapnProto.List(SaviProto.Declarator.TermAcceptor))
+    list = CapnProto.List.Builder(SaviProto.Declarator.TermAcceptor.Builder).from_pointer(@_p.init_list(3, 1, 3, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref init_terms_and_copy_or_reference_data_from(existing CapnProto.List(SaviProto.Declarator.TermAcceptor), cache CapnProto.ReferenceCache)
+    list = CapnProto.List.Builder(SaviProto.Declarator.TermAcceptor.Builder).from_pointer(@_p.init_list(3, 1, 3, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_or_reference_data_from(existing_item, cache)
+    )
+    list
+  :fun ref trim_terms(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.Declarator.TermAcceptor.Builder).from_pointer(@_p.trim_list(3, 1, 3, new_start, new_finish))
+
+  :fun body_allowed: @_p.bool(0x0, 0b00000001)
+  :fun body_allowed_if_set!: @_p.bool_if_set!(0x0, 0b00000001)
+  :fun ref "body_allowed="(new_value): @_p.set_bool(0x0, 0b00000001, Bool[new_value])
+
+  :fun body_required: @_p.bool(0x0, 0b00000010)
+  :fun body_required_if_set!: @_p.bool_if_set!(0x0, 0b00000010)
+  :fun ref "body_required="(new_value): @_p.set_bool(0x0, 0b00000010, Bool[new_value])
+
+  :fun intrinsic: @_p.bool(0x0, 0b00000100)
+  :fun intrinsic_if_set!: @_p.bool_if_set!(0x0, 0b00000100)
+  :fun ref "intrinsic="(new_value): @_p.set_bool(0x0, 0b00000100, Bool[new_value])
+
+:struct SaviProto.Declarator.TermAcceptor.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Declarator.TermAcceptor.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 1
+  :const capn_proto_pointer_count U16: 3
+  :fun capn_proto_address U64: @_p.capn_proto_address
+  :fun capn_proto_absolute_address USize: @_p.absolute_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Declarator.TermAcceptor) None
+    try (other_name = other.name_if_set!, @name.copy_data_from(other_name))
+    try (other_default = other.default_if_set!, @default.copy_data_from(other_default))
+    if other.is_keyword @init_keyword
+    try @init_enum_and_copy_data_from(other.enum!)
+    try (other_type = other.type!, @init_type.copy_data_from(other_type))
+    @_p.copy_data_section_from(other._p)
+
+  :fun ref copy_or_reference_data_from(other SaviProto.Declarator.TermAcceptor, cache CapnProto.ReferenceCache) None
+    try @copy_or_reference_name_data_from(other.name_if_set!, cache)
+    try @copy_or_reference_default_data_from(other.default_if_set!, cache)
+    if other.is_keyword @init_keyword
+    try @init_enum_and_copy_or_reference_data_from(other.enum!, cache)
+    try @copy_or_reference_type_data_from(other.type!, cache)
+    @_p.copy_data_section_from(other._p)
+
+  :fun ref name: SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct(0, 1, 2))
+  :fun ref name_if_set!: SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct_if_set!(0, 1, 2))
+  :fun ref set_name_to_point_to_existing(existing SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)): SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.set_struct_to_point_to_existing(0, existing._p))
+  :fun ref copy_or_reference_name_data_from(other_field SaviProto.Ref.Name(SaviProto.Artifact.Name.Source), cache CapnProto.ReferenceCache) None
+    is_new = False
+    p = cache.struct(other_field.capn_proto_absolute_address) -> (
+      is_new = True
+      @_p.struct(0, 1, 2)
+    )
+    if is_new (
+      SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p).copy_or_reference_data_from(other_field, cache)
+    |
+      @set_name_to_point_to_existing(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p))
+    )
+
+  :fun optional: @_p.bool(0x0, 0b00000001)
+  :fun optional_if_set!: @_p.bool_if_set!(0x0, 0b00000001)
+  :fun ref "optional="(new_value): @_p.set_bool(0x0, 0b00000001, Bool[new_value])
+
+  :fun ref default: SaviProto.Ref.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct(1, 1, 1))
+  :fun ref default_if_set!: SaviProto.Ref.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct_if_set!(1, 1, 1))
+  :fun ref set_default_to_point_to_existing(existing SaviProto.Ref.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)): SaviProto.Ref.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.set_struct_to_point_to_existing(1, existing._p))
+  :fun ref copy_or_reference_default_data_from(other_field SaviProto.Ref(SaviProto.Artifact.Name.Source), cache CapnProto.ReferenceCache) None
+    is_new = False
+    p = cache.struct(other_field.capn_proto_absolute_address) -> (
+      is_new = True
+      @_p.struct(1, 1, 1)
+    )
+    if is_new (
+      SaviProto.Ref.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p).copy_or_reference_data_from(other_field, cache)
+    |
+      @set_default_to_point_to_existing(SaviProto.Ref.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p))
+    )
+
+  :fun is_keyword: @_p.check_union(0x2, 0)
+  :fun keyword!: @_p.assert_union!(0x2, 0), None
+  :fun keyword_if_set!: @_p.assert_union!(0x2, 0), None
+  :fun ref init_keyword
+    @_p.mark_union(0x2, 0)
+    None
+
+  :fun is_enum: @_p.check_union(0x2, 1)
+  :fun ref enum!: @_p.assert_union!(0x2, 1), CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.list(2))
+  :fun ref enum_if_set!: @_p.assert_union!(0x2, 1), CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.list_if_set!(2))
+  :fun ref init_enum(new_count)
+    @_p.mark_union(0x2, 1)
+    CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.init_list(2, 1, 2, new_count))
+  :fun ref init_enum_and_copy_data_from(existing CapnProto.List(SaviProto.Ref.Name(SaviProto.Artifact.Name.Source)))
+    @_p.mark_union(0x2, 1)
+    list = CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.init_list(2, 1, 2, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref init_enum_and_copy_or_reference_data_from(existing CapnProto.List(SaviProto.Ref.Name(SaviProto.Artifact.Name.Source)), cache CapnProto.ReferenceCache)
+    @_p.mark_union(0x2, 1)
+    list = CapnProto.List.Builder(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)).from_pointer(@_p.init_list(2, 1, 2, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_or_reference_data_from(existing_item, cache)
+    )
+    list
+
+  :fun is_type: @_p.check_union(0x2, 2)
+  :fun ref type!: @_p.assert_union!(0x2, 2), SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct(2, 1, 2))
+  :fun ref type_if_set!: @_p.assert_union!(0x2, 2), SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct_if_set!(2, 1, 2))
+  :fun ref set_type_to_point_to_existing(existing SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder)): SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.set_struct_to_point_to_existing(2, existing._p))
+  :fun ref copy_or_reference_type_data_from(other_field SaviProto.Ref.Name(SaviProto.Artifact.Name.Source), cache CapnProto.ReferenceCache) None
+    is_new = False
+    p = cache.struct(other_field.capn_proto_absolute_address) -> (
+      is_new = True
+      @_p.struct(2, 1, 2)
+    )
+    if is_new (
+      SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p).copy_or_reference_data_from(other_field, cache)
+    |
+      @set_type_to_point_to_existing(SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(p))
+    )
+  :fun ref init_type
+    @_p.clear_pointer(2) // type
+    @_p.mark_union(0x2, 2)
+    SaviProto.Ref.Name.Builder(SaviProto.Artifact.Name.Source, SaviProto.Artifact.Name.Source.Builder).from_pointer(@_p.struct(2, 1, 2))
+
+:struct SaviProto.Declarator.Analysis.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Declarator.Analysis.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 2
+  :fun capn_proto_address U64: @_p.capn_proto_address
+  :fun capn_proto_absolute_address USize: @_p.absolute_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Declarator.Analysis) None
+    try @init_list_and_copy_data_from(other.list_if_set!)
+    try @init_use_sites_and_copy_data_from(other.use_sites_if_set!)
+
+  :fun ref copy_or_reference_data_from(other SaviProto.Declarator.Analysis, cache CapnProto.ReferenceCache) None
+    try @init_list_and_copy_or_reference_data_from(other.list_if_set!, cache)
+    try @init_use_sites_and_copy_or_reference_data_from(other.use_sites_if_set!, cache)
+
+  :fun ref list: CapnProto.List.Builder(SaviProto.Declarator.Builder).from_pointer(@_p.list(0))
+  :fun ref list_if_set!: CapnProto.List.Builder(SaviProto.Declarator.Builder).from_pointer(@_p.list_if_set!(0))
+  :fun ref init_list(new_count)
+    CapnProto.List.Builder(SaviProto.Declarator.Builder).from_pointer(@_p.init_list(0, 1, 4, new_count))
+  :fun ref init_list_and_copy_data_from(existing CapnProto.List(SaviProto.Declarator))
+    list = CapnProto.List.Builder(SaviProto.Declarator.Builder).from_pointer(@_p.init_list(0, 1, 4, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref init_list_and_copy_or_reference_data_from(existing CapnProto.List(SaviProto.Declarator), cache CapnProto.ReferenceCache)
+    list = CapnProto.List.Builder(SaviProto.Declarator.Builder).from_pointer(@_p.init_list(0, 1, 4, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_or_reference_data_from(existing_item, cache)
+    )
+    list
+  :fun ref trim_list(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.Declarator.Builder).from_pointer(@_p.trim_list(0, 1, 4, new_start, new_finish))
+
+  :fun ref use_sites: CapnProto.List.Builder(SaviProto.Declarator.UseSite.Builder).from_pointer(@_p.list(1))
+  :fun ref use_sites_if_set!: CapnProto.List.Builder(SaviProto.Declarator.UseSite.Builder).from_pointer(@_p.list_if_set!(1))
+  :fun ref init_use_sites(new_count)
+    CapnProto.List.Builder(SaviProto.Declarator.UseSite.Builder).from_pointer(@_p.init_list(1, 0, 3, new_count))
+  :fun ref init_use_sites_and_copy_data_from(existing CapnProto.List(SaviProto.Declarator.UseSite))
+    list = CapnProto.List.Builder(SaviProto.Declarator.UseSite.Builder).from_pointer(@_p.init_list(1, 0, 3, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref init_use_sites_and_copy_or_reference_data_from(existing CapnProto.List(SaviProto.Declarator.UseSite), cache CapnProto.ReferenceCache)
+    list = CapnProto.List.Builder(SaviProto.Declarator.UseSite.Builder).from_pointer(@_p.init_list(1, 0, 3, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_or_reference_data_from(existing_item, cache)
+    )
+    list
+  :fun ref trim_use_sites(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.Declarator.UseSite.Builder).from_pointer(@_p.trim_list(1, 0, 3, new_start, new_finish))
+
+:struct SaviProto.Declarator.UseSite.Builder
+  :let _p CapnProto.Pointer.Struct.Builder
+  :new from_pointer(@_p)
+  :fun as_reader: SaviProto.Declarator.UseSite.read_from_pointer(@_p.as_reader)
+
+  :const capn_proto_data_word_count U16: 0
+  :const capn_proto_pointer_count U16: 3
+  :fun capn_proto_address U64: @_p.capn_proto_address
+  :fun capn_proto_absolute_address USize: @_p.absolute_address
+
+  :is TraceData
+  :fun trace_data(trace TraceData.Observer)
+    @as_reader.trace_data(trace)
+
+  :fun ref copy_data_from(other SaviProto.Declarator.UseSite) None
+    try (other_position = other.position_if_set!, @position.copy_data_from(other_position))
+    try (other_declarator = other.declarator_if_set!, @declarator.copy_data_from(other_declarator))
+    try @init_terms_and_copy_data_from(other.terms_if_set!)
+
+  :fun ref copy_or_reference_data_from(other SaviProto.Declarator.UseSite, cache CapnProto.ReferenceCache) None
+    try @copy_or_reference_position_data_from(other.position_if_set!, cache)
+    try @copy_or_reference_declarator_data_from(other.declarator_if_set!, cache)
+    try @init_terms_and_copy_or_reference_data_from(other.terms_if_set!, cache)
+
+  :fun ref position: SaviProto.Source.Position.Builder.from_pointer(@_p.struct(0, 2, 1))
+  :fun ref position_if_set!: SaviProto.Source.Position.Builder.from_pointer(@_p.struct_if_set!(0, 2, 1))
+  :fun ref set_position_to_point_to_existing(existing SaviProto.Source.Position.Builder): SaviProto.Source.Position.Builder.from_pointer(@_p.set_struct_to_point_to_existing(0, existing._p))
+  :fun ref copy_or_reference_position_data_from(other_field SaviProto.Source.Position, cache CapnProto.ReferenceCache) None
+    is_new = False
+    p = cache.struct(other_field.capn_proto_absolute_address) -> (
+      is_new = True
+      @_p.struct(0, 2, 1)
+    )
+    if is_new (
+      SaviProto.Source.Position.Builder.from_pointer(p).copy_or_reference_data_from(other_field, cache)
+    |
+      @set_position_to_point_to_existing(SaviProto.Source.Position.Builder.from_pointer(p))
+    )
+
+  :fun ref declarator: SaviProto.Declarator.Builder.from_pointer(@_p.struct(1, 1, 4))
+  :fun ref declarator_if_set!: SaviProto.Declarator.Builder.from_pointer(@_p.struct_if_set!(1, 1, 4))
+  :fun ref set_declarator_to_point_to_existing(existing SaviProto.Declarator.Builder): SaviProto.Declarator.Builder.from_pointer(@_p.set_struct_to_point_to_existing(1, existing._p))
+  :fun ref copy_or_reference_declarator_data_from(other_field SaviProto.Declarator, cache CapnProto.ReferenceCache) None
+    is_new = False
+    p = cache.struct(other_field.capn_proto_absolute_address) -> (
+      is_new = True
+      @_p.struct(1, 1, 4)
+    )
+    if is_new (
+      SaviProto.Declarator.Builder.from_pointer(p).copy_or_reference_data_from(other_field, cache)
+    |
+      @set_declarator_to_point_to_existing(SaviProto.Declarator.Builder.from_pointer(p))
+    )
+
+  :fun ref terms: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list(2))
+  :fun ref terms_if_set!: CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.list_if_set!(2))
+  :fun ref init_terms(new_count)
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(2, 2, 3, new_count))
+  :fun ref init_terms_and_copy_data_from(existing CapnProto.List(SaviProto.AST))
+    list = CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(2, 2, 3, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_data_from(existing_item)
+    )
+    list
+  :fun ref init_terms_and_copy_or_reference_data_from(existing CapnProto.List(SaviProto.AST), cache CapnProto.ReferenceCache)
+    list = CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.init_list(2, 2, 3, existing.size))
+    existing.each_with_index -> (existing_item, index |
+      new_item = try (list[index]! | next)
+      new_item.copy_or_reference_data_from(existing_item, cache)
+    )
+    list
+  :fun ref trim_terms(new_start, new_finish)
+    CapnProto.List.Builder(SaviProto.AST.Builder).from_pointer(@_p.trim_list(2, 2, 3, new_start, new_finish))

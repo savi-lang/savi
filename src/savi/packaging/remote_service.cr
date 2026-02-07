@@ -125,13 +125,15 @@ module Savi::Packaging::RemoteService
     )
       # Filter the list to exclude deps where we failed to get a valid version,
       # or where the subdir for that version already exists in the deps folder.
-      download_list = deps.zip(versions).select { |dep, version|
+      download_list = deps.each_with_index.map { |dep, index|
+        {dep, versions[index]?}
+      }.select { |dep, version|
         next unless version
 
         next if Dir.exists?(File.join(into_dirname, dep.location, version))
 
         true
-      }
+      }.to_a
 
       # Fast exit if there's nothing new to be downloaded.
       return if download_list.empty?
@@ -148,7 +150,9 @@ module Savi::Packaging::RemoteService
           args << File.join(into_dirname, dep.location, version)
           process = Process.new("/usr/bin/env", args)
 
-          {process, dep, version}
+          res : Tuple(Process, Savi::Packaging::Dependency, String) =
+            {process, dep, version}
+          res
         }
 
         # Wait for the processes to complete and handle failure if encountered.

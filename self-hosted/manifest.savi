@@ -1,12 +1,15 @@
 :manifest lib SaviWorker
   :sources "src/SaviWorker/*.savi"
-  :sources "src/SaviProto/SaviProto.Source.capnp.savi"
+  :sources "src/SaviProto/SaviProto.AST.capnp.savi"
   :sources "src/SaviProto/SaviProto.Artifact.capnp.savi"
   :sources "src/SaviProto/SaviProto.Artifact.Path.savi"
+  :sources "src/SaviProto/SaviProto.Ref.capnp.savi"
+  :sources "src/SaviProto/SaviProto.Source.capnp.savi"
 
   :dependency CapnProto v0
     :from "github:jemc-savi/CapnProto"
     :depends on ByteStream
+    :depends on Map
 
   :dependency Map v0
     :from "github:savi-lang/Map"
@@ -67,13 +70,16 @@
 
 :manifest bin "savi-lang-plumber"
   :sources "src/savi-lang-plumber/*.savi"
-  :sources "src/SaviProto/SaviProto.AST.capnp.savi"
   :copies SaviWorker
 
 :manifest bin "savi-lang-parse"
   :sources "src/savi-lang-parse/*.savi"
-  :sources "src/SaviProto/SaviProto.AST.capnp.savi"
   :copies SaviWorker
 
   :dependency PEG v0
     :from "github:savi-lang/PEG"
+
+:manifest bin "savi-lang-declares"
+  :sources "src/savi-lang-declares/*.savi"
+  :sources "src/SaviProto/SaviProto.Declarator.capnp.savi"
+  :copies SaviWorker

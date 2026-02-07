@@ -17,6 +17,10 @@
   :fun out(input Any'box) // TODO: use `box` instead of `Any'box`
     _FFI.puts(@[input].cstring)
 
+  :fun out_deterministic(input TraceData'box)
+    string = Inspect.TraceData.Printer.Deterministic.print(input)
+    _FFI.puts(string.cstring)
+
   :fun into(output String'ref, input Any'box) None // TODO: use `box` instead of `Any'box`
     case input <: (
     | _InspectCustom | input.inspect_into(output)

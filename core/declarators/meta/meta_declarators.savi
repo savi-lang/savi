@@ -55,8 +55,9 @@
 :: declarator, and the declarator evaluates the declaration to generate some
 :: effect on the package's scope, such as generating new types or methods in it.
 :declarator declarator
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins declarator
+  :collect_into Savi.Declared.Declarators
 
   :: The name that must immediately follow the colon in the declaration.
   :term name Name
@@ -67,8 +68,9 @@
 :: declarators have their effects hard-coded into the Savi compiler.
 :: Such hard-coded declarators are marked as intrinsic to set them apart.
 :declarator intrinsic
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_tag
   :context declarator
+  :apply_tag intrinsic
 
 :: Mark this declarator as being conceptually nested within a named context.
 ::
@@ -84,8 +86,10 @@
 :: indicates that it needs no particular context and thus it appears at the
 :: top level of the nested hierarchy of declarations in a source file.
 :declarator context
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_attr
   :context declarator
+  :apply_attr context
+    :from_term name
 
   :: The name of the context where this kind of declaration must be nested.
   :term name Name
@@ -111,8 +115,10 @@
 :: new declaration requires the "top" context instead of the "type" context
 :: will implicitly finish the current "type" context and pop it off the stack.
 :declarator begins
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_attr
   :context declarator
+  :apply_attr begins
+    :from_term name
 
   :: The name of the new nested context that will be set up by the declaration.
   :term name Name
@@ -131,8 +137,10 @@
 :: If a term is observed that does not exactly match the keyword,
 :: this term acceptor will fail and the overall match will fail.
 :declarator keyword
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context declarator
+  :collect_into Savi.Declared.Declarators.Terms
+    :with_tag keyword
 
   :: The name of the keyword which must appear in the declaration.
   :term keyword Name
@@ -149,9 +157,11 @@
 :: this term acceptor will fallback to its default term value if present,
 :: or, if there is no default term value available, the overall match will fail.
 :declarator term
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context declarator
   :begins declarator_term
+  :collect_into Savi.Declared.Declarators.Terms
+    :with_tag enum
 
   :: The name of the term, which can be used to refer to the term value later.
   :term name Name
@@ -174,9 +184,11 @@
 :: this term acceptor will fallback to its default term value if present,
 :: or, if there is no default term value available, the overall match will fail.
 :declarator term
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context declarator
   :begins declarator_term
+  :collect_into Savi.Declared.Declarators.Terms
+    :with_tag typed
 
   :: The name of the term, which can be used to refer to the term value later.
   :term name Name
@@ -202,8 +214,9 @@
 :: When it accepts no term, the term value will be just missing from the data.
 :: If a default term value is desired, declare with `:default` instead.
 :declarator optional
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_tag
   :context declarator_term
+  :apply_tag optional
 
 :: Mark this declaration term acceptor as being optional with a default value.
 ::
@@ -213,8 +226,11 @@
 :: When it accepts no term, the given default term value will be in the data.
 :: To have the term value just be missing, declare with `:optional` instead.
 :declarator default
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_attr
   :context declarator_term
+  :apply_tag optional
+  :apply_attr default
+    :from_term term
 
   :: The term value to use when the incoming declaration term doesn't match.
   :term term Term
@@ -228,11 +244,87 @@
 :: function being declared, and `:var` and `:let` declarations take a body that
 :: is used as the initial value of the field being declared.
 :declarator body
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_attr
   :context declarator
+  :apply_attr body
+    :from_term requirement
 
   :: Specifies whether a declaration body will be required or optional.
   :term requirement enum (
     required :: a body must be provided as part of the declaration
     optional :: a body may be provided as part of the declaration
   )
+
+// TODO: Document this.
+:declarator collect_into
+  :intrinsic // TODO: remove after implementing collect_into
+  :context declarator
+  :begins declarator_collect_into
+  :collect_into Savi.Declared.Declarators.Collect
+
+  :: The collection kind that this declared item should be inserted into.
+  :term kind Name
+
+// TODO: Document this.
+:declarator with_tag
+  :intrinsic // TODO: remove after implementing collect_into
+  :context declarator_collect_into
+  :collect_into Savi.Declared.Declarators.Tags
+
+  :: The name of the tag to add to the collected declared item.
+  :term tag Name
+
+// TODO: Document this.
+:declarator apply_tag
+  :intrinsic // TODO: remove after implementing collect_into
+  :context declarator
+  :collect_into Savi.Declared.Declarators.Tags
+
+  :: The name of the tag to add to the outer declared item.
+  :term tag Name
+
+// TODO: Document this.
+:declarator apply_attr
+  :intrinsic // TODO: remove after implementing collect_into
+  :context declarator
+  :begins declarator_apply_attr
+  :collect_into Savi.Declared.Declarators.Attrs
+
+  :: The name of the attribute key to add to the outer declared item.
+  :term attr Name
+
+// TODO: Document this.
+:declarator from_term
+  :intrinsic // TODO: remove after implementing apply_attr
+  :context declarator_apply_attr
+  :apply_attr from_term
+    :from_term term
+
+  :: The name of the term to use as the source of the attribute value.
+  :term term Name
+
+// TODO: Document this.
+:declarator declares
+  :intrinsic // TODO: remove after implementing collect_into
+  :context declarator
+  :begins declarator_declares
+  :collect_into Savi.Declared.Declarators.Declares
+
+  :: The name of the declarator to use for the declaration.
+  :term name Name
+
+  :: The rest of the terms to include in the declaration, if any.
+  :term rest Term
+    :optional
+
+  :: The body to include in the declaration, if any.
+  :body optional
+
+// TODO: Document this.
+:declarator with_tag
+  :intrinsic // TODO: remove after implementing collect_into
+  :context declarator_declares
+  :collect_into Savi.Declared.Declarators.Tags
+
+  :: The name of the tag to add to the synthetic declared item.
+  :term tag Name

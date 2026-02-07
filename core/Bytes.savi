@@ -167,6 +167,7 @@
   :: trimmed to the buffer bounds, and if the range is zero sized then the
   :: overall operation will have no effect.
   :fun ref copy_from(
+    // TODO: what happens if source is the same as this Bytes instance, and the ranges overlap?
     source Bytes'box
     from USize = 0
     to USize = USize.max_value

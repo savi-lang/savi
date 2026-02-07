@@ -39,8 +39,11 @@
 :: understood implicitly to mean `:new iso` for its constructor, but you
 :: may also see `:new ref` or `:new val` on the same class.
 :declarator class
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins type
+  :collect_into Savi.Declared.Types
+    :with_tag allocated
+    :with_tag constructed
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default ref
@@ -78,8 +81,12 @@
 :: There could also be performance issues with structs that have a very large
 :: number of fields, making it unwieldy for the processor to pass them by value.
 :declarator struct
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins type
+  :collect_into Savi.Declared.Types
+    :with_tag constructed
+    :with_tag pass_by_value
+    :with_tag no_field_reassign
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default ref
@@ -150,8 +157,12 @@
 :: do choose to disable the cycle detector to eliminate overhead on programs
 :: that do not generate such cycles that need to be collected.
 :declarator actor
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins type
+  :collect_into Savi.Declared.Types
+    :with_tag actor
+    :with_tag allocated
+    :with_tag constructed
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default tag
@@ -192,8 +203,11 @@
 :: The key difference is that Savi doesn't allow the supertypes to be concrete.
 :: they can only be abstract types which cannot be instantiated in the program.
 :declarator trait
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins type
+  :collect_into Savi.Declared.Types
+    :with_tag abstract
+    :with_tag allocated
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default ref
@@ -223,9 +237,13 @@
 :: one of the standard numeric types, but is distinct in the type system,
 :: such that the type system can prevent accidental wrong value assignments.
 :declarator numeric
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins type
   :begins type_numeric
+  :collect_into Savi.Declared.Types
+    :with_tag pass_by_value
+    :with_tag simple_value
+    :with_tag numeric
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default val
@@ -240,10 +258,15 @@
 :: Each named `:member` has a numeric value associated with it, within the
 :: domain of values that are possible to express for that numeric type.
 :declarator enum
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins type
   :begins type_numeric
   :begins type_enum
+  :collect_into Savi.Declared.Types
+    :with_tag pass_by_value
+    :with_tag simple_value
+    :with_tag numeric
+    :with_tag enum
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default val
@@ -275,9 +298,12 @@
 :: be associated to any particular object as their receiver. Calling functions
 :: on a `:module` just uses the type itself (the `non` value) as the receiver.
 :declarator module
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins type
   :begins type_singleton
+  :collect_into Savi.Declared.Types
+    :with_tag singleton
+    :with_tag ignores_cap
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default non
@@ -300,9 +326,10 @@
 
 // TODO: Document this.
 :declarator fun
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type_singleton
   :begins function
+  :collect_into Savi.Declared.Functions
 
   :term cap enum (non)
     :default non
@@ -313,9 +340,10 @@
 
 // TODO: Document this.
 :declarator fun
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type
   :begins function
+  :collect_into Savi.Declared.Functions
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default box
@@ -326,18 +354,23 @@
 
 // TODO: Document this.
 :declarator be
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type
   :begins function
+  :collect_into Savi.Declared.Functions
+    :with_tag async
 
   :term name_and_params NameMaybeWithParams
   :body optional
 
 // TODO: Document this.
 :declarator new
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type
   :begins function
+  :collect_into Savi.Declared.Functions
+    :with_tag constructor
+    // TODO: old code also has tag `async` when part of an actor, though we'd like to change the semantics to make actor constructors synchronous
 
   :term cap enum (iso, val, ref, box, tag, non)
     :optional // TODO: :default: @type.cap
@@ -346,12 +379,16 @@
 
 // TODO: Document this.
 :declarator new
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type
   :begins function
+  :collect_into Savi.Declared.Functions
+    :with_tag constructor
+    // TODO: old code also has tag `async` when part of an actor, though we'd like to change the semantics to make actor constructors synchronous
 
   :term cap enum (iso, val, ref, box, tag, non)
     :optional // TODO: :default: @type.cap
+  // TODO const term `name: "new"` is implicit
   :term params Params
     :optional
   :body optional
@@ -364,8 +401,9 @@
 ::
 :: The filenames will be resolved relative to the current Savi source file.
 :declarator ffi_link_c_files
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :term filenames NameList
+  :collect_into Savi.Declared.LinkCFiles // TODO: unify with LinkLibs? include a tag or attr to differentiate if necessary
 
 :: Declare a link-time dependency on some files written in C++ code,
 :: which will be compiled and statically linked in the Savi program.
@@ -376,8 +414,9 @@
 ::
 :: The filenames will be resolved relative to the current Savi source file.
 :declarator ffi_link_cpp_files
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :term filenames NameList
+  :collect_into Savi.Declared.LinkCppFiles // TODO: unify with LinkLibs? include a tag or attr to differentiate if necessary
 
 :: Declare a link-time dependency on a particular dynamic library, by name.
 ::
@@ -386,9 +425,10 @@
 ::
 :: For example, declaring `:ffi_link_lib foo` will pass `-lfoo` to the linker.
 :declarator ffi_link_lib
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :term name Name
   :begins ffi_link_lib
+  :collect_into Savi.Declared.LinkLibs
 
 :: Declare that the compiler should prefer to link the above library statically.
 ::
@@ -398,9 +438,10 @@
 :: If a static version of the library is found, it will be used.
 :: Otherwise, the compiler will fall back to specifying dynamic linking for it.
 :declarator prefer
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_tag
   :context ffi_link_lib
   :term static enum (static)
+  :apply_tag prefer_static
 
 :: Declare a binding to an unsafe foreign function (FFI), such as a C function.
 ::
@@ -433,9 +474,11 @@
 :: Each function signature in an FFI declaration should directly correspond
 :: to a function exposed by a foreign package which is linked to the program.
 :declarator ffi
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type
   :begins ffi
+  :collect_into Savi.Declared.Func
+    :with_tag ffi
 
   :term variadic enum (variadic)
     :optional
@@ -476,9 +519,12 @@
 :: You should strongly consider using thread-local FFI variables instead
 :: (not yet implemented).
 :declarator ffi
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type
   :begins ffi
+  :collect_into Savi.Declared.Func
+    :with_tag ffi
+    :with_tag ffi_var_or_let
 
   :keyword global
   :term var_or_let enum (var, let, cpointer)
@@ -487,9 +533,13 @@
 
 // TODO: Implement and document this.
 :declarator ffi
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type
   :begins ffi
+  :collect_into Savi.Declared.Func
+    :with_tag ffi
+    :with_tag ffi_thread_local
+    :with_tag ffi_var_or_let
 
   :keyword thread_local
   :term var_or_let enum (var, let)
@@ -504,8 +554,10 @@
 :: This can be useful if you want to use a less verbose name in Savi,
 :: or if you want to bind multiple Savi `:ffi` declarations to the same C name.
 :declarator foreign_name
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_attr
   :context ffi
+  :apply_attr foreign_name
+    :from_term name
 
   :term name Name
 
@@ -519,21 +571,25 @@
 :: specify the link library here and make sure every invocation of the
 :: platform-specific function is guarded by a platform check conditional block.
 :declarator link_lib
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context ffi
+  :collect_into Savi.Declared.LinkLibs
 
   :term name Name
 
 // TODO: Document this.
 :declarator inline
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_tag
   :context function
+  :apply_tag inline
+
   :keyword always
 
 // TODO: Document this.
 :declarator yields
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context function
+  :collect_into Savi.Declared.Yields
 
   :term out TypeOrTypeList
   :keyword for
@@ -541,30 +597,36 @@
 
 // TODO: Document this.
 :declarator yields
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context function
+  :collect_into Savi.Declared.Yields
 
   :keyword for
   :term in Type
 
 // TODO: Document this.
 :declarator yields
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context function
+  :collect_into Savi.Declared.Yields
 
   :term out TypeOrTypeList
 
 // TODO: Document this.
 :declarator errors
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context function
+  :collect_into Savi.Declared.Errors
 
   :term out Type
 
 // TODO: Document this.
 :declarator const
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type
+  :collect_into Savi.Declared.Functions
+    :with_tag constant
+    :with_tag inline
 
   :term name Name
   :term type Type
@@ -573,29 +635,74 @@
 
 // TODO: Document this.
 :declarator let
-  :intrinsic
+  :intrinsic // TODO: get rid of this after implementing declares
   :context type
 
   :term name Name
   :term type Type
-    :optional
   :body optional
+
+  :declares (fun (meta @name) @->(meta @type)'aliased)
+    compiler_intrinsic_field_get (meta @name)
+  :declares (fun ref "\(meta @name)="(value (meta @type)) @->(meta @type)'aliased)
+    compiler_intrinsic_field_set (meta @name) (--value)
+  :declares (fun ref "\(meta @name)<<="(value (meta @type)) @->(meta @type))
+    compiler_intrinsic_field_displace (meta @name) (--value)
+
+// TODO: Document this.
+:declarator let
+  :intrinsic // TODO: get rid of this after implementing declares
+  :context type
+
+  :term name Name
+  :body required
+
+  :declares (fun (meta @name))
+    compiler_intrinsic_field_get (meta @name)
+  :declares (fun ref "\(meta @name)="(value (meta @type)))
+    compiler_intrinsic_field_set (meta @name) (--value)
+  :declares (fun ref "\(meta @name)<<="(value (meta @type)))
+    compiler_intrinsic_field_displace (meta @name) (--value)
 
 // TODO: Document this.
 :declarator var
-  :intrinsic
+  :intrinsic // TODO: get rid of this after implementing declares
   :context type
+  :collect_into Savi.Declared.Fields
 
   :term name Name
   :term type Type
-    :optional
   :body optional
+
+  :declares (fun (meta @name) @->(meta @type)'aliased)
+    compiler_intrinsic_field_get (meta @name)
+  :declares (fun ref "\(meta @name)="(value (meta @type)) @->(meta @type)'aliased)
+    compiler_intrinsic_field_set (meta @name) (--value)
+  :declares (fun ref "\(meta @name)<<="(value (meta @type)) @->(meta @type))
+    compiler_intrinsic_field_displace (meta @name) (--value)
+
+// TODO: Document this.
+:declarator var
+  :intrinsic // TODO: get rid of this after implementing declares
+  :context type
+  :collect_into Savi.Declared.Fields
+
+  :term name Name
+  :body required
+
+  :declares (fun (meta @name))
+    compiler_intrinsic_field_get (meta @name)
+  :declares (fun ref "\(meta @name)="(value (meta @type)))
+    compiler_intrinsic_field_set (meta @name) (--value)
+  :declares (fun ref "\(meta @name)<<="(value (meta @type)))
+    compiler_intrinsic_field_displace (meta @name) (--value)
 
 // TODO: Document this.
 // TODO: Make this more general / less boutique.
 :declarator field_order
-  :intrinsic
+  :intrinsic // TODO: get rid of this after implementing collect_into
   :context type
+  :collect_into Savi.Declared.FieldOrders
 
   :term fields NameList
   :keyword on
@@ -603,41 +710,56 @@
 
 // TODO: Document this.
 :declarator is
-  :intrinsic
+  :intrinsic // TODO: get rid of this after implementing collect_into
   :context type
+  :collect_into Savi.Declared.Supertypes
+  :collect_into Savi.Declared.CopySources
 
   :term trait Type
     :optional
 
 // TODO: Document this.
 :declarator copies
-  :intrinsic
+  :intrinsic // TODO: get rid of this after implementing collect_into
   :context type
+  :collect_into Savi.Declared.CopySources
 
   :term trait Type
     :optional
 
 // TODO: Document this.
 :declarator signed
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_tag and declares
   :context type_numeric
+  :apply_tag signed
+
+  :declares (fun non is_signed): True
+    :with_tag constant
+    :with_tag inline
 
 // TODO: Document this.
 :declarator floating_point
-  :intrinsic
+  :intrinsic // TODO: remove after implementing declares
   :context type_numeric
+
+  :declares (signed)
+  :declares (fun non is_floating_point): True
+    :with_tag constant
+    :with_tag inline
 
 // TODO: Document this.
 :declarator bit_width
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type_numeric
+  :collect_into Savi.Declared.BitWidths
 
   :term value Integer
 
 // TODO: Document this.
 :declarator bit_width
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type_numeric
+  :collect_into Savi.Declared.BitWidths
 
   :keyword of
   :keyword C
@@ -645,8 +767,9 @@
 
 // TODO: Document this.
 :declarator member
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context type_enum
+  :collect_into Savi.Declared.EnumMembers
 
   :term noprefix enum (noprefix)
     :optional
@@ -655,8 +778,9 @@
 
 // TODO: Document this.
 :declarator manifest
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :begins manifest
+  :collect_into Savi.Declared.Manifests
 
   :term kind enum (main, lib, bin)
     :default main
@@ -664,31 +788,35 @@
 
 // TODO: Document this.
 :declarator copies
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context manifest
+  :collect_into Savi.Declared.CopySources
 
   :term name Name
 
 // TODO: Document this.
 :declarator sources
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context manifest
   :begins manifest_sources
+  :collect_into Savi.Declared.ManifestSources
 
   :term path String
 
 // TODO: Document this.
 :declarator excluding
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context manifest_sources
+  :collect_into Savi.Declared.ManifestSources.Excluded
 
   :term path String
 
 // TODO: Document this.
 :declarator dependency
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context manifest
   :begins manifest_dependency
+  :collect_into Savi.Declared.ManifestDependencies
 
   :term name Name
   :term version Name
@@ -700,9 +828,11 @@
 
 // TODO: Document this.
 :declarator transitive
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context manifest
   :begins manifest_dependency
+  :collect_into Savi.Declared.ManifestDependencies
+    :with_tag transitive
 
   :keyword dependency
   :term name Name
@@ -710,23 +840,28 @@
 
 // TODO: Document this.
 :declarator from
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_attr
   :context manifest_dependency
+  :apply_attr from_location
+    :from_term location
 
   :term location String
 
 // TODO: Document this.
 :declarator lock
-  :intrinsic
+  :intrinsic // TODO: remove after implementing apply_attr
   :context manifest_dependency
+  :apply_attr lock_revision
+    :from_term revision
 
   :keyword at
   :term revision String
 
 // TODO: Document this.
 :declarator depends
-  :intrinsic
+  :intrinsic // TODO: remove after implementing collect_into
   :context manifest_dependency
+  :collect_into Savi.Declared.ManifestDependencies.Dependencies
 
   :keyword on
   :term other Name
